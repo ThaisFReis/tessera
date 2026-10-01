@@ -5,3 +5,5 @@
 //! neste projeto (smoke B3).
 
 pub mod acaso;
+pub mod pedersen;
+pub mod ponto;

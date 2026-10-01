@@ -147,7 +147,7 @@ Pendência §9.3 do spec. 50 entradas `Votou` na demo; 10.000 numa assembleia re
 
 **Decisão que destrava.** É o ponto exato em que a maioria dos projetos de cripto quebra, e a causa é quase sempre uma destas três: ordem de bytes, DST divergente, ou redução módulo `r`. A armadilha do `Fr::from_bytes` que não reduz (§10.3 do spec) já mordeu uma vez.
 
-**Tempo.** 1h · **Se falhar:** é bug, não decisão — mas é o bug mais caro possível no sábado. Por isso roda na sexta, não no sábado.
+**Tempo.** 1h · **PARCIALMENTE RESOLVIDO 2026-10-01.** O caminho Pedersen está provado: `core` reproduz em Rust nativo, byte a byte, o agregado que o contrato produziu na testnet (`core/src/pedersen.rs`, teste `agregado_bate_byte_a_byte_com_a_testnet`). A raiz do risco foi removida usando **o mesmo crate do host** — o Soroban usa arkworks, e o `core` também. Falta o mesmo cruzamento para a prova CDS, quando ela existir.
 
 ### B4 · CDS disjunctiva: custo e corretude
 

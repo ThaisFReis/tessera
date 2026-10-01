@@ -7,3 +7,9 @@ description = "Matemática do Tessera, compartilhada entre contrato, cliente e v
 
 [dependencies]
 getrandom = "0.2"
+# O host do Soroban usa arkworks. Usar o MESMO crate aqui elimina divergência
+# de aritmética entre o provador (nativo) e o verificador (Wasm) — smoke B3.
+ark-bls12-381 = { version = "0.5", default-features = false, features = ["curve"] }
+ark-ec = { version = "0.5", default-features = false }
+ark-ff = { version = "0.5", default-features = false }
+ark-serialize = { version = "0.5", default-features = false }
