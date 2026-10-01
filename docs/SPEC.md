@@ -330,55 +330,97 @@ shares brutas* conseguem. Daí N3.
 
 ## 5. Interface on-chain
 
+A cédula é uma lista de perguntas, e **a confidencialidade é da pergunta**
+(§6.5). Uma cédula confidencial é aquela em que todas as perguntas são
+sigilosas; uma semiconfidencial mistura. Não são dois caminhos de código.
+
 ```rust
+/// Uma pergunta da cédula.
+struct Pergunta { opcoes: u32, confidencial: bool }
+
 /// Abre uma votação. Chamada pela governança integradora.
 fn abrir(
     env: Env,
+    governanca: Address,         // require_auth
     proposta: BytesN<32>,        // id da proposta, escolhido pela governança
-    opcoes: u32,                 // m, número de opções (2..=16)
+    perguntas: Vec<Pergunta>,    // a cédula, em ordem (1..=8 perguntas)
     raiz_aptos: BytesN<32>,      // raiz de Merkle da lista na data de corte
     mesa: Vec<Address>,          // N membros
     limiar: u32,                 // k
-    fecha_em: u64,               // ledger sequence de fechamento
+    fecha_em: u32,               // ledger sequence de fechamento
 ) -> Result<(), Erro>;
 
-/// Registra um voto. Chamada pelo votante, que paga a taxa.
+/// Registra um voto em sigilo. Chamada pelo votante, que paga a taxa.
+///
+/// `compromissos` e `provas` vêm achatados sobre as perguntas SIGILOSAS em
+/// ordem; `escolhas` sobre as PÚBLICAS. Uma prova de soma por pergunta
+/// sigilosa — ver §6.5, onde isso é correção e não otimização.
 fn votar(
     env: Env,
     proposta: BytesN<32>,
     votante: Address,                        // require_auth
-    compromissos: Vec<Bls12381G1Affine>,     // C_j, j = 0..m
-    prova_binaria: Vec<ProvaCDS>,            // v_j ∈ {0,1}, uma por opção
-    prova_soma: ProvaSchnorr,                // Σ v_j = w
-    prova_aptidao: Vec<BytesN<32>>,          // caminho de Merkle
+    compromissos: Vec<Bls12381G1Affine>,     // C_{q,j}, achatado
+    provas: Vec<ProvaCds>,                   // v ∈ {0,1}, uma por compromisso
+    provas_soma: Vec<ProvaSoma>,             // UMA POR PERGUNTA sigilosa
+    escolhas: Vec<u32>,                      // respostas em claro, achatadas
+    caminho: Vec<BytesN<32>>,                // caminho de Merkle
+    indice: u32,
     peso: u32,                               // w, conferido contra a folha
 ) -> Result<(), Erro>;
 
+/// Revelação voluntária: abre a cédula INTEIRA em claro, inclusive as
+/// perguntas sigilosas. É o τ de §6.6 que protege quem ficou no residual.
+fn votar_publico(
+    env: Env,
+    proposta: BytesN<32>,
+    votante: Address,                        // require_auth
+    escolhas: Vec<u32>,                      // todas as perguntas, achatadas
+    caminho: Vec<BytesN<32>>,
+    indice: u32,
+    peso: u32,
+) -> Result<(), Erro>;
+
 /// Apura. UM ENDOSSO POR MEMBRO, uma transação por pessoa.
-/// Devolve o resultado quando o k-ésimo endosso fecha, e None antes.
+/// `totais` e `aberturas` cobrem só as opções SIGILOSAS; as públicas já
+/// estão somadas em claro. Devolve o resultado quando o k-ésimo endosso
+/// fecha, e None antes.
 fn apurar(
     env: Env,
     proposta: BytesN<32>,
     membro: Address,                         // require_auth
-    totais: Vec<u32>,                        // T_j
-    aberturas: Vec<Bls12381Fr>,              // R_j
+    totais: Vec<u32>,                        // T_{q,j}, achatado
+    aberturas: Vec<Bls12381Fr>,              // R_{q,j}, achatado
 ) -> Result<Option<Vec<u32>>, Erro>;
 
 /// Leitura. Qualquer pessoa.
+fn proposta(env: Env, proposta: BytesN<32>) -> Option<Proposta>;
 fn acumulador(env: Env, proposta: BytesN<32>) -> Vec<Bls12381G1Affine>;
+fn total_publico(env: Env, proposta: BytesN<32>) -> Vec<u32>;
 fn resultado(env: Env, proposta: BytesN<32>) -> Option<Vec<u32>>;
+fn comparecimento(env: Env, proposta: BytesN<32>) -> (u32, u32);
 fn ja_votou(env: Env, proposta: BytesN<32>, votante: Address) -> bool;
+fn gerador_h(env: Env) -> Bls12381G1Affine;
 ```
 
 ### 5.1 Armazenamento
 
 | Chave | Tipo | Durabilidade | Notas |
 |---|---|---|---|
-| `Proposta(id)` | metadados | persistent | opções, raiz, mesa, k, prazo |
-| `Acum(id, j)` | `Bls12381G1Affine` | persistent | 96 bytes por opção |
-| `Votou(id, addr)` | `bool` | persistent | uma entrada por votante |
+| `Proposta(id)` | metadados | persistent | perguntas, raiz, mesa, k, prazo |
+| `Acum(id, q, j)` | `Bls12381G1Affine` | persistent | 96 B; só perguntas sigilosas |
+| `TotalPublico(id, q, j)` | `u32` | persistent | **todas** as perguntas (ver nota) |
+| `Votou(id, addr)` | `bool` | persistent | **uma por cédula**, não por pergunta |
+| `Comparecimento(id)` | `(u32, u32)` | persistent | `(em sigilo, abertas)` — o que τ lê |
 | `Resultado(id)` | `Vec<u32>` | persistent | só após apurar |
+| `Endosso(id, digest, addr)` | `bool` | persistent | um membro endossou estes números |
 | `GeradorH` | `Bls12381G1Affine` | instance | calculado uma vez no deploy |
+
+`TotalPublico` existe para **toda** pergunta, inclusive as sigilosas, porque
+quem usa `votar_publico()` abre a cédula inteira e a resposta dele a uma
+pergunta sigilosa entra em claro.
+
+`Votou(id, addr)` ser **uma por cédula** é o que torna a cédula mista atômica:
+ou a pessoa respondeu a cédula inteira, ou não votou. Não existe meia cédula.
 
 `Votou(id, addr)` cresce linearmente em `n`. **Medido no smoke A1
 (2026-10-01):** o TTL padrão de uma entrada persistente é 120.959 ledgers =
@@ -524,39 +566,98 @@ escolha.
 
 ---
 
-### 6.5 Voto semi-confidencial: campos públicos na mesma cédula
+### 6.5 Voto semi-confidencial: perguntas públicas na mesma cédula
 
-Sugestão de um membro da SDF, e ela encaixa no esquema sem nenhuma primitiva
-nova — porque **um campo público é apenas um compromisso cuja abertura é
-revelada.**
+Sugestão de um membro da SDF. **Implementado e medido na v1.**
+
+A cédula é uma lista de perguntas, cada uma marcada `confidencial: bool` no
+`abrir()`. Uma cédula **confidencial** é aquela em que todas são sigilosas; uma
+**semiconfidencial** mistura. Não são dois mecanismos — é o mesmo, em dois
+ajustes, e a prova disso é que os 21 testes da cédula de uma pergunta passaram
+sem mudança de comportamento quando o mecanismo geral entrou.
 
 ```
-confidencial:  publica C = v·G + r·H  +  prova CDS de que v ∈ {0,1}
-público:       publica C = v·G + r·H  +  o par (v, r) em claro
+pergunta sigilosa:  C_j = v_j·G + r_j·H  +  CDS de que v_j ∈ {0,1}
+                    +  UMA prova de soma própria, Σ(suas opções) = w
+pergunta pública:   a resposta v_j em claro, conferida a olho
 ```
 
-O contrato verifica o campo público conferindo `C == v·G + r·H`, que é um MSM
-de 2 termos. A agregação é **idêntica** nos dois casos, porque a soma
-homomórfica não distingue um compromisso aberto de um fechado. Consequências:
+#### Correção ao desenho original
 
-- Um mecanismo só atende os dois modos. Não há segundo caminho de código.
-- **Campo público é mais barato que confidencial:** ~5,4M (um MSM de 2 termos)
-  contra ~27M da prova CDS. Publicidade economiza orçamento.
-- A apuração não muda em nada.
+A versão anterior desta seção propunha que uma pergunta pública publicasse
+**o mesmo compromisso** mais o par `(v, r)` em claro, conferido com um MSM de
+2 termos (~5,4M). A implementação é mais simples e muito mais barata: uma
+pergunta pública não tem compromisso nenhum. A resposta vai como `u32` e o
+contrato confere duas regras a olho — cada opção em `{0,1}` e a soma igual ao
+peso.
+
+| | desenho antigo | implementado |
+|---|---|---|
+| o que vai no ledger | `C` + `(v, r)` | `v` |
+| custo | ~5,4M (MSM de 2 termos) | **350.372 a cédula inteira** |
+
+Isso também **dispensa** a verificação de abertura revelada que §9.4 listava
+como pendência: não há abertura a verificar, porque não há compromisso.
+
+#### Uma prova de soma por pergunta — correção, não otimização
+
+Este é o achado que só aparece quando existe mais de uma pergunta.
+
+Uma prova única sobre todos os compromissos da cédula afirma `Σ(tudo) = w`. Com
+`w = 1`, isso obriga o eleitor a marcar **exatamente uma opção na cédula
+inteira**: quem responde a pergunta 1 é forçado a abster-se das outras. O
+protocolo não fica inseguro — fica errado.
+
+Cada pergunta sigilosa precisa do seu próprio `D_q = (Σ_j C_{q,j}) − w·G = ρ_q·H`.
+
+#### O contexto tem de amarrar a pergunta
+
+O desafio de Fiat–Shamir amarrava `proposta ‖ addr_xdr ‖ opção`. Com várias
+perguntas isso é um furo: a opção 0 da pergunta 1 e a opção 0 da pergunta 2
+produzem **o mesmo desafio**, e a disjuntiva de uma vale para a outra. O
+eleitor copia a própria prova da pergunta 1 e marca a pergunta 2 sem provar
+nada sobre ela.
+
+```
+contexto = proposta ‖ addr_xdr ‖ pergunta ‖ opção
+```
+
+A prova de soma da pergunta `q` usa `(q, u32::MAX)`, então também não migra.
+Numa cédula de uma pergunta só o furo não existia; numa cédula mista é a
+primeira coisa que quebra.
+
+#### A confidencialidade é da pergunta, nunca do eleitor por pergunta
+
+Fixada no `abrir()`, igual para todo mundo. Se cada pessoa escolhesse em quais
+perguntas se esconder, **a escolha de se esconder seria ela própria pública** —
+e "quem pediu sigilo na pergunta 2" é, numa assembleia pequena, uma lista curta
+o bastante para ser uma acusação. Fixando na proposta, toda cédula tem a mesma
+forma e não há nada a inferir da forma.
+
+O eleitor mantém uma escolha, mas ela é da **cédula inteira**: votar em sigilo
+(`votar`) ou abrir o voto todo (`votar_publico`). É a publicidade opcional por
+votante, e é o τ de §6.6 que protege quem fica no grupo residual.
 
 #### Casos de governança que isso destrava
 
-1. **Cédula com várias perguntas, sigilo por pergunta.** "Aprovar a pauta"
-   pública, "destituir o diretor" confidencial, na mesma transação.
-2. **Publicidade opcional por votante.** Quem vota *escolhe* publicar. Vários
+1. **Cédula com várias perguntas, sigilo por pergunta.** "Aprovar as contas"
+   pública, "destituir a diretoria" sigilosa, na mesma transação. ✅ v1
+2. **Publicidade opcional por votante.** Quem vota *escolhe* abrir. Vários
    estatutos de cooperativa e regimentos de conselho asseguram o direito de
    registrar voto divergente em separado, justamente como proteção jurídica de
    quem divergiu. Hoje esse direito é incompatível com voto secreto; aqui os
-   dois coexistem na mesma urna.
+   dois coexistem na mesma urna. ✅ v1
 3. **Categoria pública, direção secreta.** "Voto como delegado da região X" é
-   público e auditável; em que votou, não.
-4. **Participação pública, escolha secreta.** É o desenho base (N1), e agora se
-   revela como o caso mais simples de um mecanismo geral.
+   público e auditável; em que votou, não. ✅ v1 (é uma pergunta pública)
+4. **Participação pública, escolha secreta.** É o desenho base, e agora se
+   revela como o caso mais simples de um mecanismo geral. ✅ v1
+
+#### O que continua fora
+
+**Abstenção.** Hoje a soma de cada pergunta é obrigatoriamente o peso. Permitir
+abster-se de uma pergunta exige provar que a soma é `0` **ou** `w` — o que é
+outra disjuntiva, no nível da pergunta. Dá para fazer; é uma segunda prova, não
+um `if`. Fica para a v1.1.
 
 ### 6.6 O teorema da partição
 
@@ -580,6 +681,32 @@ Em `apurar()`, o contrato:
 3. **recusa publicar** o total de qualquer célula com menos de `τ`
    confidenciais (`τ ≥ 5` na v1, igual a §6.3).
 
+#### Na v1 a partição tem duas células, e τ é global
+
+Esta é uma correção a uma leitura intuitiva mas errada que apareceu durante a
+implementação: *"com várias perguntas, τ passa a valer por pergunta."* Não
+passa, e o motivo importa.
+
+A confidencialidade é **da pergunta**, não do eleitor (§6.5). Quem vota por
+`votar()` compromete **todas** as perguntas sigilosas; quem vota por
+`votar_publico()` abre **todas**. Logo o conjunto confidencial é exatamente o
+mesmo em toda pergunta sigilosa, e a partição induzida tem duas células — em
+sigilo e aberta — independentemente de quantas perguntas a cédula tenha. Uma
+checagem cobre a cédula inteira:
+
+```rust
+if conf > 0 && conf < TAU { return Err(Erro::AnonimatoInsuficiente); }
+```
+
+A regra por célula de §6.6 volta a ser necessária no dia em que a
+confidencialidade for escolhida **por pergunta pelo eleitor** — que é
+precisamente o desenho que §6.5 recusa, e por este motivo entre outros.
+
+Uma segunda checagem entra com a cédula mista, e essa **é** por pergunta: a
+soma dos totais confidenciais de cada pergunta tem de ser exatamente o número
+de cédulas em sigilo. Ela não protege privacidade; pega uma mesa que tente
+compensar uma pergunta com outra.
+
 A publicidade opcional precisa dessa regra com mais força que os pesos, porque
 é **adversarialmente explorável**: uma coligação que controle muitos votantes
 pode publicar todos os seus votos de propósito, encolhendo o conjunto secreto
@@ -592,11 +719,10 @@ apuração. É a troca certa (uma votação travada é contestável e repetível
 voto vazado não volta atrás), e precisa estar no regimento de quem integra, não
 só no contrato.
 
-> **Escopo na v1.** Entra a **publicidade opcional por votante** (caso 2): é o
-> caso mais simples, o de maior valor para governança real, e o mais barato de
-> implementar. Cédula multi-pergunta com sigilo por campo (caso 1) fica
-> especificada e vai para a v1.1. A regra de `τ` de §6.6 entra junto com o
-> primeiro, não depois — sem ela o recurso é uma armadilha.
+> **Escopo na v1.** Entraram os **quatro** casos de §6.5: cédula multi-pergunta
+> com sigilo por pergunta e publicidade opcional por votante, com a regra de `τ`
+> junto, não depois — sem ela o recurso é uma armadilha. O que fica para a v1.1
+> é a **abstenção** por pergunta, que precisa de uma disjuntiva a mais.
 
 ## 7. Orçamento de custo
 
@@ -645,8 +771,43 @@ contrato em vez de uma conta de padaria, e cabe na folga.
 Uma cédula **pública** custa **350.372** — 105× menos. É o preço do sigilo,
 medido, e é o número que uma governança precisa ver antes de escolher o modo.
 
-Folga contra os 400M: **11,9×**. O orçamento usa 8,4% de uma transação, e
+Folga contra os 400M: **10,9×**. O orçamento usa 9,2% de uma transação, e
 **nenhuma linha é projeção**: tudo acima foi medido em invocação real.
+
+#### O custo é linear nas opções sigilosas
+
+Medido no contrato, variando o número de opções de uma pergunta:
+
+| opções | instruções | % do teto |
+|---:|---:|---:|
+| 2 | 36.808.483 | 9,20% |
+| 4 | 63.779.252 | 15,94% |
+| 6 | 90.784.559 | 22,70% |
+| 8 | 117.782.282 | 29,45% |
+| 12 | 171.831.658 | 42,96% |
+| 16 | 225.920.355 | 56,48% |
+
+Perfeitamente linear: **9.805.000 fixos + 13.501.500 por opção sigilosa.** É
+disso que sai o teto de 16 opções confidenciais somadas numa cédula — com 16 a
+cédula consome 56,5% da transação, e os 43% restantes são a folga do envelope.
+
+#### A cédula mista
+
+| cédula | instruções | % do teto |
+|---|---:|---:|
+| 1 pergunta sigilosa (2 opções) | 36.804.670 | 9,2% |
+| **mista: 1 pública + 2 sigilosas** | **73.547.797** | **18,4%** |
+| as mesmas 2 sigilosas como propostas separadas | 73.609.340 | 18,4% |
+
+**A economia de CPU é de 0,08%, e isso corrige uma projeção otimista.** Antes
+de medir, a estimativa era que a cédula mista fosse bem mais barata, porque o
+custo fixo — a prova de aptidão por Merkle — é pago uma vez. É, mas cada
+pergunta sigilosa carrega a própria prova de soma (§6.5), e as duas coisas quase
+se cancelam.
+
+O ganho real é outro, e não é CPU: **uma transação em vez de duas** (metade da
+taxa), uma prova de aptidão em vez de duas, e **atomicidade** — `Votou` é uma
+entrada por cédula, não por pergunta, então não existe meia cédula.
 
 O caminho de Merkle era a última estimativa do orçamento e estava errada por
 8×, para cima: `sha256` no host custa ~13.128 por nível, então a aptidão é
@@ -777,10 +938,15 @@ E o host **não** a faz sozinho: validação é obrigatória e aditiva.
 
 **Ação:** medir o custo de escrever e manter 1.000 entradas `Votou`.
 
-### 9.4 Verificação de abertura revelada (campo público)
+### 9.4 Verificação de abertura revelada (campo público) — ✅ DISPENSADA
 
-Introduzida por §6.5. Projetada em ~5,4M (um MSM de 2 termos, medido), mas o
-caminho completo com desserialização ainda não foi isolado.
+A pendência existia porque §6.5 supunha que uma pergunta pública publicaria o
+compromisso mais o par `(v, r)` em claro. **O desenho mudou e a pendência
+evaporou:** uma pergunta pública não tem compromisso. A resposta vai como `u32`
+e o contrato confere a olho — cada opção em `{0,1}`, soma igual ao peso.
+
+Não há abertura a verificar. Medido: a cédula pública inteira custa 350.372,
+contra os ~5,4M que a verificação da abertura teria custado **por campo**.
 
 ### 9.5 Caminho de Merkle — ✅ RESOLVIDO
 
@@ -892,13 +1058,19 @@ contrato recusa.
 | item | estado |
 |---|---|
 | Sonda criptográfica medida e publicada | ✅ feito |
-| Trocar DST para Tessera | pendente |
-| Medir CDS, desserialização, aluguel (§9) | pendente, dia 1 |
-| `abrir` / `votar` / `apurar` | pendente |
-| Cliente de votação (CLI é suficiente) | pendente |
-| Verificador público independente | pendente |
-| Deploy na testnet + vetores de teste | pendente |
-| Vídeo de demonstração ponta a ponta | pendente |
+| Trocar DST para Tessera | ✅ feito |
+| Medir CDS, desserialização, aluguel (§9) | ✅ feito |
+| `abrir` / `votar` / `apurar` | ✅ feito |
+| **Cédula mista: sigilo por pergunta (§6.5)** | **✅ feito** |
+| Cliente de votação (CLI é suficiente) | ✅ feito |
+| Verificador público independente | ✅ feito |
+| Console HTML (Nível 2, UX.md §7) | ✅ feito |
+| Deploy na testnet + vetores de teste | ✅ feito |
+| Recusa por `τ` demonstrada na rede (D3) | ✅ feito |
+| Vídeo de demonstração ponta a ponta | **pendente** |
+
+Contrato na testnet: `CDWAY3PETO4JUATLLUM5INMJKMOQ45FTGG5FQCMAUJVTLCW5FJMP7JUH`.
+113 testes passando em quatro pacotes, Wasm de 23,4 KB otimizado.
 
 **Congelamento de código: 2026-10-04, 12:00.** Submissão fecha 2026-10-05 19:00.
 Uma interface gráfica não entra na v1; o critério de "user experience" fica

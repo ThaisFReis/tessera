@@ -43,6 +43,8 @@ Respeite `NO_COLOR` e saída não-tty: sem cor, os glyphs e as palavras carregam
 
 ## 1. `tessera abrir` — o operador
 
+Duas formas. A **curta** é a cédula de uma pergunta, sigilosa:
+
 ```
 $ tessera abrir --proposta contas-2025 \
     --pergunta "Aprovar as contas da diretoria de 2025?" \
@@ -50,13 +52,32 @@ $ tessera abrir --proposta contas-2025 \
     --aptos aptos.csv --mesa mesa.csv -k 3 --prazo 2h
 ```
 
+A **longa** repete `--pergunta "texto | opções | natureza"`, e é onde mora a
+cédula mista (SPEC §6.5):
+
+```
+$ tessera abrir --proposta assembleia-2026 \
+    --pergunta "Aprovar as contas de 2025? | aprovar, rejeitar | publica" \
+    --pergunta "Destituir a diretoria? | sim, nao | sigilosa" \
+    --pergunta "Eleger a cadeira 3 | ana, bruno, carla | sigilosa" \
+    --aptos aptos.csv --mesa mesa.csv -k 3 --prazo 2h
+```
+
+A natureza é `sigilosa` ou `publica`, e **cai em `sigilosa` quando omitida**: o
+sigilo é o padrão, e abrir uma pergunta tem de ser um ato deliberado de quem
+escreve a cédula, nunca um esquecimento.
+
 ```
   TESSERA · abrindo votação
   ────────────────────────────────────────────────────────────────────
 
-  Aprovar as contas da diretoria de 2025?
+  1. Aprovar as contas de 2025?
+    em aberto ........ aprovar · rejeitar
+  2. Destituir a diretoria?
+    em sigilo ........ sim · nao
+  3. Eleger a cadeira 3
+    em sigilo ........ ana · bruno · carla
 
-  Opções ............. aprovar · rejeitar
   Aptos .............. 50  (raiz de Merkle 7c3a…b219)
   Peso ............... um voto por pessoa
   Mesa ............... 5 membros, 3 assinaturas para apurar
@@ -75,7 +96,9 @@ $ tessera abrir --proposta contas-2025 \
     tessera cedula --proposta contas-2025 --identidade SEU_NOME
 ```
 
-**Decisões.** A pergunta vem antes de qualquer parâmetro, porque é a única linha que um humano na sala precisa ler. O `Sigilo mínimo` aparece aqui, na abertura, para que a regra `τ` seja uma configuração declarada e não uma surpresa na apuração. E a última linha é o próximo comando, pronto para copiar — toda tela termina dizendo o que fazer em seguida.
+**Decisões.** As perguntas vêm antes de qualquer parâmetro, porque são as únicas linhas que um humano na sala precisa ler. Cada uma diz `em sigilo` ou `em aberto` na própria linha: numa cédula mista, a natureza de cada pergunta é informação de primeira classe, não nota de rodapé. O `Sigilo mínimo` aparece aqui, na abertura, para que a regra `τ` seja uma configuração declarada e não uma surpresa na apuração. E a última linha é o próximo comando, pronto para copiar — toda tela termina dizendo o que fazer em seguida.
+
+**O limite que a CLI recusa na hora.** O orçamento de CPU é limitado pelas opções **sigilosas** somadas (13.501.500 instruções cada; 16 já são 56% do teto de uma transação). Passar disso é recusado no `abrir`, com a conta na tela e duas saídas — abrir alguma pergunta ou dividir a cédula. As opções públicas não entram nessa conta: a cédula pública inteira custa 350.372.
 
 ---
 
@@ -139,18 +162,27 @@ Rotular `A` e `B` em vez de "aprovar" e "rejeitar" é deliberado: assim que voc�
 
 ## 3. `tessera votar`
 
+Uma `--opcao` por pergunta, **na ordem da cédula**:
+
 ```
-$ tessera votar --proposta contas-2025 --opcao rejeitar --identidade marta
+$ tessera votar --proposta assembleia-2026 \
+    --opcao aprovar --opcao sim --opcao ana --identidade marta
 ```
+
+Faltar uma é **recusa**, com a cédula inteira impressa — nunca abstenção
+silenciosa. Abster-se de uma pergunta precisaria da própria prova (SPEC §6.5), e
+isso é v1.1; até lá, deixar de responder não pode ser um acidente de digitação.
 
 ```
   TESSERA · votando
   ────────────────────────────────────────────────────────────────────
 
-  Aprovar as contas da diretoria de 2025?
+  1. Aprovar as contas de 2025?  APROVAR   [em claro]
+  2. Destituir a diretoria?  SIM   [em segredo]
+  3. Eleger a cadeira 3  ANA   [em segredo]
 
-  Sua escolha ........ REJEITAR
-  Sigilo ............. em segredo
+  Sigilo ............. misto — as perguntas sigilosas em segredo,
+                       as outras em claro
 
   ── o que a rede vai guardar ────────────────────────────────────────
 
@@ -182,7 +214,11 @@ $ tessera votar --proposta contas-2025 --opcao rejeitar --identidade marta
 
 ### 3.1 Decisões
 
-**A escolha aparece em caixa alta uma vez, no top, e nunca mais.** Depois disso a tela fala de compromisso, posição e recibo. A escolha não se repete porque repetir a escolha na tela é ensaiar o hábito de deixá-la visível.
+**A escolha aparece em caixa alta uma vez, no topo, e nunca mais.** Depois disso a tela fala de compromisso, posição e recibo. A escolha não se repete porque repetir a escolha na tela é ensaiar o hábito de deixá-la visível.
+
+**Cada linha diz `[em claro]` ou `[em segredo]`, e isso não é decoração.** Numa cédula mista a pessoa precisa saber o que vai para o ledger ao lado do endereço dela **antes** de enviar, não descobrir depois num explorador de blocos. A `cedula` já tinha avisado; `votar` repete na hora de confirmar, porque é a última tela antes do irreversível.
+
+**`--publico` abre a cédula inteira, inclusive as perguntas sigilosas.** Não há meio-termo por pergunta: a natureza das perguntas é da proposta, e o que o eleitor escolhe é abrir tudo ou nada (SPEC §6.5). A linha `Sigilo` diz exatamente isso, em vez de só "PÚBLICO".
 
 **`Posição 27 de 43 em segredo` é a verificabilidade individual virando uma frase que Dona Marta entende.** Não é "seu commitment está no acumulador". É "você é a 27ª de 43".
 
@@ -300,6 +336,42 @@ $ tessera apurar --proposta contas-2025 --shares ./shares/
 
 **O resultado vem depois da conferência e é a única linha centrada.** A ordem comunica que o número só vale porque passou pelo bloco acima.
 
+### 6.1 Numa cédula mista
+
+Três mudanças, todas pela mesma razão: **as duas naturezas não podem se
+confundir num número solto.**
+
+**Os rótulos ganham o número da pergunta** quando há mais de uma pergunta
+sigilosa — `2·SIM`, `3·CARLA`. Duas perguntas podem ter uma opção `sim`, e
+"SIM: 4" sem contexto não é informação.
+
+**`a mesa afirmou` distingue a origem**, linha a linha:
+
+```
+  APROVAR ............ 6 em público — esta pergunta é aberta
+  2·SIM .............. 2 em segredo + 0 em público
+  2·NAO .............. 3 em segredo + 2 em público
+```
+
+Uma pergunta aberta não tem "em segredo" para mostrar, e fingir que tem seria
+inventar um sigilo que não existe.
+
+**`o contrato conferiu` só lista as perguntas sigilosas.** Não há acumulador
+para conferir numa pergunta pública — ela já estava em claro no ledger desde o
+voto. Listar uma linha `✓` ali sugeriria uma verificação criptográfica que não
+aconteceu.
+
+**E há um placar por pergunta**, cada um precedido pelo texto da pergunta e
+pela natureza dela:
+
+```
+  1. Aprovar as contas de 2025?  ·  em aberto
+                   APROVAR · 6 a 1
+
+  2. Destituir a diretoria?  ·  em sigilo
+                      NAO · 5 a 2
+```
+
 ---
 
 ## 7. `tessera verificar` — a tela do cético, e do jurado
@@ -401,6 +473,10 @@ A última linha é a tese da verificabilidade em oito palavras, e é a frase que
 
 A última frase é obrigatória: sem "nenhum voto foi perdido", a recusa parece perda de dados.
 
+**Aconteceu na testnet em 2026-10-01** (smoke D3), na proposta `coligacao-2026`: 4 em segredo, 3 abriram o voto. O que faz a cena funcionar é que a tela mostra, logo acima da recusa, **os dois acumuladores fechando com `✓`** — a mesa reconstruiu a abertura e achou `MANTER 4 · RESCINDIR 0`. O resultado estava correto e na mão. O contrato recusou com `Error(Contract, #19)`.
+
+Essa ordem na tela não é acidente: conferir **antes** de recusar é o que transforma "deu erro" em "escolheu não publicar".
+
 ### 8.3 Voto duplo
 
 ```
@@ -435,31 +511,39 @@ Todo comando escreve `./estado/<proposta>.json`:
 
 ```json
 {
-  "proposta": "contas-2025",
-  "pergunta": "Aprovar as contas da diretoria de 2025?",
-  "opcoes": ["aprovar", "rejeitar"],
-  "contrato": "CA2LFMOOLAFHUNYBD2MLNEUINYN76IZ6AOGNDPH27UX4MHOVIHGPTRTP",
+  "proposta": "assembleia-2026",
+  "perguntas": [
+    { "texto": "Aprovar as contas de 2025?",
+      "opcoes": ["aprovar", "rejeitar"], "confidencial": false },
+    { "texto": "Destituir a diretoria?",
+      "opcoes": ["sim", "nao"], "confidencial": true },
+    { "texto": "Eleger a cadeira 3",
+      "opcoes": ["ana", "bruno", "carla"], "confidencial": true }
+  ],
+  "contrato": "CDWAY3PETO4JUATLLUM5INMJKMOQ45FTGG5FQCMAUJVTLCW5FJMP7JUH",
   "raiz_aptos": "7c3a...b219",
-  "aptos": 50,
+  "aptos": ["GB4V...", "GAO2..."],
   "sigilo_minimo": 5,
-  "mesa": { "membros": 5, "limiar": 3, "assinaturas": 3 },
-  "prazo_ledger": 1291400,
+  "mesa": { "membros": 5, "limiar": 3 },
+  "prazo_ledger": 4971432,
   "votos": [
     {
-      "posicao": 27,
-      "compromissos": ["0f1ff9fc...", "05ca03df..."],
+      "posicao": 1,
+      "compromissos": ["0f1ff9fc...", "05ca03df...", "...", "...", "..."],
+      "provas": ["...", "...", "...", "...", "..."],
+      "provas_soma": ["...", "..."],
       "publico": false,
+      "escolhas": [1, 0],
       "tx": "a4f29e1c",
-      "ledger": 1284551
+      "ledger": 4971074
     }
   ],
-  "confidenciais": 43,
-  "publicos": 7,
+  "aberturas": ["3301999...", "2419847..."],
   "apuracao": {
-    "afirmado": { "aprovar": 19, "rejeitar": 31 },
+    "afirmado": [2, 3, 2, 2, 1],
     "confere": true,
     "tx": "f71b0c83",
-    "ledger": 1291402
+    "ledger": 4971440
   },
   "verificacao": {
     "aptidao": true, "unicidade": true, "boa_formacao": true,
@@ -467,6 +551,22 @@ Todo comando escreve `./estado/<proposta>.json`:
   }
 }
 ```
+
+**Três regras de achatamento, e errar qualquer uma quebra o console em
+silêncio:**
+
+| campo | cobre | ordem |
+|---|---|---|
+| `compromissos`, `provas` | só as perguntas **sigilosas** | pergunta, depois opção |
+| `provas_soma` | só as perguntas **sigilosas** | uma **por pergunta** |
+| `aberturas`, `apuracao.afirmado` | só as opções **sigilosas** | pergunta, depois opção |
+| `votos[].escolhas` | depende de `publico` | ver abaixo |
+
+`escolhas` é o único campo com duas leituras, e **não é um descuido**: numa
+cédula sigilosa ele cobre só as perguntas **públicas**; numa cédula aberta por
+`--publico`, cobre a **cédula inteira**. Quem lê precisa olhar `publico` antes
+de indexar. O console tem essa conta isolada numa função só (`contagem`), com o
+motivo escrito ao lado.
 
 Nada de `r` neste arquivo, nunca. A chave vive só em `./recibos/<identidade>.key`, que é o arquivo que `queimar` sobrescreve.
 

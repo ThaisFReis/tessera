@@ -87,7 +87,31 @@ Se a janela for curta, o verificador funciona no dia da votação e para de func
 
 **Decisão que destrava.** Se não couber: menos opções por transação, ou pontos comprimidos (48 B em vez de 96 — mas só se o host desserializar comprimido, que é um smoke por si), ou caminho de Merkle mais curto.
 
-**Tempo.** 45 min · **Se falhar:** corte de `m` ou de profundidade, e o Portão 1 do plano ganha um critério novo.
+**Tempo.** 45 min · **✅ MEDIDO NA TESTNET 2026-10-01**, na maior transação que o projeto já mandou — a cédula mista da proposta `assembleia-2026` (contrato `CDWAY3PE…7JUH`).
+
+| cédula | envelope | tx |
+|---|---:|---|
+| mista: 1 pública + 2 sigilosas, **5 opções sigilosas** | **8.360 B** | `9c7372b4…` |
+| aberta por inteiro (revelação voluntária) | **2.320 B** | `d82e27b3…` |
+
+Ambas aceitas pela rede, `status=SUCCESS`.
+
+**A aritmética da carga, que é exata e não estimada:** cada opção sigilosa custa
+`96 B` de compromisso + `320 B` de disjuntiva = **416 B**, e cada pergunta
+sigilosa custa mais `128 B` de prova de soma. A cédula medida levou
+`5×416 + 2×128 = 2.336 B` de prova; o resto dos 8.360 é caminho de Merkle,
+endereços, entrada de autorização, footprint e assinatura.
+
+**O pior caso do contrato** — 16 opções sigilosas, o teto de `MAX_OPCOES`,
+distribuídas em 8 perguntas — leva `16×416 + 8×128 = 7.680 B` de prova, ou seja
+**+5.344 B** sobre a cédula medida. Projeta um envelope de ~14 KB. *É projeção,
+não medição: não enviei a cédula máxima.*
+
+**Ressalva honesta:** não consegui confirmar nas fontes o teto declarado de
+tamanho de transação da rede, então **não afirmo uma folga em múltiplos**. O
+que está medido é que 8.360 B passam, e que o pior caso do contrato é da ordem
+de 14 KB — uma transação Soroban grande, mas nada perto de um limite de
+centenas de KB. Fechar o número do teto fica como pendência menor.
 
 ### A4 · Aluguel de estado para `n` grande
 
@@ -147,7 +171,9 @@ Pendência §9.3 do spec. 50 entradas `Votou` na demo; 10.000 numa assembleia re
 
 **Decisão que destrava.** É o ponto exato em que a maioria dos projetos de cripto quebra, e a causa é quase sempre uma destas três: ordem de bytes, DST divergente, ou redução módulo `r`. A armadilha do `Fr::from_bytes` que não reduz (§10.3 do spec) já mordeu uma vez.
 
-**Tempo.** 1h · **PARCIALMENTE RESOLVIDO 2026-10-01.** O caminho Pedersen está provado: `core` reproduz em Rust nativo, byte a byte, o agregado que o contrato produziu na testnet (`core/src/pedersen.rs`, teste `agregado_bate_byte_a_byte_com_a_testnet`). A raiz do risco foi removida usando **o mesmo crate do host** — o Soroban usa arkworks, e o `core` também. Falta o mesmo cruzamento para a prova CDS, quando ela existir.
+**Tempo.** 1h · **✅ RESOLVIDO POR CONSTRUÇÃO 2026-10-01.** O caminho Pedersen está provado byte a byte (`core/src/pedersen.rs`, teste `agregado_bate_byte_a_byte_com_a_testnet`), e a raiz do risco foi removida usando **o mesmo crate do host** — o Soroban usa arkworks, e o `core` também.
+
+O cruzamento que faltava para a CDS deixou de ser um smoke e virou estrutura: `tessera-core` é `dev-dependency` do contrato, então **toda** a bateria de testes gera as provas em Rust nativo e as verifica no host Soroban em Wasm. O cruzamento provador↔verificador acontece a cada `cargo test`, não uma vez num vetor congelado.
 
 ### B4 · CDS disjunctiva: custo e corretude
 
@@ -201,17 +227,15 @@ Pendência §9.2. São ~6 pontos por `votar()` e o custo nunca foi isolado.
 
 **Tempo.** 30 min · **RESULTADO 2026-10-01: PASSA.** 738.901 por ponto (on-curve 4.367 + subgrupo 734.877). Seis pontos = 1,1% da transação. Groth16 com validação vai a 12,4% do teto. O host não valida sozinho: `g1_add` é 15% de uma checagem, então validação é aditiva.
 
-### C2 · `verify_reveal` — o campo público
+### C2 · `verify_reveal` — o campo público — ✅ DISPENSADO 2026-10-01
 
-Pendência §9.4, o caminho do voto semi-confidencial (§6.5). Projetado em ~5,4M.
+**O smoke deixou de existir porque o desenho que o exigia foi descartado.**
 
-**Método.** Conferir `C == v·G + r·H` com `(v, r)` em claro. Medir. Testar que recusa `v` ou `r` alterado.
+A pendência §9.4 supunha que uma pergunta pública publicaria o mesmo compromisso `C` mais o par `(v, r)` em claro, conferido com um MSM de 2 termos (~5,4M projetados). A implementação é mais simples: **uma pergunta pública não tem compromisso nenhum.** A resposta vai como `u32` e o contrato confere duas regras a olho — cada opção em `{0,1}` e a soma igual ao peso.
 
-**Critério.** Número medido, negativos recusam.
+Não há abertura a verificar, porque não há compromisso. O `verify_reveal` nunca precisou ser escrito.
 
-**Decisão que destrava.** Confirma a afirmação que foi para os dois decks: **publicidade é mais barata que sigilo.** Se for mais caro que a CDS, a frase sai do deck.
-
-**Tempo.** 30 min.
+**A afirmação do deck fica — e com folga maior do que a projetada.** Medido no contrato: a cédula pública inteira custa **350.372**, contra **13.501.500 por opção sigilosa**. Não é 5× mais barato: é duas ordens de grandeza.
 
 ### C3 · Caminho de Merkle e `require_auth` de `k` membros
 
@@ -248,7 +272,7 @@ O roteiro do vídeo é o smoke. Cinco votantes, um divergente, apuração 3-de-5
 
 **Decisão que destrava.** É o passo 6 do vídeo e o que separa verificabilidade real de afirmada. **Não é cortável.**
 
-**Tempo.** 20 min.
+**Tempo.** 20 min · **✅ RESOLVIDO NA TESTNET 2026-10-01.** `--forcar-total 4,1` numa rodada em que os totais reais eram outros: a CLI recusou antes de enviar, com a frase "Não é denúncia depois. É recusa na hora.", e o contrato recusa pelo `AberturaNaoFecha` se alguém pular a CLI. Coberto também em teste de contrato (`mesa_que_mente_no_total_e_recusada`).
 
 ### D3 · A recusa por `τ`
 
@@ -258,7 +282,9 @@ O roteiro do vídeo é o smoke. Cinco votantes, um divergente, apuração 3-de-5
 
 **Decisão que destrava.** É o teorema da partição (§6.6) executando. Quinze segundos de vídeo, e o estado que mais impressiona quem entende de votação.
 
-**Tempo.** 30 min.
+**Tempo.** 30 min · **✅ RESOLVIDO NA TESTNET 2026-10-01.** Proposta `coligacao-2026` no contrato `CDWAY3PE…7JUH`: 7 aptos, **4 votaram em segredo e 3 abriram o voto** — a coligação de §6.6 encolhendo o conjunto secreto de propósito. Depois do prazo, `apurar` foi recusada com `HostError: Error(Contract, #19)` = `AnonimatoInsuficiente`.
+
+O que faz a cena funcionar é que **os números conferiam**: a mesa reconstruiu a abertura, achou `MANTER 4 · RESCINDIR 0`, e os dois acumuladores fecharam com `✓`. O contrato tinha o resultado correto em mãos e **recusou publicá-lo**. Não é falha de cálculo; é a troca de §6.6 — uma quebra de privacidade virando falha de liveness, ao vivo.
 
 ### D4 · O verificador é realmente independente?
 
@@ -299,7 +325,7 @@ Uma pessoa de fora vota na demo. Depois:
 
 **Decisão que destrava.** Vídeo comprimido come saturação, e o terminal de quem avalia não é o seu.
 
-**Tempo.** 5 min.
+**Tempo.** 5 min · **✅ RESOLVIDO 2026-10-01.** Zero escapes ANSI através de `| cat`, e `tela::tem_cor()` respeita `NO_COLOR`. Travado em teste (`cli/src/tela.rs`, `sem_cor_nao_emite_escape`).
 
 ### E3 · Setenta e duas colunas em tela cheia
 
