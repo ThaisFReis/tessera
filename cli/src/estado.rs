@@ -19,11 +19,20 @@ pub struct Mesa {
     pub identidades: Vec<String>,
 }
 
+/// Uma pergunta da cédula, com o texto que a pessoa lê.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct PerguntaEstado {
+    pub texto: String,
+    pub opcoes: Vec<String>,
+    pub confidencial: bool,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Voto {
     pub posicao: usize,
     pub identidade: String,
     pub endereco: String,
+    /// Achatados sobre as perguntas sigilosas, em ordem.
     pub compromissos: Vec<String>,
     /// As provas, em hex. São **públicas** — já estão no ledger — e por isso
     /// moram aqui e não no recibo. Se morassem no recibo, `queimar` apagaria a
@@ -31,10 +40,14 @@ pub struct Voto {
     /// proteger quem vota passaria a custar auditabilidade. Não custa.
     #[serde(default)]
     pub provas: Vec<String>,
+    /// **Uma por pergunta sigilosa.** Era uma só quando a cédula tinha uma
+    /// pergunta; com várias, uma prova única deixaria de provar a boa formação
+    /// de cada pergunta separadamente.
     #[serde(default)]
-    pub prova_soma: String,
+    pub provas_soma: Vec<String>,
     pub publico: bool,
-    /// Só para cédula pública: a escolha em claro, que já está no ledger.
+    /// As respostas em claro. Numa cédula sigilosa são as perguntas públicas;
+    /// numa cédula aberta por revelação voluntária, a cédula inteira.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub escolhas: Option<Vec<u32>>,
     pub tx: String,
@@ -62,8 +75,9 @@ pub struct Verificacao {
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Estado {
     pub proposta: String,
-    pub pergunta: String,
-    pub opcoes: Vec<String>,
+    /// A cédula, em ordem. Uma cédula confidencial é aquela em que todas as
+    /// perguntas são sigilosas; uma semiconfidencial mistura.
+    pub perguntas: Vec<PerguntaEstado>,
     pub contrato: String,
     pub rede: String,
     /// `H` como o contrato o calculou. Pedir é mais seguro que deduzir: é o
@@ -126,6 +140,37 @@ impl Estado {
     pub fn ja_votou(&self, endereco: &str) -> Option<&Voto> {
         self.votos.iter().find(|v| v.endereco == endereco)
     }
+
+    /// Quantas opções sigilosas a cédula tem somadas. É o tamanho dos vetores
+    /// de compromisso, de prova e de abertura.
+    pub fn opcoes_confidenciais(&self) -> usize {
+        self.perguntas
+            .iter()
+            .filter(|p| p.confidencial)
+            .map(|p| p.opcoes.len())
+            .sum()
+    }
+
+    /// Quantas perguntas sigilosas — o número de provas de soma por cédula.
+    pub fn perguntas_confidenciais(&self) -> usize {
+        self.perguntas.iter().filter(|p| p.confidencial).count()
+    }
+
+    /// Todas as opções, de todas as perguntas, em ordem. É o formato do
+    /// resultado que o contrato devolve.
+    pub fn todas_as_opcoes(&self) -> Vec<&str> {
+        self.perguntas
+            .iter()
+            .flat_map(|p| p.opcoes.iter().map(|o| o.as_str()))
+            .collect()
+    }
+
+    /// A cédula tem alguma pergunta pública? É o que distingue uma votação
+    /// semiconfidencial de uma inteiramente sigilosa.
+    pub fn e_mista(&self) -> bool {
+        self.perguntas.iter().any(|p| !p.confidencial)
+            && self.perguntas.iter().any(|p| p.confidencial)
+    }
 }
 
 #[cfg(test)]
@@ -145,7 +190,7 @@ mod testes {
                 endereco: "GABC".into(),
                 compromissos: vec!["0f1ff9".into()],
                 provas: vec!["aa".into()],
-                prova_soma: "bb".into(),
+                provas_soma: vec!["bb".into()],
                 publico: false,
                 escolhas: None,
                 tx: "a4f2".into(),
@@ -167,7 +212,7 @@ mod testes {
     fn conta_confidenciais_e_publicos() {
         let voto = |publico| Voto {
             posicao: 0, identidade: "x".into(), endereco: "G".into(),
-            compromissos: vec![], provas: vec![], prova_soma: String::new(),
+            compromissos: vec![], provas: vec![], provas_soma: vec![],
             publico, escolhas: None, tx: "t".into(), ledger: 0,
         };
         let e = Estado {
@@ -182,13 +227,28 @@ mod testes {
     fn ida_e_volta_do_json() {
         let e = Estado {
             proposta: "p".into(),
-            opcoes: vec!["a".into(), "b".into()],
+            perguntas: vec![
+                PerguntaEstado {
+                    texto: "Aprovar as contas?".into(),
+                    opcoes: vec!["aprovar".into(), "rejeitar".into()],
+                    confidencial: false,
+                },
+                PerguntaEstado {
+                    texto: "Destituir a diretoria?".into(),
+                    opcoes: vec!["sim".into(), "nao".into()],
+                    confidencial: true,
+                },
+            ],
             sigilo_minimo: 5,
             ..Default::default()
         };
         let s = serde_json::to_string(&e).unwrap();
         let v: Estado = serde_json::from_str(&s).unwrap();
-        assert_eq!(v.opcoes, e.opcoes);
+        assert_eq!(v.perguntas.len(), 2);
+        assert_eq!(v.todas_as_opcoes().len(), 4);
+        assert_eq!(v.opcoes_confidenciais(), 2, "só a segunda pergunta é sigilosa");
+        assert_eq!(v.perguntas_confidenciais(), 1);
+        assert!(v.e_mista());
         assert_eq!(v.sigilo_minimo, 5);
         assert!(v.apuracao.is_none());
     }

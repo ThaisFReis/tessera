@@ -14,8 +14,9 @@ use std::path::PathBuf;
 pub struct Recibo {
     pub identidade: String,
     pub proposta: String,
-    pub escolha: usize,
-    /// Os `r_j`, em hexadecimal, um por opção.
+    /// Uma por pergunta, na ordem da cédula.
+    pub escolhas: Vec<usize>,
+    /// Os `r_j`, em hexadecimal, achatados sobre as perguntas sigilosas.
     pub acasos: Vec<String>,
 }
 
@@ -30,7 +31,9 @@ pub fn gravar(r: &Recibo) -> Result<(), String> {
     s.push_str("# Enquanto ele existir, você consegue provar em que votou —\n");
     s.push_str("# e quem te obrigar a mostrar consegue conferir.\n");
     s.push_str(&format!("proposta={}\n", r.proposta));
-    s.push_str(&format!("escolha={}\n", r.escolha));
+    for (q, e) in r.escolhas.iter().enumerate() {
+        s.push_str(&format!("escolha{}={}\n", q, e));
+    }
     for (j, a) in r.acasos.iter().enumerate() {
         s.push_str(&format!("r{}={}\n", j, a));
     }
@@ -77,7 +80,7 @@ mod testes {
         gravar(&Recibo {
             identidade: "marta".into(),
             proposta: "contas-2025".into(),
-            escolha: 1,
+            escolhas: vec![1, 0],
             acasos: vec!["aa".into(), "bb".into()],
         })
         .unwrap();
@@ -85,6 +88,7 @@ mod testes {
         let s = std::fs::read_to_string(caminho("marta")).unwrap();
         assert!(s.contains("PROVA O SEU VOTO"));
         assert!(s.contains("r0=aa") && s.contains("r1=bb"));
+        assert!(s.contains("escolha0=1") && s.contains("escolha1=0"), "uma escolha por pergunta");
         // Só o segredo mora aqui: as provas são públicas e ficam no estado,
         // para que queimar o recibo não custe auditabilidade.
         assert!(

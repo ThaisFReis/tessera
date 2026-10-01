@@ -9,23 +9,39 @@ use serde_json::{json, Value};
 use tessera_core::ark::{Fr, G1Affine};
 use tessera_core::{cds, pedersen, ponto, shamir, soma};
 
+/// Uma pergunta da cédula, como o cliente a enxerga.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Pergunta {
+    pub opcoes: usize,
+    pub confidencial: bool,
+}
+
 pub struct Cedula {
+    /// Achatados sobre as perguntas **sigilosas**, em ordem.
     pub compromissos: Vec<G1Affine>,
     pub provas: Vec<cds::Prova>,
-    pub soma: soma::Prova,
+    /// **Uma por pergunta sigilosa.** Uma prova só, sobre a cédula inteira,
+    /// afirmaria `Σ(tudo) = peso` — e com peso 1 isso obrigaria quem responde
+    /// a pergunta 1 a abster-se das outras.
+    pub somas: Vec<soma::Prova>,
+    /// Achatadas sobre as perguntas **públicas**, em ordem.
+    pub publicas: Vec<u32>,
     /// Os `r_j`. Vão para o recibo e para as shares, e **para mais lugar
     /// nenhum**.
     pub acasos: Vec<Fr>,
 }
 
-/// `proposta ‖ addr_xdr ‖ opção` — os mesmos bytes que `cripto::contexto` monta
-/// dentro do contrato.
+/// `proposta ‖ addr_xdr ‖ pergunta ‖ opção` — os mesmos bytes que
+/// `cripto::contexto` monta dentro do contrato.
 ///
-/// Prende cada prova a esta proposta, a esta pessoa e a esta opção. Sem isso,
-/// copiar o `C` e a prova de outra pessoa é um voto válido.
-pub fn contexto(proposta: &[u8; 32], addr_xdr: &[u8], opcao: u32) -> Vec<u8> {
+/// Prende cada prova a esta proposta, a esta pessoa, a esta pergunta e a esta
+/// opção. Sem o endereço, copiar o `C` e a prova de outra pessoa é um voto
+/// válido. **Sem a pergunta**, a disjuntiva da pergunta 1 vale na pergunta 2,
+/// e o eleitor marca a segunda sem provar nada sobre ela.
+pub fn contexto(proposta: &[u8; 32], addr_xdr: &[u8], pergunta: u32, opcao: u32) -> Vec<u8> {
     let mut v = proposta.to_vec();
     v.extend_from_slice(addr_xdr);
+    v.extend_from_slice(&pergunta.to_be_bytes());
     v.extend_from_slice(&opcao.to_be_bytes());
     v
 }
@@ -35,48 +51,96 @@ pub fn contexto(proposta: &[u8; 32], addr_xdr: &[u8], opcao: u32) -> Vec<u8> {
 /// alcança.
 pub const OPCAO_DA_SOMA: u32 = u32::MAX;
 
+/// Monta a cédula inteira: compromissos e provas nas perguntas sigilosas,
+/// resposta em claro nas públicas.
+///
+/// `escolhas[q]` é a opção marcada na pergunta `q`.
 pub fn montar(
     h: &G1Affine,
     proposta: &[u8; 32],
     addr_xdr: &[u8],
-    opcoes: usize,
-    escolha: usize,
+    perguntas: &[Pergunta],
+    escolhas: &[usize],
 ) -> Result<Cedula, String> {
+    if escolhas.len() != perguntas.len() {
+        return Err(format!(
+            "a cédula tem {} perguntas e vieram {} escolhas",
+            perguntas.len(),
+            escolhas.len()
+        ));
+    }
     let g = pedersen::gerador();
-    let mut acasos = Vec::with_capacity(opcoes);
-    for _ in 0..opcoes {
-        acasos.push(pedersen::acaso_fr().map_err(|_| "sem aleatoriedade do sistema".to_string())?);
-    }
+    let mut compromissos = Vec::new();
+    let mut provas = Vec::new();
+    let mut somas = Vec::new();
+    let mut publicas = Vec::new();
+    let mut acasos = Vec::new();
 
-    let compromissos: Vec<G1Affine> = (0..opcoes)
-        .map(|j| {
+    for (q, pg) in perguntas.iter().enumerate() {
+        let escolha = escolhas[q];
+        if escolha >= pg.opcoes {
+            return Err(format!(
+                "a pergunta {} tem {} opções e a escolha foi {}",
+                q + 1,
+                pg.opcoes,
+                escolha
+            ));
+        }
+        if !pg.confidencial {
+            for j in 0..pg.opcoes {
+                publicas.push(if j == escolha { 1u32 } else { 0 });
+            }
+            continue;
+        }
+
+        let mut rs = Vec::with_capacity(pg.opcoes);
+        for _ in 0..pg.opcoes {
+            rs.push(
+                pedersen::acaso_fr().map_err(|_| "sem aleatoriedade do sistema".to_string())?,
+            );
+        }
+        let cs: Vec<G1Affine> = (0..pg.opcoes)
+            .map(|j| {
+                let v = if j == escolha { 1u64 } else { 0 };
+                pedersen::comprometer(&g, h, &pedersen::escalar(v), &rs[j])
+            })
+            .collect();
+
+        for j in 0..pg.opcoes {
             let v = if j == escolha { 1u64 } else { 0 };
-            pedersen::comprometer(&g, h, &pedersen::escalar(v), &acasos[j])
-        })
-        .collect();
+            provas.push(
+                cds::provar(
+                    &contexto(proposta, addr_xdr, q as u32, j as u32),
+                    &g,
+                    h,
+                    &cs[j],
+                    v,
+                    &rs[j],
+                )
+                .map_err(|e| {
+                    format!("não consegui provar a opção {} da pergunta {}: {:?}", j, q + 1, e)
+                })?,
+            );
+        }
 
-    let mut provas = Vec::with_capacity(opcoes);
-    for j in 0..opcoes {
-        let v = if j == escolha { 1u64 } else { 0 };
-        provas.push(
-            cds::provar(
-                &contexto(proposta, addr_xdr, j as u32),
-                &g,
+        // A prova de soma desta pergunta, sobre a fatia dela.
+        let rho = rs.iter().fold(pedersen::escalar(0), |a, r| a + r);
+        let d = soma::alvo(&g, &cs, 1);
+        somas.push(
+            soma::provar(
+                &contexto(proposta, addr_xdr, q as u32, OPCAO_DA_SOMA),
                 h,
-                &compromissos[j],
-                v,
-                &acasos[j],
+                &d,
+                &rho,
             )
-            .map_err(|e| format!("não consegui provar a opção {}: {:?}", j, e))?,
+            .map_err(|e| format!("não consegui provar a soma da pergunta {}: {:?}", q + 1, e))?,
         );
+
+        compromissos.extend(cs);
+        acasos.extend(rs);
     }
 
-    let rho = acasos.iter().fold(pedersen::escalar(0), |a, r| a + r);
-    let d = soma::alvo(&g, &compromissos, 1);
-    let soma = soma::provar(&contexto(proposta, addr_xdr, OPCAO_DA_SOMA), h, &d, &rho)
-        .map_err(|e| format!("não consegui provar a soma: {:?}", e))?;
-
-    Ok(Cedula { compromissos, provas, soma, acasos })
+    Ok(Cedula { compromissos, provas, somas, publicas, acasos })
 }
 
 // ---------- serialização para a `stellar contract invoke` ----------
@@ -110,8 +174,27 @@ pub fn provas_json(provas: &[cds::Prova]) -> String {
     Value::Array(v).to_string()
 }
 
-pub fn soma_json(p: &soma::Prova) -> String {
-    json!({ "a": hex_ponto(&p.a), "z": dec_escalar(&p.z) }).to_string()
+/// As provas de soma, uma por pergunta sigilosa.
+pub fn somas_json(ps: &[soma::Prova]) -> String {
+    let v: Vec<Value> = ps
+        .iter()
+        .map(|p| json!({ "a": hex_ponto(&p.a), "z": dec_escalar(&p.z) }))
+        .collect();
+    Value::Array(v).to_string()
+}
+
+/// As respostas em claro, achatadas sobre as perguntas públicas.
+pub fn escolhas_json(es: &[u32]) -> String {
+    Value::Array(es.iter().map(|e| json!(e)).collect()).to_string()
+}
+
+/// A cédula, no formato que o `abrir` do contrato espera.
+pub fn perguntas_json(ps: &[Pergunta]) -> String {
+    let v: Vec<Value> = ps
+        .iter()
+        .map(|p| json!({ "opcoes": p.opcoes, "confidencial": p.confidencial }))
+        .collect();
+    Value::Array(v).to_string()
 }
 
 pub fn pontos_json(ps: &[G1Affine]) -> String {
@@ -205,23 +288,77 @@ mod testes {
         let (h, p32) = (h(), [7u8; 32]);
         let addr = xdr(CONTA).unwrap();
 
+        let uma = [Pergunta { opcoes: 3, confidencial: true }];
         for escolha in 0..3 {
-            let c = montar(&h, &p32, &addr, 3, escolha).unwrap();
+            let c = montar(&h, &p32, &addr, &uma, &[escolha]).unwrap();
             for j in 0..3 {
                 assert!(
-                    cds::verificar(&contexto(&p32, &addr, j as u32), &g, &h, &c.compromissos[j], &c.provas[j]),
+                    cds::verificar(&contexto(&p32, &addr, 0, j as u32), &g, &h, &c.compromissos[j], &c.provas[j]),
                     "a disjuntiva da opcao {} nao fecha",
                     j
                 );
             }
             let d = soma::alvo(&g, &c.compromissos, 1);
             assert!(soma::verificar(
-                &contexto(&p32, &addr, OPCAO_DA_SOMA),
+                &contexto(&p32, &addr, 0, OPCAO_DA_SOMA),
                 &h,
                 &d,
-                &c.soma
+                &c.somas[0]
             ));
         }
+    }
+
+    /// **A cédula mista: uma prova de soma por pergunta, e nenhuma migra.**
+    ///
+    /// Duas perguntas sigilosas e uma pública. A prova da pergunta 1 tem de
+    /// falhar quando conferida no contexto da pergunta 2 — é o furo que o
+    /// índice da pergunta no desafio de Fiat–Shamir fecha.
+    #[test]
+    fn a_cedula_mista_fecha_pergunta_a_pergunta() {
+        let g = pedersen::gerador();
+        let (h, p32) = (h(), [11u8; 32]);
+        let addr = xdr(CONTA).unwrap();
+        let perguntas = [
+            Pergunta { opcoes: 2, confidencial: true },
+            Pergunta { opcoes: 2, confidencial: false },
+            Pergunta { opcoes: 3, confidencial: true },
+        ];
+        let c = montar(&h, &p32, &addr, &perguntas, &[1, 0, 2]).unwrap();
+
+        assert_eq!(c.compromissos.len(), 5, "2 + 3 opcoes sigilosas");
+        assert_eq!(c.somas.len(), 2, "uma prova de soma por pergunta sigilosa");
+        assert_eq!(c.publicas, vec![1, 0], "a pergunta publica vai em claro");
+        assert_eq!(c.acasos.len(), 5, "um r por opcao sigilosa");
+
+        // Cada pergunta sigilosa fecha no seu proprio contexto.
+        let fatias: [(u32, usize, usize); 2] = [(0, 0, 2), (2, 2, 5)];
+        for (q, ini, fim) in fatias {
+            for j in ini..fim {
+                assert!(cds::verificar(
+                    &contexto(&p32, &addr, q, (j - ini) as u32),
+                    &g, &h, &c.compromissos[j], &c.provas[j]
+                ));
+            }
+        }
+        let d0 = soma::alvo(&g, &c.compromissos[0..2], 1);
+        assert!(soma::verificar(&contexto(&p32, &addr, 0, OPCAO_DA_SOMA), &h, &d0, &c.somas[0]));
+        let d2 = soma::alvo(&g, &c.compromissos[2..5], 1);
+        assert!(soma::verificar(&contexto(&p32, &addr, 2, OPCAO_DA_SOMA), &h, &d2, &c.somas[1]));
+
+        // **A prova nao migra.** A disjuntiva da opcao 0 da pergunta 0,
+        // conferida como se fosse da pergunta 2, tem de falhar.
+        assert!(
+            !cds::verificar(
+                &contexto(&p32, &addr, 2, 0),
+                &g, &h, &c.compromissos[0], &c.provas[0]
+            ),
+            "a prova da pergunta 1 nao pode valer na pergunta 3"
+        );
+        // E a prova de soma tambem nao.
+        assert!(
+            !soma::verificar(&contexto(&p32, &addr, 2, OPCAO_DA_SOMA), &h, &d0, &c.somas[0]),
+            "a soma da pergunta 1 nao pode valer na pergunta 3"
+        );
     }
 
     /// **A rodada da mesa, inteira, sem nenhum `r` individual se juntando.**
@@ -242,8 +379,9 @@ mod testes {
         let mut caixa: Vec<Vec<Fr>> = vec![vec![pedersen::escalar(0); opcoes]; membros];
         let mut acumuladores = vec![Vec::new(); opcoes];
 
+        let uma = [Pergunta { opcoes: 2, confidencial: true }];
         for escolha in escolhas {
-            let c = montar(&h, &p32, &addr, opcoes, escolha).unwrap();
+            let c = montar(&h, &p32, &addr, &uma, &[escolha]).unwrap();
             for j in 0..opcoes {
                 acumuladores[j].push(c.compromissos[j]);
             }
@@ -293,10 +431,10 @@ mod testes {
     /// mordeu: hex com só dígitos entra em silêncio como o decimal errado.
     #[test]
     fn escalar_serializa_em_decimal_no_json() {
-        let s = soma_json(&soma::Prova {
+        let s = somas_json(&[soma::Prova {
             a: pedersen::gerador(),
             z: pedersen::escalar(101),
-        });
+        }]);
         assert!(s.contains("\"z\":\"101\""), "{}", s);
         assert!(!s.contains("0065"));
     }
@@ -304,10 +442,15 @@ mod testes {
     #[test]
     fn o_contexto_e_o_mesmo_que_o_contrato_monta() {
         let addr = xdr(CONTA).unwrap();
-        let c = contexto(&[7u8; 32], &addr, 3);
-        assert_eq!(c.len(), 32 + 44 + 4);
+        let c = contexto(&[7u8; 32], &addr, 2, 3);
+        assert_eq!(c.len(), 32 + 44 + 4 + 4);
         assert_eq!(&c[..32], &[7u8; 32]);
         assert_eq!(&c[32..76], &addr[..]);
-        assert_eq!(&c[76..], &3u32.to_be_bytes());
+        assert_eq!(&c[76..80], &2u32.to_be_bytes(), "o indice da pergunta");
+        assert_eq!(&c[80..], &3u32.to_be_bytes(), "o indice da opcao");
+
+        // Duas perguntas diferentes nao podem dar o mesmo contexto — e esse
+        // era exatamente o furo antes de a pergunta entrar no desafio.
+        assert_ne!(contexto(&[7u8; 32], &addr, 0, 0), contexto(&[7u8; 32], &addr, 1, 0));
     }
 }

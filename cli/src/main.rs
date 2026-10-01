@@ -26,11 +26,20 @@ enum Comando {
     Abrir {
         #[arg(long)]
         proposta: String,
+        /// Uma por pergunta: `"texto | opção, opção | sigilosa"`.
+        ///
+        /// A natureza é `sigilosa` ou `publica`, e cai em `sigilosa` se você
+        /// omitir. Uma cédula toda sigilosa é a confidencial; misturar as duas
+        /// é a semiconfidencial.
+        ///
+        /// Com `--opcoes`, `--pergunta` volta a ser só o texto da única
+        /// pergunta, sigilosa — é a forma curta de sempre.
         #[arg(long)]
-        pergunta: String,
+        pergunta: Vec<String>,
+        /// Forma curta para a cédula de uma pergunta só, sigilosa.
         /// Lista separada por vírgula, ou arquivo com uma por linha.
         #[arg(long)]
-        opcoes: String,
+        opcoes: Option<String>,
         /// Identidades da `stellar keys`, por vírgula ou em arquivo.
         #[arg(long)]
         aptos: String,
@@ -60,11 +69,14 @@ enum Comando {
     Votar {
         #[arg(long)]
         proposta: String,
+        /// Uma por pergunta, na ordem da cédula. Numa cédula de uma pergunta
+        /// só, basta uma.
         #[arg(long)]
-        opcao: String,
+        opcao: Vec<String>,
         #[arg(long)]
         identidade: String,
-        /// Vota em claro: a escolha vai para o ledger sem compromisso.
+        /// Abre a cédula **inteira** em claro — inclusive as perguntas
+        /// sigilosas. É a revelação voluntária.
         #[arg(long)]
         publico: bool,
     },
@@ -97,7 +109,7 @@ fn main() {
     let cli = Cli::parse();
     let r = match &cli.comando {
         Comando::Abrir { proposta, pergunta, opcoes, aptos, mesa, limiar, prazo, contrato, rede, governanca } =>
-            comandos::abrir(proposta, pergunta, opcoes, aptos, mesa, *limiar, prazo, contrato, rede, governanca),
+            comandos::abrir(proposta, pergunta, opcoes.as_deref(), aptos, mesa, *limiar, prazo, contrato, rede, governanca),
         Comando::Cedula { proposta, identidade } => comandos::mostrar_cedula(proposta, identidade),
         Comando::Votar { proposta, opcao, identidade, publico } => comandos::votar(proposta, opcao, identidade, *publico),
         Comando::Queimar { identidade } => comandos::queimar(identidade),
