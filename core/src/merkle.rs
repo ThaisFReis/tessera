@@ -1,6 +1,12 @@
 //! Árvore de Merkle da lista de aptos, e o caminho que quem vota apresenta.
 //!
-//! A folha é `H(endereço ‖ peso)`. A governança integradora monta a árvore na
+//! A folha é `H(0x00 ‖ endereço ‖ peso_be)`, onde `endereço` são os bytes XDR
+//! do `Address` — exatamente o que o contrato tem em mãos quando recebe a
+//! chamada, e o que identifica sem ambiguidade uma conta ou um contrato. O
+//! peso ocupa os últimos 4 bytes, então o comprimento variável do endereço não
+//! cria ambiguidade.
+//!
+//! A governança integradora monta a árvore na
 //! data de corte e passa só a **raiz** para `abrir()`. Quem vota apresenta o
 //! caminho; o contrato confere e usa **o peso da folha, nunca o peso informado
 //! na chamada** (SPEC §6.4).
@@ -40,8 +46,8 @@ pub enum Erro {
 /// Uma linha da lista de aptos na data de corte.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Apto {
-    /// Chave pública bruta da conta, ou id de contrato. 32 bytes.
-    pub endereco: [u8; 32],
+    /// Bytes XDR do `Address`, como o contrato os produz com `to_xdr`.
+    pub endereco: Vec<u8>,
     /// Peso, ou identificador de faixa. Conferido contra a folha, nunca
     /// aceito do que quem vota afirma.
     pub peso: u32,
@@ -51,7 +57,7 @@ pub struct Apto {
 pub fn folha(a: &Apto) -> Hash {
     let mut h = Sha256::new();
     h.update([DOM_FOLHA]);
-    h.update(a.endereco);
+    h.update(&a.endereco);
     h.update(a.peso.to_be_bytes());
     h.finalize().into()
 }
@@ -180,10 +186,7 @@ mod testes {
     fn lista(n: usize) -> Vec<Apto> {
         (0..n)
             .map(|i| {
-                let mut e = [0u8; 32];
-                e[0] = (i & 0xff) as u8;
-                e[1] = ((i >> 8) & 0xff) as u8;
-                Apto { endereco: e, peso: 1 }
+                Apto { endereco: (i as u64).to_be_bytes().to_vec(), peso: 1 }
             })
             .collect()
     }
@@ -207,7 +210,7 @@ mod testes {
         let aptos = lista(16);
         let arv = Arvore::montar(&aptos).unwrap();
         let raiz = arv.raiz();
-        let intruso = Apto { endereco: [0xEE; 32], peso: 1 };
+        let intruso = Apto { endereco: vec![0xEE; 32], peso: 1 };
         for i in 0..16 {
             let c = arv.caminho(i).unwrap();
             assert!(!verificar(&intruso, &c, &raiz), "intruso passou no caminho {}", i);
@@ -226,9 +229,9 @@ mod testes {
         let (raiz, c) = (arv.raiz(), arv.caminho(3).unwrap());
 
         assert!(verificar(&aptos[3], &c, &raiz));
-        let mentindo = Apto { endereco: aptos[3].endereco, peso: 1000 };
+        let mentindo = Apto { endereco: aptos[3].endereco.clone(), peso: 1000 };
         assert!(!verificar(&mentindo, &c, &raiz), "peso inflado foi aceito");
-        let menos = Apto { endereco: aptos[3].endereco, peso: 0 };
+        let menos = Apto { endereco: aptos[3].endereco.clone(), peso: 0 };
         assert!(!verificar(&menos, &c, &raiz));
     }
 
@@ -278,7 +281,7 @@ mod testes {
     /// nem a folha-vazia pode ser reivindicada por alguém.
     #[test]
     fn dominios_nao_colidem() {
-        let a = Apto { endereco: [7u8; 32], peso: 3 };
+        let a = Apto { endereco: vec![7u8; 32], peso: 3 };
         let f = folha(&a);
         assert_ne!(f, no(&f, &f));
         assert_ne!(f, vazio());
@@ -350,7 +353,11 @@ mod vetor {
     pub fn lista_fixa(n: usize) -> Vec<Apto> {
         (0..n)
             .map(|i| {
-                let mut e = [0u8; 32];
+                // 32 bytes aqui porque a sonda 13 do `bls-smoke` recebe
+                // `BytesN<32>`. O contrato de verdade usa os bytes XDR do
+                // `Address`, de comprimento variável — o que a função de folha
+                // aceita sem mudança, porque o peso ocupa os últimos 4 bytes.
+                let mut e = vec![0u8; 32];
                 e[..8].copy_from_slice(&(i as u64).to_be_bytes());
                 e[31] = 0xA7;
                 Apto { endereco: e, peso: 1 }
@@ -372,7 +379,8 @@ mod vetor {
         println!("n .............. {}", N);
         println!("profundidade ... {}", arv.profundidade());
         println!("indice ......... {}", ALVO);
-        println!("endereco ....... 0x{}", para_hex(&aptos[ALVO].endereco));
+        println!("endereco ....... 0x{}",
+            aptos[ALVO].endereco.iter().map(|b| format!("{:02x}", b)).collect::<String>());
         println!("peso ........... {}", aptos[ALVO].peso);
         println!("raiz ........... 0x{}", para_hex(&arv.raiz()));
         for (i, s) in c.irmaos.iter().enumerate() {

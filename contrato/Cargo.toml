@@ -1,0 +1,29 @@
+[package]
+name = "tessera"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Voto secreto para qualquer governança, na Stellar."
+
+[lib]
+crate-type = ["lib", "cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = "28.0.0"
+
+[dev-dependencies]
+soroban-sdk = { version = "28.0.0", features = ["testutils"] }
+# O `core` gera as provas nos testes e o contrato as verifica. É o cruzamento
+# provador↔verificador (smoke B3) feito a cada `cargo test`, não uma vez.
+tessera-core = { path = "../core" }
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "symbols"
+debug-assertions = false
+panic = "abort"
+codegen-units = 1
+lto = true

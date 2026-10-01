@@ -59,9 +59,16 @@ fn fr_bytes(f: &Fr) -> [u8; 32] {
 /// os 128 necessários. O mesmo truque seria **errado** no fator de
 /// aleatoriedade do compromisso, que precisa de uniformidade sobre todo o
 /// corpo — ver `acaso.rs`.
-pub fn desafio(c: &G1Affine, a0: &G1Affine, a1: &G1Affine) -> Fr {
+///
+/// `contexto` prende a prova a esta proposta e a esta pessoa. Sem isso, copiar
+/// o `C` e a prova de outra pessoa é um voto válido: a prova convence de que
+/// `v ∈ {0,1}`, e nada nela diz de quem é. O comprimento entra no hash antes
+/// do conteúdo para que `("ab","c")` e `("a","bc")` não colidam.
+pub fn desafio(contexto: &[u8], c: &G1Affine, a0: &G1Affine, a1: &G1Affine) -> Fr {
     let mut h = Sha256::new();
     h.update(DST_DESAFIO);
+    h.update((contexto.len() as u32).to_be_bytes());
+    h.update(contexto);
     h.update(ponto::serializar(c));
     h.update(ponto::serializar(a0));
     h.update(ponto::serializar(a1));
@@ -72,6 +79,7 @@ pub fn desafio(c: &G1Affine, a0: &G1Affine, a1: &G1Affine) -> Fr {
 
 /// Prova que `C = v·G + r·H` com `v ∈ {0,1}`, sem revelar `v`.
 pub fn provar(
+    contexto: &[u8],
     g: &G1Affine,
     h: &G1Affine,
     c: &G1Affine,
@@ -93,7 +101,7 @@ pub fn provar(
         let z1 = fr()?;
         let a1: G1Affine = (*h * z1 - c_menos_g * e1).into();
 
-        let e = desafio(c, &a0, &a1);
+        let e = desafio(contexto, c, &a0, &a1);
         let e0 = e - e1;
         let z0 = t + e0 * r;
         Ok(Prova { a0, a1, e0, z0, e1, z1 })
@@ -104,7 +112,7 @@ pub fn provar(
         let z0 = fr()?;
         let a0: G1Affine = (*h * z0 - G1Projective::from(*c) * e0).into();
 
-        let e = desafio(c, &a0, &a1);
+        let e = desafio(contexto, c, &a0, &a1);
         let e1 = e - e0;
         let z1 = t + e1 * r;
         Ok(Prova { a0, a1, e0, z0, e1, z1 })
@@ -112,9 +120,15 @@ pub fn provar(
 }
 
 /// Verifica a prova. Três igualdades, e todas têm de fechar.
-pub fn verificar(g: &G1Affine, h: &G1Affine, c: &G1Affine, p: &Prova) -> bool {
-    // 1. os desafios parciais somam o desafio ligado a (C, a0, a1)
-    if p.e0 + p.e1 != desafio(c, &p.a0, &p.a1) {
+pub fn verificar(
+    contexto: &[u8],
+    g: &G1Affine,
+    h: &G1Affine,
+    c: &G1Affine,
+    p: &Prova,
+) -> bool {
+    // 1. os desafios parciais somam o desafio ligado a (contexto, C, a0, a1)
+    if p.e0 + p.e1 != desafio(contexto, c, &p.a0, &p.a1) {
         return false;
     }
     // 2. ramo 0: z0·H == a0 + e0·C
@@ -160,6 +174,11 @@ impl Prova {
 #[cfg(test)]
 mod testes {
     use super::*;
+
+    /// Contexto vazio nos testes de unidade da primitiva. O contrato usa
+    /// `proposta ‖ votante ‖ opção`, e o teste `prova_nao_migra_de_contexto`
+    /// é o que trava essa ligação.
+    const CTX: &[u8] = b"";
     use crate::ponto;
 
     const H_HEX: &str = "1462b4b57a7d01e598685e913608bab6990de8cce1c705642c19a6b9ed660fc589758bdebb20c2bdde65a25b35b12206198669dff273abe7b9e6a0b3e636f8a8a41f9c81f6a79d308ec0fe57ef8a073c90e444002ba59807f987cce67d72eccf";
@@ -169,7 +188,7 @@ mod testes {
         let h = ponto::de_hex(H_HEX).unwrap();
         let r = pedersen::acaso_fr().unwrap();
         let c = pedersen::comprometer(&g, &h, &pedersen::escalar(v), &r);
-        let p = provar(&g, &h, &c, v, &r).unwrap();
+        let p = provar(CTX, &g, &h, &c, v, &r).unwrap();
         (g, h, c, r, p)
     }
 
@@ -177,7 +196,7 @@ mod testes {
     fn aceita_voto_zero_e_voto_um() {
         for v in [0u64, 1] {
             let (g, h, c, _, p) = cenario(v);
-            assert!(verificar(&g, &h, &c, &p), "prova honesta de v={} falhou", v);
+            assert!(verificar(CTX, &g, &h, &c, &p), "prova honesta de v={} falhou", v);
         }
     }
 
@@ -188,7 +207,7 @@ mod testes {
         let h = ponto::de_hex(H_HEX).unwrap();
         let r = pedersen::acaso_fr().unwrap();
         let c = pedersen::comprometer(&g, &h, &pedersen::escalar(2), &r);
-        assert_eq!(provar(&g, &h, &c, 2, &r), Err(Erro::VotoForaDoBinario(2)));
+        assert_eq!(provar(CTX, &g, &h, &c, 2, &r), Err(Erro::VotoForaDoBinario(2)));
     }
 
     /// E se alguém TENTAR forjar uma prova para v=2 usando o maquinário
@@ -207,11 +226,11 @@ mod testes {
         let e1 = pedersen::acaso_fr().unwrap();
         let z1 = pedersen::acaso_fr().unwrap();
         let a1: G1Affine = (h * z1 - (G1Projective::from(c2) - g) * e1).into();
-        let e = desafio(&c2, &a0, &a1);
+        let e = desafio(CTX, &c2, &a0, &a1);
         let forjada = Prova { a0, a1, e0: e - e1, z0: t + (e - e1) * r, e1, z1 };
 
         assert!(
-            !verificar(&g, &h, &c2, &forjada),
+            !verificar(CTX, &g, &h, &c2, &forjada),
             "prova forjada para v=2 passou: a urna pode ser rechada"
         );
     }
@@ -223,19 +242,19 @@ mod testes {
 
         let mut q = p.clone();
         q.e0 = q.e0 + um;
-        assert!(!verificar(&g, &h, &c, &q), "e0 adulterado passou");
+        assert!(!verificar(CTX, &g, &h, &c, &q), "e0 adulterado passou");
 
         let mut q = p.clone();
         q.z0 = q.z0 + um;
-        assert!(!verificar(&g, &h, &c, &q), "z0 adulterado passou");
+        assert!(!verificar(CTX, &g, &h, &c, &q), "z0 adulterado passou");
 
         let mut q = p.clone();
         q.z1 = q.z1 + um;
-        assert!(!verificar(&g, &h, &c, &q), "z1 adulterado passou");
+        assert!(!verificar(CTX, &g, &h, &c, &q), "z1 adulterado passou");
 
         let mut q = p.clone();
         core::mem::swap(&mut q.a0, &mut q.a1);
-        assert!(!verificar(&g, &h, &c, &q), "ramos trocados passaram");
+        assert!(!verificar(CTX, &g, &h, &c, &q), "ramos trocados passaram");
     }
 
     /// A prova está presa ao SEU compromisso: não dá para reusar a de outra
@@ -245,7 +264,36 @@ mod testes {
         let (g, h, _, _, p) = cenario(1);
         let outro_r = pedersen::acaso_fr().unwrap();
         let outro_c = pedersen::comprometer(&g, &h, &pedersen::escalar(1), &outro_r);
-        assert!(!verificar(&g, &h, &outro_c, &p), "prova migrou de compromisso");
+        assert!(!verificar(CTX, &g, &h, &outro_c, &p), "prova migrou de compromisso");
+    }
+
+    /// **A prova está presa a QUEM vota e a QUAL proposta.**
+    ///
+    /// Sem isso, copiar o `C` e a prova de outra pessoa é um voto válido: a
+    /// prova convence de que `v ∈ {0,1}` e nada nela diz de quem é. O
+    /// `Votou(id, addr)` impede votar duas vezes, não impede votar com a
+    /// cédula alheia.
+    #[test]
+    fn prova_nao_migra_de_contexto() {
+        let g = pedersen::gerador();
+        let h = ponto::de_hex(H_HEX).unwrap();
+        let r = pedersen::acaso_fr().unwrap();
+        let c = pedersen::comprometer(&g, &h, &pedersen::escalar(1), &r);
+
+        let alice = b"proposta-7|alice|opcao-0".as_slice();
+        let bob = b"proposta-7|bob|opcao-0".as_slice();
+        let outra = b"proposta-8|alice|opcao-0".as_slice();
+        let outra_opcao = b"proposta-7|alice|opcao-1".as_slice();
+
+        let p = provar(alice, &g, &h, &c, 1, &r).unwrap();
+        assert!(verificar(alice, &g, &h, &c, &p));
+        for ctx in [bob, outra, outra_opcao, b"".as_slice()] {
+            assert!(
+                !verificar(ctx, &g, &h, &c, &p),
+                "prova de alice valeu no contexto {:?}",
+                std::str::from_utf8(ctx)
+            );
+        }
     }
 
     #[test]
@@ -273,6 +321,10 @@ mod vetor {
     use super::*;
     use crate::ponto;
 
+    /// A sonda 12 do contrato mede a primitiva isolada, com contexto vazio.
+    /// O contrato de verdade passa `proposta ‖ votante ‖ opção`.
+    const CTX: &[u8] = b"";
+
     const H_HEX: &str = "1462b4b57a7d01e598685e913608bab6990de8cce1c705642c19a6b9ed660fc589758bdebb20c2bdde65a25b35b12206198669dff273abe7b9e6a0b3e636f8a8a41f9c81f6a79d308ec0fe57ef8a073c90e444002ba59807f987cce67d72eccf";
 
     #[test]
@@ -283,8 +335,8 @@ mod vetor {
         let r = pedersen::escalar(31337);
         let v = 1u64;
         let c = pedersen::comprometer(&g, &h, &pedersen::escalar(v), &r);
-        let p = provar(&g, &h, &c, v, &r).unwrap();
-        assert!(verificar(&g, &h, &c, &p));
+        let p = provar(CTX, &g, &h, &c, v, &r).unwrap();
+        assert!(verificar(CTX, &g, &h, &c, &p));
 
         let dec = |f: &Fr| pedersen::fr_para_decimal(f);
         println!("\n# vetor CDS (v=1, r=31337) — gerado pelo core, para o contrato");

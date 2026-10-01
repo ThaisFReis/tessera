@@ -225,3 +225,14 @@ mod testes {
         assert_eq!(fr_para_decimal(&escalar(101)), "101");
     }
 }
+
+/// Escalar → 32 bytes big-endian canônicos, que é como `Bls12381Fr::from_bytes`
+/// lê. O contrato **não reduz** módulo `r` na leitura, então os bytes têm de
+/// já ser canônicos — e são, porque `acaso.rs` sorteia por rejeição.
+pub fn fr_para_bytes_be(f: &Fr) -> [u8; 32] {
+    use ark_ff::BigInteger;
+    let v = f.into_bigint().to_bytes_be();
+    let mut b = [0u8; 32];
+    b[32 - v.len()..].copy_from_slice(&v);
+    b
+}

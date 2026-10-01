@@ -13,6 +13,22 @@ use ark_ff::{BigInteger, PrimeField, Zero};
 
 pub const TAMANHO: usize = 96;
 
+/// **O ponto no infinito, como o host do Soroban o codifica.**
+///
+/// Não é 96 bytes de zero — isso o host recusa com "point not on curve". É o
+/// bit de flag de infinito do formato zcash (`0x40` no byte alto), com o resto
+/// zerado. Descoberto empiricamente ao somar cada candidato ao gerador e ver
+/// qual devolvia o gerador: só `0x40` passou; zeros e `0xc0` abortaram.
+///
+/// É exatamente a classe de divergência silenciosa que este arquivo existe
+/// para fechar: o acumulador de uma proposta sem votos é o infinito, então
+/// errar aqui quebraria a primeira cédula de toda votação.
+pub const INFINITO: [u8; TAMANHO] = {
+    let mut b = [0u8; TAMANHO];
+    b[0] = 0x40;
+    b
+};
+
 #[derive(Debug, PartialEq)]
 pub enum Erro {
     TamanhoErrado(usize),
@@ -25,8 +41,7 @@ pub enum Erro {
 pub fn serializar(p: &G1Affine) -> [u8; TAMANHO] {
     let mut saida = [0u8; TAMANHO];
     if p.is_zero() {
-        // O ponto no infinito é (0, 0) nesta serialização.
-        return saida;
+        return INFINITO;
     }
     let (x, y) = (p.x().unwrap(), p.y().unwrap());
     saida[..48].copy_from_slice(&x.into_bigint().to_bytes_be());
@@ -44,7 +59,7 @@ pub fn desserializar(b: &[u8]) -> Result<G1Affine, Erro> {
     if b.len() != TAMANHO {
         return Err(Erro::TamanhoErrado(b.len()));
     }
-    if b.iter().all(|&x| x == 0) {
+    if b == INFINITO {
         return Ok(G1Affine::identity());
     }
     let x = Fq::from_be_bytes_mod_order(&b[..48]);
@@ -99,6 +114,19 @@ mod testes {
             para_hex(&g),
             G_HEX,
             "o gerador nativo NAO serializa como o host espera"
+        );
+    }
+
+    /// O infinito tem de ida-e-voltar na codificação do host, não em zeros.
+    #[test]
+    fn infinito_e_a_flag_do_host_nao_zeros() {
+        let id = G1Affine::identity();
+        assert_eq!(serializar(&id)[0], 0x40);
+        assert!(serializar(&id)[1..].iter().all(|&b| b == 0));
+        assert_eq!(desserializar(&INFINITO).unwrap(), id);
+        assert!(
+            desserializar(&[0u8; TAMANHO]).is_err(),
+            "96 zeros foram aceitos como infinito; o host os recusa"
         );
     }
 

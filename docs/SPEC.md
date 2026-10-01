@@ -395,8 +395,29 @@ O TTL padrão coincide com a janela de retenção do RPC (§8.3): sem intervenç
 | `Votou(id, addr)` | até encerrar | TTL padrão, pode arquivar |
 
 Estender todos os `Votou` custaria ~2.070 XLM numa assembleia de 10.000
-pessoas. Estender só o que o nível 1 do verificador precisa custa **~0,6 XLM,
-independente do comparecimento**. Os `Votou` só impedem voto duplo *durante* a
+pessoas. Estender só o que o nível 1 do verificador precisa custa **1,73 XLM,
+independente do comparecimento** — medido na testnet em 2026-10-01, contra uma
+projeção de ~0,6 XLM que errava por 3×.
+
+**E há um custo que a projeção não tinha: o do próprio contrato.** Aluguel é
+proporcional ao tamanho da entrada, e o Wasm tem 21 KB. Manter instância e
+código vivos por 180 dias custa **181,70 XLM**.
+
+Esse número achou um defeito de desenho antes de ele chegar na rede. Na
+primeira versão, `abrir()` estendia o TTL da instância junto com o resto, e a
+primeira chamada custou **182,39 XLM** contra **1,72 XLM** da segunda: *a
+primeira governança a usar o módulo pagaria a conta de todas as outras.*
+
+A correção é separar as duas coisas:
+
+| chamada | custo | quem paga | com que frequência |
+|---|---|---|---|
+| `abrir()` | **1,73 XLM** | a governança | por proposta |
+| `manter()` | **181,70 XLM** | qualquer pessoa | a cada 180 dias |
+
+`manter()` é um bem público: enquanto alguém pagar, todas as propostas seguem
+utilizáveis. Sem ninguém pagar, instância e código arquivam em 7 dias e voltam
+com `RestoreFootprintOp` — degradação, não perda. Os `Votou` só impedem voto duplo *durante* a
 votação; a unicidade histórica é reconferida pelo nível 2, que lê eventos.
 
 Entrada arquivada não é perdida: volta com `RestoreFootprintOp`, ao custo de
@@ -612,7 +633,15 @@ MSM único, nunca muls somados.**
 | validação de 6 pontos G1 | 4.433.406 | medido |
 | caminho de Merkle (profundidade 8, sha256) | 127.863 | medido |
 | 2 × `g1_add` no acumulador | 221.496 | medido |
-| **total** | **33.480.865** | |
+| **soma das primitivas** | **33.480.865** | |
+| **`votar()` inteiro, no contrato** | **36.781.170** | **medido** |
+
+A diferença de 9,8% entre a soma das primitivas e a chamada inteira é
+autorização, leitura e escrita de estado, e o evento. É o custo de ser um
+contrato em vez de uma conta de padaria, e cabe na folga.
+
+Uma cédula **pública** custa **350.372** — 105× menos. É o preço do sigilo,
+medido, e é o número que uma governança precisa ver antes de escolher o modo.
 
 Folga contra os 400M: **11,9×**. O orçamento usa 8,4% de uma transação, e
 **nenhuma linha é projeção**: tudo acima foi medido em invocação real.

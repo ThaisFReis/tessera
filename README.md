@@ -27,7 +27,7 @@ computacional, para sempre. O voto em si transita fora da cadeia e é destruído
 |---|---|
 | Sonda criptográfica medida na testnet | ✅ no ar |
 | Desenho Pedersen verificado on-chain | ✅ medido |
-| Contrato de urna (`abrir`/`votar`/`apurar`) | ❌ em construção |
+| Contrato de urna (`abrir`/`votar`/`apurar`) | ✅ no ar, 20 testes |
 | Cliente CLI | ❌ em construção |
 | Verificador público | ❌ em construção |
 
@@ -52,6 +52,9 @@ Teto de CPU por transação, achado por bissecção na testnet: **400.000.000**.
 | **prova disjuntiva CDS** | **10.980.243** | **14.144 stroops** |
 | **apuração Pedersen** | **5.408.931** | **8.622 stroops** |
 | **caminho de Merkle (profundidade 8)** | **127.863** | **5.235 stroops** |
+| **`votar()` completo, m=2** | **36.781.170** | |
+| **`apurar()`, m=2** | **11.150.582** | |
+| **`votar_publico()`, m=2** | **350.372** | |
 | apuração ElGamal (desenho anterior) | 6.712.183 | 11.852 stroops |
 | verificação Groth16 (4 entradas públicas) | 47.371.348 | |
 
@@ -67,8 +70,13 @@ Três conclusões que mudaram o desenho:
    mais barato em CPU e 27% em taxa que o ElGamal que ele substituiu. Não houve
    trade-off a pagar.
 
-E o orçamento fechou: **um voto completo custa 33.480.865 instruções, 8,4% de
-uma transação, com folga de 11,9×.** Nenhuma linha desse orçamento é projeção.
+E o orçamento fechou no contrato de verdade, não na soma das sondas: **um voto
+confidencial custa 36.781.170 instruções, 9,2% de uma transação, com folga de
+10,9×.** A soma das primitivas dava 33.480.865; os 9,8% a mais são autorização,
+estado e evento.
+
+Uma cédula **pública** custa 350.372 — **105× menos**. É o preço do sigilo,
+medido.
 
 E uma que responde à pergunta mais comum: **ZK cabe.** `pairing_check`
 compartilha a exponenciação final entre os pares, então uma verificação Groth16
@@ -97,7 +105,7 @@ Detalhes e método em [`bls-smoke/RESULTADOS.md`](bls-smoke/RESULTADOS.md).
 
 ---
 
-## Duas descobertas que valem aviso
+## Três descobertas que valem aviso
 
 **As sondas 8 e 9 encontraram o mesmo número por caminhos diferentes.** A janela
 de retenção do RPC público é de 120.960 ledgers; o TTL padrão de uma entrada
@@ -110,7 +118,25 @@ dia 1. As consequências de desenho estão em
 
 - o verificador lê dos **arquivos de histórico** por padrão, não do RPC;
 - `abrir()` estende o TTL de `Proposta` e dos acumuladores ao teto da rede
-  (~0,6 XLM fixo), e deixa as entradas `Votou` arquivarem.
+  (**1,73 XLM**, independente do comparecimento), e deixa as entradas `Votou`
+  arquivarem;
+- o aluguel do **próprio contrato** — 21 KB de Wasm por 180 dias — custa
+  **181,70 XLM** e fica numa função `manter()` separada, que qualquer pessoa
+  chama. Na primeira versão isso estava dentro de `abrir()`, e a medição na
+  testnet mostrou a primeira chamada custando **182,39 XLM** contra **1,72** da
+  segunda: a primeira governança a usar o módulo pagaria a conta de todas as
+  outras.
+
+**O ponto no infinito não é 96 bytes de zero.** O host recusa zeros com
+"point not on curve". A codificação é o bit de flag do formato zcash — `0x40`
+no byte alto, zeros no resto — e não está escrita em lugar nenhum que
+tivéssemos encontrado; foi achada somando cada candidato ao gerador e vendo
+qual devolvia o gerador.
+
+Importa porque **o acumulador de uma proposta sem votos é o infinito**: errar
+isso quebra a primeira cédula de toda votação, e só a primeira. Está travado
+dos dois lados, em `core/src/ponto.rs` e no teste
+`o_infinito_do_host_e_a_flag_zcash_nao_zeros`.
 
 **Para quem for reproduzir:** as invocações registradas aqui saem da janela do
 RPC sete dias depois de feitas. Depois disso, leia dos arquivos de histórico.
@@ -121,18 +147,21 @@ RPC sete dias depois de feitas. Depois disso, leia dos arquivos de histórico.
 
 ```bash
 cd bls-smoke && cargo test --lib -- --nocapture --test-threads=1   # 13 sondas
-cd ../core   && cargo test                                          # 39 testes
+cd ../core   && cargo test                                          # 48 testes
+cd ../contrato && cargo test                                        # 20 testes
 ```
 
 Requer `rustc 1.97+`, `stellar-cli 25.2+`, alvo `wasm32v1-none`.
-Cinquenta e dois testes, todos passando, sem rede.
+Oitenta e um testes, todos passando, sem rede.
 
 O crate `core/` é a matemática compartilhada entre contrato, cliente e
 verificador. Ele usa **arkworks, o mesmo crate do host do Soroban** — o que
 elimina pela raiz a divergência entre o provador nativo e o verificador Wasm.
-Três testes travam isso: o agregado Pedersen, a prova CDS e o caminho de
-Merkle gerados no `core` reproduzem byte a byte o que o contrato aceitou na
-testnet.
+E o cruzamento provador↔verificador não é um vetor congelado: **os testes do
+contrato geram as provas com o `core`, em Rust nativo, e as verificam no host
+do Soroban, em Wasm, a cada `cargo test`.** A rodada completa — seis pessoas
+votando em sigilo, a mesa abrindo o agregado, o resultado saindo certo — roda
+com criptografia de verdade do começo ao fim.
 
 Os testes de custo asseram teto: uma regressão de custo quebra o build em vez
 de aparecer na demo.
@@ -141,6 +170,7 @@ Contratos na testnet:
 
 | | |
 |---|---|
+| **Tessera (`abrir`/`votar`/`apurar`)** | `CBD5QTEJPKQGNLFBEGVRXDKJ6CUBGYS2CHEUFEXPERR7W7TXBFH4X43W` |
 | sondas 1–13 (cripto, CDS e Merkle) | `CCL4CPAJ4ZVP25FP2PO7T3AMYGIVQZLYJZYZS53UAM5IFA5NFYGLUISR` |
 | sonda 9 (TTL) | `CCCZ4HPW3ESHO6BMNFGXX6DJRSWPWA7FBQH2MS6QGHC3U67DIZ434KFC` |
 

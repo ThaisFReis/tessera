@@ -10,3 +10,12 @@ pub mod merkle;
 pub mod pedersen;
 pub mod ponto;
 pub mod shamir;
+pub mod soma;
+
+/// Os tipos do arkworks que o `core` expõe, para quem o consome não precisar
+/// repetir a dependência — e, mais importante, não conseguir repetir numa
+/// **versão diferente**. O host do Soroban usa arkworks; divergir de versão
+/// aqui seria exatamente o bug que este crate existe para impedir.
+pub mod ark {
+    pub use ark_bls12_381::{Fr, G1Affine};
+}
