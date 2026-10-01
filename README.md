@@ -119,18 +119,20 @@ RPC sete dias depois de feitas. Depois disso, leia dos arquivos de histórico.
 
 ```bash
 cd bls-smoke && cargo test --lib -- --nocapture --test-threads=1   # 12 sondas
-cd ../core   && cargo test                                          # 20 testes
+cd ../core   && cargo test                                          # 21 testes
 ```
 
 Requer `rustc 1.97+`, `stellar-cli 25.2+`, alvo `wasm32v1-none`.
-Trinta e dois testes, todos passando, sem rede.
+Trinta e três testes, todos passando, sem rede.
 
 O crate `core/` é a matemática compartilhada entre contrato, cliente e
 verificador. Ele usa **arkworks, o mesmo crate do host do Soroban** — o que
 elimina pela raiz a divergência entre o provador nativo e o verificador Wasm.
 Dois testes travam isso: o agregado Pedersen e a prova CDS geradas no `core`
-reproduzem byte a byte o que o contrato produziu na testnet. Os testes de custo asseram teto: uma
-regressão de custo quebra o build em vez de aparecer na demo.
+reproduzem byte a byte o que o contrato produziu na testnet.
+
+Os testes de custo asseram teto: uma regressão de custo quebra o build em vez
+de aparecer na demo.
 
 Contratos na testnet:
 
