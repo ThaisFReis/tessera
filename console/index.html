@@ -19,7 +19,7 @@ body{
   font-family:var(--sans); font-size:15px; line-height:1.55;
   -webkit-font-smoothing:antialiased;
 }
-.pag{max-width:900px; margin:0 auto; padding-block:0 72px; padding-left:20px; padding-right:20px}
+.pag{max-width:1440px; margin:0 auto; padding-block:0 72px; padding-left:clamp(20px,4vw,64px); padding-right:clamp(20px,4vw,64px)}
 a{color:var(--acento); text-decoration:none; border-bottom:1px solid rgba(200,242,79,.3)}
 a:hover{border-bottom-color:var(--acento)}
 :focus-visible{outline:2px solid var(--acento); outline-offset:3px}
@@ -32,6 +32,49 @@ a:hover{border-bottom-color:var(--acento)}
 .meta{display:flex; flex-wrap:wrap; gap:4px 28px; margin-top:20px;
   font-family:var(--mono); font-size:11px; color:var(--secundario)}
 .meta b{color:var(--texto); font-weight:400}
+.roteiro{display:flex; align-items:center; justify-content:space-between; gap:20px; padding:18px 0; border-bottom:1px solid var(--hairline)}
+.ato{font:10px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--acento)}
+.passos{font:11px var(--mono); color:var(--secundario)}
+.navegacao{display:flex; align-items:center; gap:10px}
+button{font:inherit; cursor:pointer}
+.nav-btn,.acao,.natureza{background:transparent; color:var(--texto); border:1px solid var(--hairline); border-radius:2px}
+.nav-btn{padding:9px 13px; font:11px var(--mono)}
+.nav-btn:hover,.natureza:hover{border-color:var(--secundario)}
+.nav-btn:disabled{opacity:.35; cursor:default}
+.acao{display:inline-block; padding:13px 18px; margin-top:20px; background:var(--acento); color:var(--profundo); border-color:var(--acento); font:11px var(--mono); text-transform:uppercase; letter-spacing:.08em}
+.acao:hover{filter:brightness(1.08)}
+.palco{display:grid; grid-template-columns:minmax(0,1.35fr) minmax(300px,.75fr); min-height:670px}
+.palco>section{padding:clamp(28px,4vw,58px) clamp(20px,4vw,60px) 50px 0; border:0}
+.mecanica{padding:clamp(28px,4vw,58px) 0 50px clamp(22px,3vw,46px); border-left:1px solid var(--hairline); background:linear-gradient(90deg,rgba(14,16,13,.55),transparent)}
+.mecanica .olho{color:var(--acento)}
+.mecanica p{font-size:13px; color:var(--secundario)}
+.mecanica strong{color:var(--texto); font-weight:500}
+.mecanica .hex{font-size:9px; max-height:130px; overflow:hidden}
+.painel-tag{font:10px var(--mono); color:var(--secundario); letter-spacing:.12em; text-transform:uppercase}
+.marca-painel{font:11px var(--mono); color:var(--acento); margin-bottom:22px}
+.rolo-cli{font:11px/1.45 var(--mono); white-space:pre-wrap; word-break:break-word; max-height:300px; overflow-y:auto; margin:10px 0 0; color:var(--secundario); background:var(--profundo); padding:12px}
+.selo-vivo,.selo-eco{font:9px var(--mono); letter-spacing:.14em; padding:2px 7px; border-radius:999px; vertical-align:middle; white-space:nowrap}
+.selo-vivo{color:var(--acento); border:1px solid var(--acento)}
+.selo-eco{color:var(--apagado); border:1px solid var(--hairline)}
+select.campo-demo{appearance:none}
+.aviso-demo{font:11px var(--mono); color:var(--secundario); border:1px solid var(--hairline); padding:12px; margin:20px 0}
+.cartao{border:1px solid var(--hairline); background:var(--profundo); padding:20px; margin:20px 0}
+.cartao h3{margin:0 0 12px; font:11px var(--mono); color:var(--secundario); letter-spacing:.08em; text-transform:uppercase}
+.pergunta-demo{border-top:1px solid var(--hairline); padding:18px 0}
+.pergunta-demo:first-child{border-top:0}
+.pergunta-demo h3{font:17px var(--sans); font-weight:500; margin:0 0 14px}
+.campo-demo{display:block; width:100%; padding:10px 12px; margin:7px 0; color:var(--texto); background:var(--fundo); border:1px solid var(--hairline); border-radius:2px; font:13px var(--sans)}
+.campo-demo:focus{border-color:var(--acento);outline:none}
+.campo-rot{display:block; margin-top:10px; font:10px var(--mono); color:var(--secundario); text-transform:uppercase; letter-spacing:.08em}
+.grupo-opcoes{display:flex; flex-wrap:wrap; gap:8px}
+.natureza{padding:10px 14px; font:11px var(--mono)}
+.natureza[aria-pressed=true]{border-color:var(--texto); background:var(--texto); color:var(--profundo)}
+.rotulo-natureza{display:block; margin-top:12px; font:10px var(--mono); color:var(--secundario)}
+.destaque{font:clamp(26px,4vw,48px)/1.08 var(--serif); margin:20px 0; max-width:16ch}
+.fato{color:var(--acento); font:11px var(--mono)}
+.recusa-demo{border-left:2px solid var(--recusa); padding:16px; color:var(--recusa); background:rgba(255,107,74,.05); margin-top:18px; white-space:pre-line}
+.linha-dado{font:11px var(--mono); color:var(--secundario); padding:8px 0; border-bottom:1px solid var(--hairline); overflow-wrap:anywhere}
+.linha-dado b{color:var(--texto); font-weight:400}
 
 /* ---- seções ---- */
 section{padding-block:52px; border-bottom:1px solid var(--hairline)}
@@ -120,6 +163,10 @@ input[type=file]{font-family:var(--mono); font-size:11px; color:var(--secundario
   margin-top:8px; max-width:100%}
 
 @media (max-width:620px){
+  .palco{display:block}
+  .palco>section{padding-right:0;min-height:420px}
+  .mecanica{border-left:0;border-top:1px solid var(--hairline);padding:26px 0}
+  .roteiro{flex-wrap:wrap}
   .par-cedula{grid-template-columns:1fr}
   /* Em tela estreita o bloco encolhe, e 192 caracteres têm de continuar
      cabendo: hex cortado é bug, e cortado DIFERENTE entre dois blocos
@@ -132,14 +179,18 @@ input[type=file]{font-family:var(--mono); font-size:11px; color:var(--secundario
 
 <div class="pag">
   <header class="topo">
-    <div class="marca">Tessera · console</div>
+    <div class="marca">Tessera · demonstração</div>
     <p class="aviso-escopo">
-      Visor sobre a saída da CLI. Não é um aplicativo: não tem carteira, não tem
-      servidor e não assina nada. Lê o <code>estado/&lt;proposta&gt;.json</code>
-      que a CLI escreve e desenha os três momentos.
+      Votos, compromissos e transações de rodadas reais na testnet. Os controles
+      didáticos não enviam transações; a CLI é quem publica os votos.
     </p>
     <dl class="meta" id="meta"></dl>
   </header>
+
+  <nav class="roteiro" aria-label="Navegação da demonstração">
+    <div><div class="ato" id="ato"></div><div class="passos" id="passos"></div></div>
+    <div class="navegacao"><button class="nav-btn" id="anterior" type="button">← anterior</button><button class="nav-btn" id="proximo" type="button">próximo →</button></div>
+  </nav>
 
   <main id="app"></main>
 
@@ -258,7 +309,7 @@ function cabecalho(d) {
    nomeia, a pessoa para de olhar os bytes e começa a ler o rótulo. */
 function momentoCedula(d) {
   const s = el("section");
-  s.append(el("p", "olho", "Momento 1 · cédula"));
+  s.append(el("p", "olho", "06 / 10 · III · qualquer pessoa"));
   /* A primeira pergunta sigilosa: é dela que sai o par de compromissos.
      Numa cédula mista as públicas não têm o que mostrar aqui — elas já
      estão em claro no ledger. */
@@ -292,7 +343,7 @@ function momentoCedula(d) {
   const par = el("div", "par-cedula");
   ["A", "B"].forEach((rot, i) => {
     const col = el("div");
-    col.append(el("div", "cedula-rot", `Cédula ${rot}`));
+    col.append(el("div", "cedula-rot", `Bloco ${rot}`));
     col.append(el("div", "hex", v.compromissos[desloc + i]));
     par.append(col);
   });
@@ -322,7 +373,7 @@ function momentoCedula(d) {
    este console existir (UX.md §7, Nível 2). */
 function grade(d) {
   const s = el("section");
-  s.append(el("p", "olho", "o que a rede guarda, para sempre"));
+  s.append(el("p", "olho", "07 / 10 · III · qualquer pessoa"));
   s.append(el("h2", null, "Todos os compromissos, lado a lado"));
 
   const sigilosos = d.votos.filter((v) => !v.publico);
@@ -338,10 +389,11 @@ function grade(d) {
   s.append(g);
 
   const uns = sigilosos.length;
+  const votosComprometidos = uns * nPerguntasConf(d);
   const leg = el("p", "legenda-grade");
   leg.textContent =
     `${num(todos.length)} objetos, de ${num(uns)} pessoas, ${num(opcoesConf(d))} por cédula. ` +
-    `${num(uns)} deles cometem um voto e ${num(todos.length - uns)} cometem a ausência dele. ` +
+    `${num(votosComprometidos)} deles cometem um voto e ${num(todos.length - votosComprometidos)} cometem a ausência dele. ` +
     `Qual é qual não está aqui, e não vai estar nunca — nem para quem apura, ` +
     `nem para quem escreveu este código.`;
   s.append(leg);
@@ -533,12 +585,12 @@ function momentoApuracao(d) {
 /* ---------- O verificador. A tela do cético, e do jurado. ---------- */
 function verificador(d) {
   const s = el("section");
-  s.append(el("p", "olho", "verificador independente"));
-  s.append(el("h2", null, "Confia em nada."));
+  s.append(el("p", "olho", "10 / 10 · III · qualquer pessoa"));
+  s.append(el("h2", null, "O veredito do verificador"));
   s.append(
     el("p", "dim",
-      "Processo separado. Não fala com o contrato: relê o ledger, recalcula a " +
-      "raiz de aptos, reverifica cada prova e refaz o agregado.")
+      "Um processo separado, em Rust, releu o estado e refez a aritmética. " +
+      "Esta tela apresenta o veredito gravado por ele; não recalcula as provas no navegador.")
   );
 
   const v = d.verificacao;
@@ -584,19 +636,488 @@ function verificador(d) {
   return s;
 }
 
-/* ---------- desenho ---------- */
-function desenhar(d) {
-  cabecalho(d);
-  const app = $("#app");
-  app.replaceChildren(
-    momentoCedula(d),
-    grade(d),
-    momentoConferencia(d),
-    momentoApuracao(d),
-    verificador(d)
-  );
-  document.title = `Tessera Console · ${d.proposta}`;
+/* ---------- roteiro em três atos ---------- */
+let dados = null, passo = 0, reciboQueimado = false, mesaMentindo = false;
+let rascunho = [], erroRascunho = "";
+
+/* ---------- A ponte ----------
+   A página é estática, e página estática não assina transação. Quando
+   `console/ponte.py` está no ar, cada botão desta demo chama a CLI e vira uma
+   transação de verdade na testnet. Sem a ponte, a página continua sendo a
+   reencenação de uma rodada real — é assim que ela funciona no GitHub Pages.
+
+   Em outras palavras: a ponte não muda o que a tela afirma, muda o tempo
+   verbal. */
+const ponte = { viva: false, identidades: [], saida: "", ocupada: false, falha: "" };
+
+async function chamar(verbo, corpo) {
+  ponte.ocupada = true; ponte.falha = ""; mostrar();
+  try {
+    const r = await fetch(`/api/${verbo}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(corpo),
+    });
+    const j = await r.json();
+    ponte.saida = j.saida || j.erro || "";
+    /* `ok: false` não é defeito: a recusa do contrato é um resultado da demo,
+       e o painel de τ existe para mostrá-la. */
+    if (!j.ok && !j.saida) ponte.falha = j.erro || "a ponte recusou";
+    if (j.estado && valido(j.estado)) {
+      const passoAtual = passo;
+      desenhar(j.estado);
+      passo = passoAtual;
+    }
+    return j;
+  } catch (e) {
+    ponte.falha = "a ponte caiu — ela ainda está rodando?";
+    return { ok: false };
+  } finally {
+    ponte.ocupada = false; mostrar();
+  }
 }
+
+/* O rolo do terminal. É a mecânica deixada de ver: a mesma saída que a CLI
+   imprimiria, dentro da tela, sem tradução. */
+function terminal(pai) {
+  if (!ponte.saida) return;
+  const cx = el("div", "cartao");
+  texto(cx, "p", "olho", "a CLI respondeu");
+  const pre = el("pre", "rolo-cli", ponte.saida);
+  cx.append(pre); pai.append(cx);
+}
+
+function aviso(pai, vivo, reencenado) {
+  texto(pai, "p", "aviso-demo", ponte.viva ? vivo : reencenado);
+  if (ponte.falha) texto(pai, "p", "recusa-demo", ponte.falha);
+}
+
+function botao(rotulo, aoClicar) {
+  const b = el("button", "acao", ponte.ocupada ? "enviando à testnet…" : rotulo);
+  b.type = "button"; b.disabled = ponte.ocupada;
+  b.addEventListener("click", aoClicar);
+  return b;
+}
+
+function campo(pai, rot, valor, aoMudar) {
+  texto(pai, "label", "campo-rot", rot);
+  const i = el("input", "campo-demo"); i.type = "text"; i.value = valor;
+  i.setAttribute("aria-label", rot);
+  i.addEventListener("change", () => aoMudar(i.value.trim()));
+  pai.append(i); return i;
+}
+
+async function sondarPonte() {
+  try {
+    const r = await fetch("/api/identidades");
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j.ok) return;
+    ponte.viva = true;
+    ponte.identidades = j.identidades.filter((x) => x.tem_chave).map((x) => x.nome);
+    mostrar();
+  } catch (_) { /* sem ponte: a reencenação continua valendo */ }
+}
+
+/* O que o organizador está montando, e com que nome vai ao ar. */
+const aoVivo = { proposta: "", prazo: "15m", identidade: "", escolhas: [], publico: false };
+
+const roteiro = [
+  ["I · organizador", "Montar a cédula", painelPerguntas, mecanismoPerguntas],
+  ["I · organizador", "Eleitorado, mesa e prazo", painelAbertura, mecanismoAbertura],
+  ["II · votante", "Analisar a cédula", painelAnalise, mecanismoAnalise],
+  ["II · votante", "Voto real", painelVotar, mecanismoVotar],
+  ["II · votante", "O recibo", painelRecibo, mecanismoRecibo],
+  ["III · qualquer pessoa", "A cédula indecifrável", momentoCedula, mecanismoCedula],
+  ["III · qualquer pessoa", "A grade", grade, mecanismoGrade],
+  ["III · qualquer pessoa", "Apurar", painelApurar, mecanismoApurar],
+  ["III · qualquer pessoa", "Sigilo abaixo do mínimo", painelLimite, mecanismoLimite],
+  ["III · qualquer pessoa", "O verificador", verificador, mecanismoVerificador],
+];
+const texto = (pai, tag, cls, valor) => { const n = el(tag, cls, valor); pai.append(n); return n; };
+const detalhe = (pai, rot, valor) => {
+  const linha = el("div", "linha-dado");
+  texto(linha,"b",null,rot + "  ");
+  linha.append(document.createTextNode(valor));
+  pai.append(linha);
+};
+function titulo(s, numero, nome, subtitulo) {
+  const marca = texto(s,"p","marca-painel",`0${numero} / 10 · ${roteiro[numero-1][0].toUpperCase()}`);
+  const selo = el("span", ponte.viva ? "selo-vivo" : "selo-eco", ponte.viva ? "AO VIVO · TESTNET" : "RODADA GRAVADA");
+  marca.append(document.createTextNode("  ")); marca.append(selo);
+  texto(s,"h1",null,nome);
+  if (subtitulo) texto(s,"p","dim",subtitulo);
+}
+function blocoMecanica(nome) {
+  const m = el("aside","mecanica");
+  texto(m,"p","olho","O que acontece");
+  texto(m,"h2",null,nome);
+  return m;
+}
+function painelPerguntas(d) {
+  const s=el("section"); titulo(s,1,"Uma cédula, três decisões","O organizador define a natureza de cada pergunta antes da abertura.");
+  const carta=el("div","cartao");
+  const secretas=rascunho.filter(p=>p.confidencial).length;
+  texto(carta,"h3",null,"Modo derivado das perguntas");
+  texto(carta,"div","destaque",secretas===rascunho.length?"Confidencial":secretas===0?"Em aberto":"Semiconfidencial");
+  texto(carta,"p","peq dim",`${rascunho.length-secretas} em aberto · ${secretas} em sigilo · uma transação`);
+  if(secretas===0) texto(carta,"p","peq dim","Com todas as perguntas abertas, a votação é comum e não precisa dos compromissos do Tessera.");
+  s.append(carta);
+  rascunho.forEach((pg,i)=>{
+    const q=el("div","pergunta-demo");
+    texto(q,"div","painel-tag",`Pergunta ${i+1}`);
+    texto(q,"label","campo-rot","Texto da pergunta");
+    const pergunta=el("input","campo-demo");pergunta.type="text";pergunta.value=pg.texto;
+    pergunta.setAttribute("aria-label",`Texto da pergunta ${i+1}`);
+    pergunta.addEventListener("change",()=>{pg.texto=pergunta.value.trim()||pg.texto;mostrar();});q.append(pergunta);
+    texto(q,"label","campo-rot","Opções separadas por vírgula");
+    const opcoes=el("input","campo-demo");opcoes.type="text";opcoes.value=pg.opcoes.join(", ");
+    opcoes.setAttribute("aria-label",`Opções da pergunta ${i+1}`);
+    opcoes.addEventListener("change",()=>{
+      const novas=opcoes.value.split(",").map(x=>x.trim()).filter(Boolean);
+      const total=rascunho.reduce((n,p,j)=>n+(j===i?(pg.confidencial?novas.length:0):(p.confidencial?p.opcoes.length:0)),0);
+      if(novas.length<2||total>16){erroRascunho=novas.length<2?"Cada pergunta precisa de ao menos duas opções.":"O máximo é 16 opções sigilosas no total.";}
+      else {pg.opcoes=novas;erroRascunho="";}
+      mostrar();
+    });q.append(opcoes);
+    const grupo=el("div","grupo-opcoes");
+    [[true,"Em sigilo"],[false,"Em aberto"]].forEach(([valor,rot])=>{
+      const b=el("button","natureza",rot); b.type="button"; b.setAttribute("aria-pressed",String(pg.confidencial===valor));
+      b.addEventListener("click",()=>{
+        const total=rascunho.reduce((n,p,j)=>n+((j===i?valor:p.confidencial)?p.opcoes.length:0),0);
+        if(total>16)erroRascunho="O máximo é 16 opções sigilosas no total.";
+        else {pg.confidencial=valor;erroRascunho="";}
+        mostrar();
+      }); grupo.append(b);
+    });
+    q.append(grupo); s.append(q);
+  });
+  if(erroRascunho) texto(s,"p","recusa-demo",erroRascunho);
+  const add=el("button","nav-btn","+ pergunta");add.type="button";add.disabled=rascunho.length>=8;
+  add.addEventListener("click",()=>{rascunho.push({texto:"Nova pergunta",opcoes:["sim","não"],confidencial:false});mostrar();});s.append(add);
+  texto(s,"p","peq dim",`${rascunho.length} de 8 perguntas · ${rascunho.reduce((n,p)=>n+(p.confidencial?p.opcoes.length:0),0)} de 16 opções sigilosas`);
+  if (ponte.viva) {
+    const lanca = el("div","cartao");
+    texto(lanca,"h3",null,"Abrir esta cédula na testnet");
+    if (!aoVivo.proposta) aoVivo.proposta = "ao-vivo-" + Date.now().toString(36).slice(-5);
+    campo(lanca,"Nome da proposta",aoVivo.proposta,(v)=>{aoVivo.proposta=v;});
+    campo(lanca,"Prazo",aoVivo.prazo,(v)=>{aoVivo.prazo=v;});
+    lanca.append(botao("Abrir votação na testnet →", async () => {
+      if (erroRascunho) return;
+      const j = await chamar("abrir", {
+        proposta: aoVivo.proposta, prazo: aoVivo.prazo, limiar: 3,
+        perguntas: rascunho.map((p)=>({texto:p.texto,opcoes:p.opcoes,confidencial:p.confidencial})),
+      });
+      if (j.ok) { aoVivo.escolhas = []; passo = 1; mostrar(); }
+    }));
+    s.append(lanca);
+    terminal(s);
+  }
+  aviso(s,
+    "A ponte está no ar: estas perguntas são as que vão ao ledger. O nome e o prazo acima valem de verdade.",
+    "Prévia de desenho. A proposta da testnet abaixo já foi aberta; mudar esta prévia não altera a rede.");
+  return s;
+}
+function mecanismoPerguntas(d) {
+  const m=blocoMecanica("A natureza pertence à pergunta");
+  texto(m,"p",null,"Ela é fixada na abertura e vale para todos. Uma escolha individual de sigilo revelaria quem pediu proteção.");
+  detalhe(m,"CONTRATO",`Pergunta { opcoes: u32, confidencial: bool }`);
+  detalhe(m,"LIMITE","8 perguntas · 16 opções sigilosas no total");
+  texto(m,"p","peq","A cédula semiconfidencial é um vetor de perguntas abertas e sigilosas, na mesma transação.");
+  return m;
+}
+function painelAbertura(d) {
+  const s=el("section"); titulo(s,2,"Abrir a votação","Eleitorado, mesa e prazo foram publicados nesta rodada da testnet.");
+  const carta=el("div","cartao");
+  detalhe(carta,"QUEM VOTA",`${d.aptos.length} pessoas`);
+  detalhe(carta,"PESO","um voto por pessoa");
+  detalhe(carta,"MESA",`${d.mesa.membros} membros · ${d.mesa.limiar} endossos para apurar`);
+  detalhe(carta,"SIGILO MÍNIMO",`${d.sigilo_minimo} cédulas confidenciais`);
+  detalhe(carta,"ENCERRA","ledger "+num(d.prazo_ledger));
+  s.append(carta);
+  const a=el("a","acao","Ver transação de abertura ↗");
+  a.href=expert(d,"tx",d.abertura_tx); a.target="_blank"; a.rel="noopener"; s.append(a);
+  texto(s,"p","peq dim",`Raiz de aptos: ${d.raiz_aptos}`);
+  return s;
+}
+function mecanismoAbertura(d) {
+  const m=blocoMecanica("Quatro objetos publicados");
+  detalhe(m,"MERKLE",`raiz de 32 bytes · ${curto(d.raiz_aptos,12,8)}`);
+  detalhe(m,"MESA",`${d.mesa.limiar} de ${d.mesa.membros} parcelas de Shamir para reconstruir somente Σr`);
+  detalhe(m,"PRAZO",`fecha_em = ${d.prazo_ledger} · número de ledger`);
+  detalhe(m,"LIMIAR",`τ = ${d.sigilo_minimo} · fixado na abertura`);
+  texto(m,"p","peq","O contrato guarda a raiz, não a lista de eleitores. Cada pessoa apresenta seu caminho de Merkle ao votar.");
+  return m;
+}
+function painelAnalise(d) {
+  const s=el("section"); titulo(s,3,"Antes de votar","Agora é a vez de uma pessoa apta. Ela vê o que ficará público antes de enviar.");
+  texto(s,"p","fato",`${d.votos.length} de ${d.aptos.length} votaram nesta rodada registrada`);
+  d.perguntas.forEach((pg,i)=>{
+    const q=el("div","pergunta-demo"); texto(q,"div","painel-tag",`${i+1} · ${pg.confidencial?"em sigilo":"em aberto"}`);
+    texto(q,"h3",null,pg.texto); texto(q,"p","peq dim",pg.opcoes.map(MAIUSC).join("  ·  ")); s.append(q);
+  });
+  const abertas=d.perguntas.filter(p=>!p.confidencial);
+  if (abertas.length) texto(s,"p","aviso-demo",`A escolha em ${abertas.map(p=>p.texto).join("; ")} vai em claro ao lado do endereço. As outras perguntas ficam em sigilo na mesma transação.`);
+  return s;
+}
+function mecanismoAnalise(d) {
+  const m=blocoMecanica("A divulgação vem primeiro");
+  texto(m,"p",null,"O endereço e o fato de votar são públicos. Nas perguntas abertas, a escolha também é pública.");
+  detalhe(m,"APTIDÃO",`caminho de Merkle conferido contra ${curto(d.raiz_aptos,10,6)}`);
+  detalhe(m,"ATOMICIDADE",`${d.perguntas.length} perguntas · uma cédula · uma transação`);
+  return m;
+}
+function painelVotar(d) {
+  const s=el("section"); titulo(s,4,"Um voto publicado na testnet","Esta é uma cédula registrada, com transação e ledger conferíveis. As escolhas sigilosas não constam do estado público.");
+  const v=d.votos.find(x=>!x.publico && x.compromissos?.length);
+  /* Numa proposta recém-aberta ainda não existe cédula publicada — e é
+     exatamente aí que a urna precisa aparecer. */
+  if(!v){
+    texto(s,"p","dim","Ainda não há voto confidencial registrado nesta proposta.");
+    if (ponte.viva) s.append(urna(d));
+    return s;
+  }
+  let offPub=0;
+  d.perguntas.forEach((pg,i)=>{
+    const q=el("div","pergunta-demo"); texto(q,"div","painel-tag",`${i+1} · ${pg.confidencial?"em sigilo":"em aberto"}`);
+    texto(q,"h3",null,pg.texto);
+    if(pg.confidencial) texto(q,"p","peq dim",`${pg.opcoes.map(MAIUSC).join(" · ")} · escolha não publicada`);
+    else {
+      const escolha=(v.escolhas||[]).slice(offPub,offPub+pg.opcoes.length).findIndex(x=>x===1);
+      texto(q,"p","fato",escolha>=0?`Escolha publicada: ${MAIUSC(pg.opcoes[escolha])}`:"Escolha pública registrada no estado");
+      offPub+=pg.opcoes.length;
+    }
+    s.append(q);
+  });
+  const carta=el("div","cartao");texto(carta,"h3",null,"Dados da cédula real");
+  detalhe(carta,"TRANSAÇÃO",v.tx);
+  detalhe(carta,"LEDGER",num(v.ledger));
+  detalhe(carta,"CÉDULA",`${v.compromissos.length} compromissos · ${v.provas.length} provas disjuntivas · ${v.provas_soma.length} provas de soma`);
+  texto(carta,"p","peq dim","Primeiro compromisso publicado, sem rótulo de escolha:");
+  carta.append(el("div","hex",v.compromissos[0]));s.append(carta);
+  const a=el("a",null,"Conferir esta transação ↗");a.href=expert(d,"tx",v.tx);a.target="_blank";a.rel="noopener";s.append(a);
+  if (ponte.viva) s.append(urna(d));
+  return s;
+}
+
+/* A urna ao vivo. Uma opção por pergunta, uma identidade, um envio.
+
+   Ela mostra o compromisso **da escolha**, nunca o par — o par aparece só no
+   painel 6, onde a pergunta "qual era qual?" já não tem resposta na tela. Se os
+   dois aparecessem aqui, a demo revelaria o mapa que ela jura ser indecifrável. */
+function urna(d) {
+  const cx = el("div","cartao");
+  texto(cx,"h3",null,"Votar agora, nesta proposta");
+  const votaram = new Set((d.votos||[]).map((v)=>v.identidade));
+  const faltantes = ponte.identidades.filter((n)=>!votaram.has(n));
+  texto(cx,"label","campo-rot","Quem vota");
+  const quem = el("select","campo-demo");
+  ponte.identidades.forEach((n)=>{
+    const o=el("option",null, votaram.has(n) ? `${n} · já votou` : n);
+    o.value=n; o.disabled=votaram.has(n); quem.append(o);
+  });
+  /* Numa gravação são sete votos seguidos. A urna sempre oferece a próxima
+     pessoa que ainda não votou, para não travar na que acabou de votar — o
+     contrato recusaria com VotouDuasVezes. */
+  if (!aoVivo.identidade || votaram.has(aoVivo.identidade))
+    aoVivo.identidade = faltantes[0] || "";
+  quem.value = aoVivo.identidade;
+  quem.addEventListener("change",()=>{aoVivo.identidade=quem.value;});
+  cx.append(quem);
+
+  d.perguntas.forEach((pg,i)=>{
+    const q = el("div","pergunta-demo");
+    texto(q,"div","painel-tag",`${i+1} · ${pg.confidencial?"em sigilo":"em aberto"}`);
+    texto(q,"h3",null,pg.texto);
+    const g = el("div","grupo-opcoes");
+    pg.opcoes.forEach((o)=>{
+      const b = el("button","natureza",MAIUSC(o)); b.type="button";
+      b.setAttribute("aria-pressed", String(aoVivo.escolhas[i]===o));
+      b.addEventListener("click",()=>{aoVivo.escolhas[i]=o;mostrar();});
+      g.append(b);
+    });
+    q.append(g); cx.append(q);
+  });
+
+  const abre = el("button","nav-btn", aoVivo.publico ? "✓ abrindo o voto inteiro" : "abrir o voto inteiro (revelação voluntária)");
+  abre.type="button"; abre.setAttribute("aria-pressed",String(aoVivo.publico));
+  abre.addEventListener("click",()=>{aoVivo.publico=!aoVivo.publico;mostrar();});
+  cx.append(abre);
+
+  const faltam = d.perguntas.length - aoVivo.escolhas.filter(Boolean).length;
+  if (faltam > 0) texto(cx,"p","peq dim",`falta escolher ${faltam} de ${d.perguntas.length}`);
+  else cx.append(botao(`Enviar o voto de ${aoVivo.identidade} →`, async () => {
+    const j = await chamar("votar", {
+      proposta: d.proposta, identidade: aoVivo.identidade,
+      opcoes: aoVivo.escolhas, publico: aoVivo.publico,
+    });
+    if (j.ok) { aoVivo.escolhas = []; aoVivo.publico = false; mostrar(); }
+  }));
+  if (!faltantes.length) texto(cx,"p","fato","Todas as pessoas aptas já votaram.");
+  terminal(cx);
+  return cx;
+}
+function mecanismoVotar(d) {
+  const m=blocoMecanica("Um voto inteiro ou nenhum");
+  texto(m,"p",null,"Cada opção sigilosa publica um compromisso C = v·G + r·H de 96 bytes, acompanhado de prova de boa formação.");
+  detalhe(m,"EM ABERTO","um u32 ao lado do endereço, sem compromisso");
+  detalhe(m,"EM SIGILO","compromisso de 96 B por opção");
+  detalhe(m,"VOTOU","uma chave por cédula, não por pergunta");
+  texto(m,"p","peq","O contrato verifica aptidão, formato e provas antes de gravar qualquer parte da cédula.");
+  return m;
+}
+function painelRecibo(d) {
+  const s=el("section"); titulo(s,5,"O recibo","O aviso mais importante para quem vota.");
+  const caixa=el("div","cartao");
+  if(!reciboQueimado){
+    texto(caixa,"h3",null,"⚠ A chave em ./recibos/<identidade>.key prova o seu voto");
+    texto(caixa,"p",null,"Enquanto ela existir, você consegue provar a qualquer pessoa em que votou — e quem te obrigar a mostrar consegue conferir.");
+    texto(caixa,"p","dim","A rede nunca vai saber. Mas você pode ser forçada a contar.");
+    caixa.append(ponte.viva
+      ? botao(`Queimar o recibo de ${aoVivo.identidade||ponte.identidades[0]||""}`, async () => {
+          const j = await chamar("queimar", { identidade: aoVivo.identidade || ponte.identidades[0] });
+          if (j.ok) { reciboQueimado = true; mostrar(); }
+        })
+      : (() => { const b=el("button","acao","Simular a queima do recibo");b.type="button";
+                 b.addEventListener("click",()=>{reciboQueimado=true;mostrar();});return b; })());
+  } else {
+    texto(caixa,"p","fato","✓ Recibo removido na reencenação");
+    texto(caixa,"div","destaque","Agora nem você consegue provar em que votou.");
+    texto(caixa,"p","dim","Seu voto continua na contagem, e você continua podendo conferir que ele está lá.");
+  }
+  s.append(caixa);
+  if (ponte.viva) terminal(s);
+  aviso(s,
+    "Com a ponte no ar, o botão acima sobrescreve o arquivo de verdade. Não há como desfazer — é o que o produto promete.",
+    "Esta tela não acessa arquivos locais. O comando real é tessera queimar --identidade <nome>.");
+  return s;
+}
+function mecanismoRecibo() {
+  const m=blocoMecanica("Segredo separado da prova pública");
+  detalhe(m,"RECIBO","escolha e acaso r · dados privados");
+  detalhe(m,"ESTADO","compromissos e provas · dados públicos");
+  texto(m,"p",null,"Queimar o recibo destrói a capacidade de provar o próprio voto. As provas públicas continuam disponíveis para auditoria.");
+  return m;
+}
+function mecanismoCedula() {
+  const m=blocoMecanica("O objeto que esconde e soma");
+  texto(m,"p",null,"C = v·G + r·H. O acaso r esconde o valor v; os compromissos preservam a soma.");
+  detalhe(m,"CADA BLOCO","96 bytes · ponto de BLS12-381");
+  detalhe(m,"SOMA","ΣC = (Σv)·G + (Σr)·H");
+  texto(m,"p","peq","Os dois blocos à esquerda são da mesma pessoa e transação. Nenhum deles traz um rótulo que revele a escolha.");
+  return m;
+}
+function mecanismoGrade(d) {
+  const m=blocoMecanica("Três objetos verificáveis");
+  detalhe(m,"COMPROMISSO","96 B · esconde o voto e preserva a soma");
+  detalhe(m,"DISJUNTIVA","320 B · prova v ∈ {0,1}");
+  detalhe(m,"SOMA","128 B · uma por pergunta sigilosa");
+  texto(m,"p",null,`Na rodada, ${d.votos.filter(v=>!v.publico).length*nPerguntasConf(d)} provas de soma impedem compensar votos entre perguntas.`);
+  return m;
+}
+function painelApurar(d) {
+  const s=el("section"); titulo(s,8,"A mesa afirma. O contrato confere.","Veja a apuração registrada e teste uma afirmação falsa como simulação visual.");
+  if(!d.apuracao){
+    texto(s,"p","dim","Esta proposta ainda não tem apuração publicada.");
+    if (ponte.viva) {
+      const cx=el("div","cartao");
+      texto(cx,"h3",null,"Apurar agora");
+      texto(cx,"p","peq dim","A mesa só consegue apurar depois do prazo. Antes dele o contrato recusa com Error(Contract, #7) = VotacaoAindaAberta — e essa recusa também é parte da demo.");
+      cx.append(botao("A mesa apura →", async () => { await chamar("apurar", { proposta: d.proposta }); }));
+      cx.append(botao("A mesa mente →", async () => {
+        /* O total falso vai à rede de verdade. O contrato recusa de verdade. */
+        const n=contagem(d,[]).filter(c=>c.confidencial).length;
+        await chamar("apurar", { proposta: d.proposta, forcar_total: Array.from({length:n},(_,i)=>i===0?99:0).join(",") });
+      }));
+      terminal(cx); s.append(cx);
+    }
+    return s;
+  }
+  const v=el("div","cartao");
+  texto(v,"h3",null,"A mesa afirmou");
+  const conta=contagem(d,d.apuracao.afirmado||[]);
+  const falsoIndice=conta.findIndex(c=>c.confidencial);
+  const delta=(i)=>!mesaMentindo?0:i===falsoIndice?1:i===falsoIndice+1?-1:0;
+  conta.forEach((c,i)=>detalhe(v,MAIUSC(c.rotulo),`${c.segredo+delta(i)} em segredo + ${c.claro} em claro = ${c.total+delta(i)}`));
+  s.append(v);
+  const contrato=el("div","cartao");texto(contrato,"h3",null,"O contrato conferiu");
+  conta.filter(c=>c.confidencial).forEach((c,i)=>detalhe(contrato,MAIUSC(c.rotulo),mesaMentindo&&i<2?`${c.segredo+(i===0?1:-1)}·G + R·H  ✗ NÃO FECHA`:`${c.segredo}·G + R·H  ✓ fecha`));
+  s.append(contrato);
+  if(mesaMentindo) texto(s,"div","recusa-demo","✗ apuração recusada · nada seria publicado com esse total falso. Simulação visual; a rodada real continua apurada.");
+  else {
+    texto(s,"p","fato",`✓ Resultado publicado no ledger ${num(d.apuracao.ledger)}`);
+    let off=0;d.perguntas.forEach((pg,i)=>{const fatia=conta.slice(off,off+pg.opcoes.length);off+=pg.opcoes.length;texto(s,"p","painel-tag",`${i+1}. ${pg.texto} · ${pg.confidencial?"em sigilo":"em aberto"}`);texto(s,"div","destaque",fatia.map(c=>`${MAIUSC(c.rotulo.split("·").pop())} ${c.total}`).join("  ·  "));});
+  }
+  const b=el("button","nav-btn",mesaMentindo?"Restaurar total real":"Mesa mentindo →");b.type="button";b.addEventListener("click",()=>{mesaMentindo=!mesaMentindo;mostrar();});s.append(b);
+  if (ponte.viva) {
+    s.append(botao("Conferir com o verificador →", async () => { await chamar("verificar", { proposta: d.proposta }); }));
+    terminal(s);
+  }
+  return s;
+}
+function mecanismoApurar(d) {
+  const m=blocoMecanica("A mesa não escolhe o resultado");
+  texto(m,"p",null,`${d.mesa.limiar} de ${d.mesa.membros} membros somam parcelas de Shamir localmente e reconstroem somente Σr, a abertura agregada.`);
+  detalhe(m,"CONFERÊNCIA","total·G + Σr·H = acumulado na rede");
+  texto(m,"p","peq","Se um total não fecha, o contrato recusa a publicação. A mesa pode deixar de apurar; não consegue publicar um total falso.");
+  return m;
+}
+function painelLimite() {
+  const s=el("section"); titulo(s,9,"O resultado correto também pode ser recusado","Outra proposta real na testnet: coligacao-2026, sobre manter o contrato de limpeza.");
+  const c=el("div","cartao");
+  detalhe(c,"ELEITORADO","7 aptos · 7 votaram");
+  detalhe(c,"PARTIÇÃO","4 em segredo · 3 abriram o voto");
+  detalhe(c,"SIGILO MÍNIMO","τ = 5");
+  detalhe(c,"MANTER","4 · acumulado 4·G + R·H  ✓");
+  detalhe(c,"RESCINDIR","0 · acumulado 0·G + R·H  ✓");
+  s.append(c);
+  texto(s,"div","recusa-demo","✗ apuração recusada · nada foi publicado\nError(Contract, #19) = AnonimatoInsuficiente");
+  texto(s,"p","peq dim","Os acumuladores fecham antes da recusa. O contrato tinha o total correto e escolheu proteger as quatro pessoas. Nenhum voto foi perdido.");
+  const a=el("a",null,"Ver transação de abertura ↗");a.href="https://stellar.expert/explorer/testnet/tx/ed66a8c78b798539ad9796fd8a985325e137d270e152f2b7325970f00ce2f200";a.target="_blank";a.rel="noopener";s.append(a);
+  if (ponte.viva) {
+    const cx=el("div","cartao");
+    texto(cx,"h3",null,"Reproduzir a recusa, agora");
+    texto(cx,"p","peq dim","Abra uma proposta sigilosa, faça três pessoas votarem com --publico, e apure. O conjunto secreto cai abaixo de τ e o contrato recusa — com os acumuladores fechando logo acima.");
+    campo(cx,"Proposta a apurar",aoVivo.proposta||"",(v)=>{aoVivo.proposta=v;});
+    cx.append(botao("Tentar apurar →", async () => { await chamar("apurar", { proposta: aoVivo.proposta }); }));
+    terminal(cx); s.append(cx);
+  }
+  return s;
+}
+function mecanismoLimite() {
+  const m=blocoMecanica("O mínimo protege a célula pequena");
+  texto(m,"p",null,"Quando algumas pessoas abrem o voto, elas particionam o eleitorado. O total das quatro restantes poderia revelar escolhas por subtração.");
+  detalhe(m,"REGRA", "cédulas sigilosas < τ → recusar apuração");
+  detalhe(m,"NESTA RODADA","4 < 5 → Error(Contract, #19)");
+  texto(m,"p","peq","O limiar é global porque a natureza sigilosa é fixada por pergunta para todos.");
+  return m;
+}
+function mecanismoVerificador(d) {
+  const m=blocoMecanica("Outro processo, em Rust");
+  texto(m,"p",null,"O verificador relê o estado, refaz provas e aritmética e grava o veredito. Esta tela apenas apresenta esse resultado; ela não reverifica BLS12-381 no navegador.");
+  detalhe(m,"LIMITE","compromissos lidos do JSON local");
+  detalhe(m,"VÍNCULO COM A REDE","soma conferida contra o acumulado on-chain");
+  texto(m,"p","peq","A independência da fonte é parcial, e isso faz parte do resultado mostrado.");
+  return m;
+}
+function mostrar() {
+  const [ato,nome,painel,mecanismo]=roteiro[passo];
+  $("#ato").textContent=ato;
+  $("#passos").textContent=`${String(passo+1).padStart(2,"0")} / 10 · ${nome}`;
+  $("#anterior").disabled=passo===0;$("#proximo").disabled=passo===9;
+  const palco=el("div","palco");
+  palco.append(painel(dados),mecanismo(dados));
+  $("#app").replaceChildren(palco);
+}
+function desenhar(d) {
+  dados=d; passo=0; reciboQueimado=false; mesaMentindo=false;
+  rascunho=d.perguntas.map(p=>({texto:p.texto,opcoes:[...p.opcoes],confidencial:p.confidencial}));erroRascunho="";
+  cabecalho(d); mostrar();
+  document.title = `Tessera Demo · ${d.proposta}`;
+}
+$("#anterior").addEventListener("click",()=>{if(passo>0){passo--;mostrar();scrollTo({top:0,behavior:"smooth"});}});
+$("#proximo").addEventListener("click",()=>{if(passo<9){passo++;mostrar();scrollTo({top:0,behavior:"smooth"});}});
+document.addEventListener("keydown",ev=>{if(ev.target.closest("button,input,a"))return;if(ev.key==="ArrowRight"&&passo<9){passo++;mostrar();}if(ev.key==="ArrowLeft"&&passo>0){passo--;mostrar();}});
 
 function erro(msg) {
   const e = $("#erro");
@@ -627,12 +1148,21 @@ function inicial() {
 const embutido = inicial();
 if (embutido) desenhar(embutido);
 
+/* Se a ponte responder, a demo deixa de ser reencenação. */
+sondarPonte();
+
 const p = new URLSearchParams(location.search).get("p");
 if (p && /^[a-zA-Z0-9_-]+$/.test(p)) {
-  fetch(`../estado/${p}.json`)
+  /* Com a ponte no ar o estado vem pela API; sem ela, do arquivo ao lado. */
+  fetch(`/api/estado?p=${p}`)
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status))))
-    .then((d) => { if (valido(d)) desenhar(d); })
-    .catch(() => erro(`Não encontrei estado/${p}.json ao lado desta página.`));
+    .then((j) => { if (j.ok && valido(j.estado)) desenhar(j.estado); else throw new Error("vazio"); })
+    .catch(() =>
+      fetch(`../estado/${p}.json`)
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status))))
+        .then((d) => { if (valido(d)) desenhar(d); })
+        .catch(() => erro(`Não encontrei o estado de ${p}.`))
+    );
 }
 
 $("#arq").addEventListener("change", (ev) => {
