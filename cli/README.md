@@ -3,7 +3,7 @@
 ```bash
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
-export TESSERA_CONTRATO=CBLUSE2LCPPELS7GIQ5MRYKSW7KTILMWY7VBRFRSWAVG3L7TSRQYHP7H
+export TESSERA_CONTRATO=CDWAY3PETO4JUATLLUM5INMJKMOQ45FTGG5FQCMAUJVTLCW5FJMP7JUH
 ```
 
 Requer a `stellar` CLI com identidades criadas e financiadas. Quem vota paga a
@@ -33,6 +33,29 @@ tessera verificar --proposta contas
 
 `--aptos` e `--mesa` aceitam lista por vírgula ou um arquivo com um nome por
 linha. `--prazo` aceita `8m`, `2h` ou um número de ledgers.
+
+## A cédula mista
+
+Uma pergunta por `--pergunta`, no formato `"texto | opções | natureza"`. A
+natureza é `sigilosa` ou `publica`, e **cai em `sigilosa` se você omitir** — o
+sigilo é o padrão, e abrir uma pergunta tem de ser deliberado.
+
+```bash
+tessera abrir   --proposta assembleia                 --pergunta "Aprovar as contas de 2025? | aprovar, rejeitar | publica"                 --pergunta "Destituir a diretoria? | sim, nao | sigilosa"                 --pergunta "Eleger a cadeira 3 | ana, bruno, carla | sigilosa"                 --aptos marta,joao,ana,carlos,lucia,pedro,sofia                 --mesa mesa1,mesa2,mesa3,mesa4,mesa5 -k 3 --prazo 30m
+
+# uma --opcao por pergunta, na ordem da cédula
+tessera votar   --proposta assembleia --opcao aprovar --opcao sim --opcao ana                 --identidade marta
+
+# --publico abre a cédula INTEIRA, inclusive as perguntas sigilosas
+tessera votar   --proposta assembleia --opcao aprovar --opcao nao --opcao bruno                 --identidade pedro --publico
+```
+
+Uma cédula **confidencial** é aquela em que todas as perguntas são sigilosas;
+uma **semiconfidencial** mistura. É o mesmo mecanismo, em dois ajustes.
+
+O teto é de 8 perguntas e **16 opções sigilosas somadas** — cada uma custa
+13.501.500 instruções, e 16 já são 56% do teto de uma transação. As opções
+públicas não entram nessa conta: a cédula pública inteira custa 350.372.
 
 **Dê ao menos 8 minutos de prazo para 7 votantes:** cada voto confidencial leva
 ~30 s de relógio pela `stellar` CLI, e a janela fecha por ledger, não por
