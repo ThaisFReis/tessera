@@ -579,7 +579,9 @@ Teto **medido** por transação: **400.000.000 instruções de CPU** (§10.2).
 | Groth16 verify (4 entradas públicas) | 47.371.348 | ✅ |
 | `verify_schnorr` (invocação cheia) | 6.737.614 | ✅ |
 | apuração conferida, constante no peso | 6.712.183 | ✅ |
-| **desserialização G1 + checagem de subgrupo** | **?** | ❌ **§9.2** |
+| `g1_is_on_curve` | 4.367 | ✅ |
+| `g1_is_in_subgroup` | 734.877 | ✅ |
+| validação completa de um ponto | 738.901 | ✅ |
 
 Marginal do MSM por termo ≈ 1,47M contra 3,29M de um `g1_mul` solto (base
 ≈ 2,46M). Consequência de desenho: **toda verificação com múltiplos termos é um
@@ -593,13 +595,18 @@ MSM único, nunca muls somados.**
 |---|---|---|
 | 2 × prova CDS | ~54M | projetado |
 | 1 × prova de soma | ~6,7M | medido |
-| desserialização de ~6 pontos G1 | ? | **não medido** |
+| validação de 6 pontos G1 | 4.433.406 | medido |
 | caminho de Merkle (depth 16, sha256) | ~1M | estimado |
 | 2 × `g1_add` no acumulador | 221k | medido |
-| **total** | **~62M + desserialização** | |
+| **total** | **~66M** | |
 
-Folga contra os 400M: **~6×**. Confortável, e o número que falta
-(desserialização) teria de ser absurdo para comprometer isso.
+Folga contra os 400M: **~6×**. A validação de ponto, que era a incógnita,
+saiu em 1,1% da transação.
+
+**O host não valida subgrupo sozinho:** `g1_add` custa 110.748, que é 15% de
+uma checagem isolada, e uma operação não contém algo 7× mais caro que ela.
+Logo `votar()` tem de conferir explicitamente todo ponto que recebe, e esse
+custo é aditivo.
 
 **`apurar()`:**
 
@@ -705,14 +712,14 @@ Mesmo com fator 2 cabe nos 400M, mas o número publicado precisa ser medido.
 
 **Ação:** implementar `verify_cds` na sonda e medir na testnet.
 
-### 9.2 Desserialização de ponto com checagem de subgrupo
+### 9.2 Desserialização de ponto com checagem de subgrupo — ✅ RESOLVIDO
 
-Cada `Bls12381G1Affine` que entra por argumento precisa ser verificado
-on-curve e in-subgroup, senão há ataque de subgrupo pequeno. `probe()` já
-exercita `g1_is_on_curve` e `g1_is_in_subgroup`, mas o **custo por ponto
-desserializado em argumento** nunca foi isolado. São ~6 pontos por `votar()`.
+**Medido em 2026-10-01 (sonda 10):** on-curve 4.367, in-subgroup 734.877,
+as duas 738.901 por ponto. Seis pontos por `votar()` custam 4.433.406, ou 1,1%
+da transação. A checagem de subgrupo custa 0,22× um `g1_mul`, o que indica
+checagem por endomorfismo e não multiplicação pelo cofator.
 
-**Ação:** isolar por diferença, como em §7.1.
+E o host **não** a faz sozinho: validação é obrigatória e aditiva.
 
 ### 9.3 Aluguel de estado para `n` grande
 

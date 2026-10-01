@@ -199,7 +199,7 @@ Pendência §9.2. São ~6 pontos por `votar()` e o custo nunca foi isolado.
 
 **Decisão que destrava.** Entra no Portão 1. E resolve o aviso do Tyler: *não venda Groth16 no pitch sem medir desserialização com checagem de subgrupo.*
 
-**Tempo.** 30 min.
+**Tempo.** 30 min · **RESULTADO 2026-10-01: PASSA.** 738.901 por ponto (on-curve 4.367 + subgrupo 734.877). Seis pontos = 1,1% da transação. Groth16 com validação vai a 12,4% do teto. O host não valida sozinho: `g1_add` é 15% de uma checagem, então validação é aditiva.
 
 ### C2 · `verify_reveal` — o campo público
 

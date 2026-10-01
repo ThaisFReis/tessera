@@ -551,3 +551,82 @@ fn sonda7_pedersen_abertura_do_agregado_fecha() {
         c_verify
     );
 }
+
+/// SONDA 10 (smoke C1) — quanto custa validar um ponto que chega por argumento.
+///
+/// Todo G1 recebido precisa ser conferido on-curve e in-subgroup, senao ha
+/// ataque de subgrupo pequeno. Sao ~6 pontos por `votar()`. A checagem de
+/// subgrupo e a suspeita: ingenuamente ela e uma multiplicacao escalar.
+///
+/// Isolamento por diferenca: (custo com n=11 menos custo com n=1) / 10,
+/// que cancela o overhead de invocacao.
+#[test]
+fn sonda10_desserializacao_e_checagem_de_subgrupo() {
+    let (env, client) = setup();
+    let g = generator(&env);
+    let bls = env.crypto().bls12_381();
+
+    let mut p1 = Vec::new(&env);
+    let mut p11 = Vec::new(&env);
+    for i in 0..11u32 {
+        let p = bls.g1_mul(&g, &fr(&env, i + 2));
+        if i < 1 {
+            p1.push_back(p.clone());
+        }
+        p11.push_back(p);
+    }
+
+    let marg = |a: u64, b: u64| (b - a) / 10;
+
+    let c_curve = marg(
+        cpu(&env, || client.on_curve_n(&p1)),
+        cpu(&env, || client.on_curve_n(&p11)),
+    );
+    let c_sub = marg(
+        cpu(&env, || client.in_subgroup_n(&p1)),
+        cpu(&env, || client.in_subgroup_n(&p11)),
+    );
+    let c_ambos = marg(
+        cpu(&env, || client.validar_n(&p1)),
+        cpu(&env, || client.validar_n(&p11)),
+    );
+
+    // referencia: um g1_mul, para saber se a checagem de subgrupo e uma delas
+    let c_mul = marg(
+        cpu(&env, || client.mul_n(&g, &fr(&env, 3), &1)),
+        cpu(&env, || client.mul_n(&g, &fr(&env, 3), &11)),
+    );
+
+    println!("\n== SONDA 10 (C1): validacao de ponto, por ponto ==");
+    println!("g1_is_on_curve ............... {:>10}", c_curve);
+    println!("g1_is_in_subgroup ............ {:>10}", c_sub);
+    println!("as duas juntas ............... {:>10}", c_ambos);
+    println!("   referencia: g1_mul ........ {:>10}", c_mul);
+    println!(
+        "   subgrupo / mul ............ {:.2}x",
+        c_sub as f64 / c_mul as f64
+    );
+    println!("\n-- impacto em votar() (m=2) --");
+    let pontos_por_voto = 6u64;
+    let custo_val = pontos_por_voto * c_ambos;
+    println!("6 pontos validados ........... {:>10}", custo_val);
+    println!(
+        "   % de uma transacao ........ {:.1}%",
+        100.0 * custo_val as f64 / TX_CPU_LIMIT as f64
+    );
+    println!("\n-- impacto em Groth16 (o aviso do Tyler) --");
+    // Groth16: 3 pontos G1 na prova (A, C e o agregado de entradas) + 2 G2.
+    // So os G1 aqui; G2 e mais caro e fica para quando houver circuito.
+    println!("3 pontos G1 da prova ......... {:>10}", 3 * c_ambos);
+    println!(
+        "   verify medido 47.371.348 -> {:>10} com validacao",
+        47_371_348 + 3 * c_ambos
+    );
+
+    // O criterio do smoke: validar 6 pontos nao pode comer o orcamento.
+    assert!(
+        custo_val * 10 < TX_CPU_LIMIT,
+        "validar 6 pontos custa {}, mais de 10% do teto",
+        custo_val
+    );
+}

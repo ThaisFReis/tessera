@@ -262,6 +262,49 @@ impl BlsSmoke {
         a == bls.g1_msm(ps, ss)
     }
 
+    // ---------- Sonda 10 (C1): desserializacao e checagem de subgrupo ----------
+    //
+    // Todo ponto G1 que entra por argumento precisa ser validado on-curve e
+    // in-subgroup, senao ha ataque de subgrupo pequeno. Sao ~6 pontos por
+    // `votar()` e o custo nunca foi isolado. A checagem de subgrupo e a cara:
+    // ingenuamente e uma multiplicacao escalar pelo cofator.
+
+    /// So on-curve, em `n` pontos.
+    pub fn on_curve_n(env: Env, ps: Vec<Bls12381G1Affine>) -> u32 {
+        let bls = env.crypto().bls12_381();
+        let mut ok = 0u32;
+        for p in ps.iter() {
+            if bls.g1_is_on_curve(&p) {
+                ok += 1;
+            }
+        }
+        ok
+    }
+
+    /// So in-subgroup, em `n` pontos.
+    pub fn in_subgroup_n(env: Env, ps: Vec<Bls12381G1Affine>) -> u32 {
+        let bls = env.crypto().bls12_381();
+        let mut ok = 0u32;
+        for p in ps.iter() {
+            if bls.g1_is_in_subgroup(&p) {
+                ok += 1;
+            }
+        }
+        ok
+    }
+
+    /// As duas, que e o que uma desserializacao segura faz de verdade.
+    pub fn validar_n(env: Env, ps: Vec<Bls12381G1Affine>) -> u32 {
+        let bls = env.crypto().bls12_381();
+        let mut ok = 0u32;
+        for p in ps.iter() {
+            if bls.g1_is_on_curve(&p) && bls.g1_is_in_subgroup(&p) {
+                ok += 1;
+            }
+        }
+        ok
+    }
+
     // ---------- Sonda 9 (A1): TTL e arquivamento de estado ----------
     //
     // Entradas persistentes do Soroban sao ARQUIVADAS quando o TTL expira, e

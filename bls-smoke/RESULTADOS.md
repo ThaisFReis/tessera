@@ -1,7 +1,7 @@
 # Smoke BLS12-381 — resultado (2026-09-30)
 
 Ambiente: `rustc 1.97.1`, `soroban-sdk 28.0.0`, `soroban-env-host 28.0.2`,
-`stellar-cli 25.2.0`, alvo `wasm32v1-none`. Wasm: 12.455 bytes. 9/9 testes passam.
+`stellar-cli 25.2.0`, alvo `wasm32v1-none`. Wasm: 13.102 bytes. 10/10 testes passam.
 
 ## Veredito: Plano A está de pé
 
@@ -282,6 +282,46 @@ votação, e a unicidade histórica é reconferida pelo nível 2, que lê evento
 Isso mantém o custo de abertura em **~0,6 XLM independente do número de
 votantes**, e é a diferença entre um módulo usável e um que cobra 2.000 XLM
 por assembleia.
+
+## Sonda 10 — Validação de ponto (smoke C1, 2026-10-01)
+
+Todo ponto G1 que chega por argumento precisa ser conferido on-curve e
+in-subgroup, senão há ataque de subgrupo pequeno. São ~6 pontos por `votar()`,
+e o custo nunca tinha sido isolado. Era o aviso do Tyler: *não venda Groth16 no
+pitch sem medir desserialização com checagem de subgrupo.*
+
+| operação | custo por ponto |
+|---|---|
+| `g1_is_on_curve` | **4.367** |
+| `g1_is_in_subgroup` | **734.877** |
+| as duas juntas | **738.901** |
+
+### Duas conclusões
+
+**1. A checagem de subgrupo custa 0,22× uma multiplicação escalar.** Se o host
+fizesse o caminho ingênuo — multiplicar pelo cofator — ela custaria pelo menos
+um `g1_mul` inteiro (3.290.524). Custa um quinto disso, o que indica que o host
+usa a checagem por endomorfismo. Boa notícia que não era garantida.
+
+**2. O host NÃO valida subgrupo dentro das operações aritméticas.** Isto é
+inferência de custo, não teste direto, mas é decisiva: `g1_add` custa **110.748**,
+que é **15% de uma checagem de subgrupo isolada**. Uma operação não pode conter
+algo 7× mais caro que ela mesma. Logo a validação é **obrigatória e aditiva** —
+`votar()` tem de conferir explicitamente cada ponto que recebe.
+
+(Para `g1_mul` a inferência não fecha, porque 734.877 cabe dentro de 3.290.524.
+Mas basta `g1_add` para estabelecer que validação automática não existe.)
+
+### Impacto
+
+| | custo | % do teto |
+|---|---|---|
+| 6 pontos validados, por `votar()` | 4.433.406 | **1,1%** |
+| 3 pontos G1 de uma prova Groth16 | 2.216.703 | 0,6% |
+| Groth16 **com** validação | 49.588.051 | **12,4%** (era 11,8%) |
+
+O aviso do Tyler está respondido: incluir a checagem de subgrupo move o Groth16
+de 11,8% para 12,4% do orçamento. O número do deck sobrevive à objeção.
 
 ## O que este smoke NÃO cobre
 
