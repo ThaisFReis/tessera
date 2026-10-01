@@ -9,12 +9,29 @@ use soroban_sdk::{
 /// Limiar mínimo de anonimato. Ver SPEC §6.6, o teorema da partição.
 ///
 /// Nenhuma célula da partição induzida pelos campos públicos pode ser apurada
-/// com menos de `TAU` cédulas confidenciais. Na v1 há duas células —
-/// confidencial e pública — então a regra se reduz a: ou ninguém votou em
-/// sigilo, ou pelo menos `TAU` votaram.
+/// com menos de `TAU` cédulas confidenciais. Há duas células — confidencial e
+/// pública — então a regra se reduz a: ou ninguém votou em sigilo, ou pelo
+/// menos `TAU` votaram.
+///
+/// **Numa cédula mista a regra continua global, não por pergunta.** O conjunto
+/// confidencial é o mesmo em todas as perguntas sigilosas — quem vota por
+/// `votar()` compromete *todas* elas — então uma checagem cobre a cédula
+/// inteira. Fosse a confidencialidade escolhida por pergunta pelo eleitor,
+/// haveria uma célula por pergunta e τ teria de ser conferido em cada uma.
 pub const TAU: u32 = 5;
 
-/// Máximo de opções por proposta.
+/// Máximo de perguntas numa cédula.
+pub const MAX_PERGUNTAS: u32 = 8;
+
+/// Máximo de opções **confidenciais somadas** na cédula inteira.
+///
+/// É o que limita a CPU, e o limite é medido, não arbitrado: `votar()` custa
+/// 9.805.000 fixos mais 13.501.500 por opção confidencial, perfeitamente
+/// linear. Com 16 opções a cédula consome 225.920.355 — 56,5% do teto de uma
+/// transação, com 43% de folga para o resto do envelope.
+///
+/// As opções públicas não entram nesta conta: uma cédula pública inteira custa
+/// 350.372, três ordens de grandeza abaixo de uma única disjuntiva.
 pub const MAX_OPCOES: u32 = 16;
 
 #[contracterror]
@@ -52,6 +69,9 @@ pub enum Erro {
     SomaDiferenteDoPeso = 22,
     TotalDiferenteDoComparecimento = 23,
     MembroJaEndossou = 24,
+    /// Nenhuma pergunta, perguntas demais, ou opções confidenciais somadas
+    /// acima de `MAX_OPCOES`.
+    PerguntasForaDaFaixa = 25,
 }
 
 #[contracttype]
@@ -59,13 +79,19 @@ pub enum Erro {
 pub enum Chave {
     /// Metadados da proposta. TTL estendido ao teto da rede em `abrir()`.
     Proposta(BytesN<32>),
-    /// `A_j`, a soma dos compromissos confidenciais da opção `j`. TTL ao teto.
-    Acum(BytesN<32>, u32),
+    /// `A_{q,j}`, a soma dos compromissos confidenciais da opção `j` da
+    /// pergunta `q`. Só existe para perguntas sigilosas. TTL ao teto.
+    Acum(BytesN<32>, u32, u32),
     /// Uma entrada por votante. TTL padrão — pode arquivar depois de encerrar,
     /// e estender todas custaria ~2.070 XLM numa assembleia de 10.000 (A1).
+    ///
+    /// **Uma só por cédula, não uma por pergunta.** É o que torna a cédula
+    /// mista atômica: ou a pessoa respondeu a cédula inteira, ou não votou.
     Votou(BytesN<32>, Address),
-    /// Total em claro da opção `j`, vindo das cédulas públicas.
-    TotalPublico(BytesN<32>, u32),
+    /// Total em claro da opção `j` da pergunta `q`. Recebe de duas origens: as
+    /// respostas em claro de quem votou por `votar()` nas perguntas públicas,
+    /// e a cédula inteira de quem abriu o voto por `votar_publico()`.
+    TotalPublico(BytesN<32>, u32, u32),
     /// `(confidenciais, públicas)`. É o que a regra de `TAU` consulta.
     Comparecimento(BytesN<32>),
     Resultado(BytesN<32>),
@@ -84,10 +110,31 @@ pub enum Instancia {
     GeradorH,
 }
 
+/// Uma pergunta da cédula.
+///
+/// **A confidencialidade é da pergunta, fixada em `abrir()` — nunca escolhida
+/// pelo eleitor por pergunta.** Se cada pessoa escolhesse onde se esconder, a
+/// escolha de se esconder seria ela própria pública, e numa assembleia pequena
+/// "quem pediu sigilo na pergunta 2" é uma lista curta o bastante para ser uma
+/// acusação. Fixando na proposta, toda cédula tem a mesma forma e não há nada
+/// a inferir da forma.
+///
+/// O eleitor mantém uma escolha, mas ela é da cédula inteira: votar em sigilo
+/// (`votar`) ou abrir o voto todo (`votar_publico`). É a revelação voluntária,
+/// e é o τ que protege quem ficou no grupo residual.
+#[contracttype]
+#[derive(Clone)]
+pub struct Pergunta {
+    pub opcoes: u32,
+    pub confidencial: bool,
+}
+
 #[contracttype]
 #[derive(Clone)]
 pub struct Proposta {
-    pub opcoes: u32,
+    /// A cédula, em ordem. Uma cédula toda confidencial é o caso em que todas
+    /// as perguntas têm `confidencial: true` — não é outro caminho de código.
+    pub perguntas: Vec<Pergunta>,
     pub raiz_aptos: BytesN<32>,
     pub mesa: Vec<Address>,
     pub limiar: u32,

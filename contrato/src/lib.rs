@@ -26,7 +26,7 @@
 mod cripto;
 mod tipos;
 
-pub use tipos::{Erro, Proposta, ProvaCds, ProvaSoma};
+pub use tipos::{Erro, Pergunta, Proposta, ProvaCds, ProvaSoma};
 
 use cripto::*;
 use soroban_sdk::{
@@ -34,7 +34,7 @@ use soroban_sdk::{
     crypto::bls12_381::{Bls12381Fr, Bls12381G1Affine},
     Address, Bytes, BytesN, Env, Vec,
 };
-use tipos::{Chave, Instancia, MAX_OPCOES, TAU};
+use tipos::{Chave, Instancia, MAX_OPCOES, MAX_PERGUNTAS, TAU};
 
 #[contract]
 pub struct Tessera;
@@ -52,11 +52,17 @@ impl Tessera {
     /// isso eles arquivam em 7 dias (sonda 9) — o mesmo dia em que a janela do
     /// RPC fecha (sonda 8), e os dois níveis do verificador morreriam juntos.
     /// Custa ~0,6 XLM fixos, independente do comparecimento.
+    ///
+    /// ## A cédula
+    ///
+    /// `perguntas` é a cédula, em ordem. Uma cédula **confidencial** é aquela
+    /// em que todas têm `confidencial: true`; uma **semiconfidencial** mistura.
+    /// Não são dois caminhos de código — é o mesmo mecanismo em dois ajustes.
     pub fn abrir(
         env: Env,
         governanca: Address,
         proposta: BytesN<32>,
-        opcoes: u32,
+        perguntas: Vec<Pergunta>,
         raiz_aptos: BytesN<32>,
         mesa: Vec<Address>,
         limiar: u32,
@@ -67,8 +73,22 @@ impl Tessera {
         if env.storage().persistent().has(&Chave::Proposta(proposta.clone())) {
             return Err(Erro::PropostaJaExiste);
         }
-        if opcoes < 2 || opcoes > MAX_OPCOES {
-            return Err(Erro::OpcoesForaDaFaixa);
+        if perguntas.len() == 0 || perguntas.len() > MAX_PERGUNTAS {
+            return Err(Erro::PerguntasForaDaFaixa);
+        }
+        // O que limita a CPU é o total de opções **confidenciais**, porque é
+        // nelas que mora a disjuntiva. As públicas são conferidas a olho.
+        let mut conf_opcoes = 0u32;
+        for q in perguntas.iter() {
+            if q.opcoes < 2 || q.opcoes > MAX_OPCOES {
+                return Err(Erro::OpcoesForaDaFaixa);
+            }
+            if q.confidencial {
+                conf_opcoes += q.opcoes;
+            }
+        }
+        if conf_opcoes > MAX_OPCOES {
+            return Err(Erro::PerguntasForaDaFaixa);
         }
         if limiar == 0 || limiar > mesa.len() {
             return Err(Erro::LimiarInvalido);
@@ -97,19 +117,28 @@ impl Tessera {
             env.storage().instance().set(&Instancia::GeradorH, &h);
         }
 
-        let p = Proposta { opcoes, raiz_aptos, mesa, limiar, fecha_em };
+        let n_perguntas = perguntas.len();
+        let p = Proposta { perguntas, raiz_aptos, mesa, limiar, fecha_em };
         env.storage().persistent().set(&Chave::Proposta(proposta.clone()), &p);
         guardar_longo(&env, &Chave::Proposta(proposta.clone()));
 
-        // Acumuladores começam no infinito: o compromisso de ninguém.
+        // Acumuladores começam no infinito: o compromisso de ninguém. Só as
+        // perguntas sigilosas têm acumulador; **todas** têm total público,
+        // porque quem abre o voto por `votar_publico()` responde a cédula
+        // inteira em claro, inclusive as perguntas sigilosas.
         let zero = infinito(&env);
-        for j in 0..opcoes {
-            let k = Chave::Acum(proposta.clone(), j);
-            env.storage().persistent().set(&k, &zero);
-            guardar_longo(&env, &k);
-            let kp = Chave::TotalPublico(proposta.clone(), j);
-            env.storage().persistent().set(&kp, &0u32);
-            guardar_longo(&env, &kp);
+        for (q, pg) in p.perguntas.iter().enumerate() {
+            let q = q as u32;
+            for j in 0..pg.opcoes {
+                if pg.confidencial {
+                    let k = Chave::Acum(proposta.clone(), q, j);
+                    env.storage().persistent().set(&k, &zero);
+                    guardar_longo(&env, &k);
+                }
+                let kp = Chave::TotalPublico(proposta.clone(), q, j);
+                env.storage().persistent().set(&kp, &0u32);
+                guardar_longo(&env, &kp);
+            }
         }
         let kc = Chave::Comparecimento(proposta.clone());
         env.storage().persistent().set(&kc, &(0u32, 0u32));
@@ -117,27 +146,44 @@ impl Tessera {
 
         env.events().publish(
             (symbol_short!("abrir"), proposta),
-            (opcoes, fecha_em, limiar),
+            (n_perguntas, conf_opcoes, fecha_em, limiar),
         );
         Ok(())
     }
 
     // ===================== votar =========================================
 
-    /// Registra uma cédula confidencial. Quem vota paga a taxa.
+    /// Registra uma cédula em sigilo. Quem vota paga a taxa.
     ///
-    /// O que entra no ledger é `C_j = v_j·G + r_j·H` por opção, e provas de que
-    /// a cédula é bem formada. O `v_j` não entra, não transita, e é destruído
-    /// no cliente.
+    /// Nas perguntas sigilosas entra `C_j = v_j·G + r_j·H` por opção, mais as
+    /// provas de boa formação. O `v_j` não entra, não transita, e é destruído
+    /// no cliente. Nas perguntas públicas a resposta vai em claro, na mesma
+    /// transação — é a cédula semiconfidencial.
     ///
-    /// Custo medido: **33.480.865 instruções para `m = 2`, 8,4% do teto.**
+    /// `compromissos` e `provas` vêm achatados sobre as perguntas **sigilosas**
+    /// em ordem; `escolhas` sobre as **públicas**. Uma prova de soma por
+    /// pergunta sigilosa, em `provas_soma`.
+    ///
+    /// ## Por que uma prova de soma por pergunta
+    ///
+    /// Não é otimização, é correção. Uma prova única sobre todos os
+    /// compromissos da cédula afirmaria `Σ(tudo) = peso` — e com `peso = 1`
+    /// isso obriga o eleitor a marcar **exatamente uma opção na cédula
+    /// inteira**. Quem responde a pergunta 1 seria forçado a abster-se das
+    /// outras. Cada pergunta precisa do seu `Σ(suas opções) = peso`.
+    ///
+    /// Custo medido: 9.805.000 fixos + 13.501.500 por opção confidencial.
+    /// Três perguntas de 2 opções sigilosas custam 22,7% do teto — menos que
+    /// as mesmas três como propostas separadas, porque a prova de aptidão por
+    /// Merkle é paga **uma vez**.
     pub fn votar(
         env: Env,
         proposta: BytesN<32>,
         votante: Address,
         compromissos: Vec<Bls12381G1Affine>,
         provas: Vec<ProvaCds>,
-        prova_soma: ProvaSoma,
+        provas_soma: Vec<ProvaSoma>,
+        escolhas: Vec<u32>,
         caminho: Vec<BytesN<32>>,
         indice: u32,
         peso: u32,
@@ -148,7 +194,12 @@ impl Tessera {
         if env.ledger().sequence() >= p.fecha_em {
             return Err(Erro::VotacaoEncerrada);
         }
-        if compromissos.len() != p.opcoes || provas.len() != p.opcoes {
+        let (n_conf, n_publ, n_perg_conf) = formato(&p);
+        if compromissos.len() != n_conf
+            || provas.len() != n_conf
+            || provas_soma.len() != n_perg_conf
+            || escolhas.len() != n_publ
+        {
             return Err(Erro::ArgumentoMalFormado);
         }
         conferir_aptidao(&env, &p, &votante, peso, indice, &caminho)?;
@@ -162,41 +213,78 @@ impl Tessera {
             .ok_or(Erro::PropostaNaoExiste)?;
         let bls = env.crypto().bls12_381();
 
-        // Todo ponto que chega é validado: o host não valida sozinho, e um
-        // ponto de ordem pequena vazaria informação sobre o escalar (sonda 10).
-        let mut soma = infinito(&env);
-        for j in 0..p.opcoes {
-            let c = compromissos.get(j).unwrap();
-            let pr = provas.get(j).unwrap();
-            validar(&env, &c)?;
-            validar(&env, &pr.a0)?;
-            validar(&env, &pr.a1)?;
-
-            let ctx = contexto(&env, &proposta, &votante, j);
-            if !verificar_cds(&env, &ctx, &g, &h, &c, &pr) {
-                return Err(Erro::ProvaBinariaInvalida);
+        let mut off_conf = 0u32; // posição em `compromissos`/`provas`
+        let mut off_publ = 0u32; // posição em `escolhas`
+        let mut i_soma = 0u32; // qual prova de soma
+        for (q, pg) in p.perguntas.iter().enumerate() {
+            let q = q as u32;
+            if !pg.confidencial {
+                conferir_bloco(&escolhas, off_publ, pg.opcoes, peso)?;
+                off_publ += pg.opcoes;
+                continue;
             }
-            soma = bls.g1_add(&soma, &c);
+
+            // Todo ponto que chega é validado: o host não valida sozinho, e
+            // um ponto de ordem pequena vazaria informação sobre o escalar
+            // (sonda 10).
+            let mut soma = infinito(&env);
+            for j in 0..pg.opcoes {
+                let c = compromissos.get(off_conf + j).unwrap();
+                let pr = provas.get(off_conf + j).unwrap();
+                validar(&env, &c)?;
+                validar(&env, &pr.a0)?;
+                validar(&env, &pr.a1)?;
+
+                let ctx = contexto(&env, &proposta, &votante, q, j);
+                if !verificar_cds(&env, &ctx, &g, &h, &c, &pr) {
+                    return Err(Erro::ProvaBinariaInvalida);
+                }
+                soma = bls.g1_add(&soma, &c);
+            }
+
+            // D = (Σ C_j da pergunta) − w·G tem de ser múltiplo conhecido de
+            // H. Com cada v_j ∈ {0,1} pelas disjuntivas, isso fecha a boa
+            // formação **desta** pergunta.
+            let ps = provas_soma.get(i_soma).unwrap();
+            validar(&env, &ps.a)?;
+            let d = bls.g1_add(&soma, &(-bls.g1_mul(&g, &fr(&env, peso))));
+            let ctx = contexto(&env, &proposta, &votante, q, u32::MAX);
+            if !verificar_soma(&env, &ctx, &h, &d, &ps) {
+                return Err(Erro::ProvaDeSomaInvalida);
+            }
+            i_soma += 1;
+            off_conf += pg.opcoes;
         }
 
-        // D = (Σ C_j) − w·G tem de ser um múltiplo conhecido de H. Como cada
-        // v_j ∈ {0,1} pelas disjuntivas, isso fecha a boa formação da cédula.
-        validar(&env, &prova_soma.a)?;
-        let d = bls.g1_add(&soma, &(-bls.g1_mul(&g, &fr(&env, peso))));
-        let ctx = contexto(&env, &proposta, &votante, u32::MAX);
-        if !verificar_soma(&env, &ctx, &h, &d, &prova_soma) {
-            return Err(Erro::ProvaDeSomaInvalida);
-        }
-
-        // Agregação homomórfica: g1_add é ~30× mais barato que g1_mul, então
-        // somar é praticamente de graça. O custo está todo na verificação.
-        for j in 0..p.opcoes {
-            let k = Chave::Acum(proposta.clone(), j);
-            let a: Bls12381G1Affine = env.storage().persistent().get(&k).unwrap();
-            env.storage()
-                .persistent()
-                .set(&k, &bls.g1_add(&a, &compromissos.get(j).unwrap()));
-            guardar_longo(&env, &k);
+        // Daqui para baixo a cédula inteira já passou. Só agora se escreve —
+        // uma pergunta mal formada não deixa rastro parcial no acumulador.
+        let mut off_conf = 0u32;
+        let mut off_publ = 0u32;
+        for (q, pg) in p.perguntas.iter().enumerate() {
+            let q = q as u32;
+            for j in 0..pg.opcoes {
+                if pg.confidencial {
+                    // Agregação homomórfica: g1_add é ~30× mais barato que
+                    // g1_mul, então somar é praticamente de graça.
+                    let k = Chave::Acum(proposta.clone(), q, j);
+                    let a: Bls12381G1Affine = env.storage().persistent().get(&k).unwrap();
+                    let c = compromissos.get(off_conf + j).unwrap();
+                    env.storage().persistent().set(&k, &bls.g1_add(&a, &c));
+                    guardar_longo(&env, &k);
+                } else {
+                    let k = Chave::TotalPublico(proposta.clone(), q, j);
+                    let t: u32 = env.storage().persistent().get(&k).unwrap();
+                    env.storage()
+                        .persistent()
+                        .set(&k, &(t + escolhas.get(off_publ + j).unwrap()));
+                    guardar_longo(&env, &k);
+                }
+            }
+            if pg.confidencial {
+                off_conf += pg.opcoes;
+            } else {
+                off_publ += pg.opcoes;
+            }
         }
 
         let kc = Chave::Comparecimento(proposta.clone());
@@ -208,7 +296,7 @@ impl Tessera {
         // histórico para recalcular o acumulador sem depender do RPC (§8.3).
         env.events().publish(
             (symbol_short!("votar"), proposta, votante),
-            compromissos,
+            (compromissos, escolhas),
         );
         Ok(())
     }
@@ -238,30 +326,35 @@ impl Tessera {
         if env.ledger().sequence() >= p.fecha_em {
             return Err(Erro::VotacaoEncerrada);
         }
-        if escolhas.len() != p.opcoes {
+        // Aqui `escolhas` cobre a cédula **inteira**, inclusive as perguntas
+        // sigilosas: é a revelação voluntária, e quem a usa abre tudo.
+        let total_opcoes = p.perguntas.iter().fold(0u32, |a, q| a + q.opcoes);
+        if escolhas.len() != total_opcoes {
             return Err(Erro::ArgumentoMalFormado);
         }
         conferir_aptidao(&env, &p, &votante, peso, indice, &caminho)?;
         marcar_votou(&env, &proposta, &votante)?;
 
-        // As mesmas regras da cédula confidencial, só que conferíveis a olho:
-        // cada escolha é binária e a soma é o peso.
-        let mut total = 0u32;
-        for v in escolhas.iter() {
-            if v > 1 {
-                return Err(Erro::EscolhaForaDoBinario);
-            }
-            total += v;
-        }
-        if total != peso {
-            return Err(Erro::SomaDiferenteDoPeso);
+        // As mesmas regras da cédula sigilosa, só que conferíveis a olho:
+        // cada escolha é binária e cada pergunta soma o peso.
+        let mut off = 0u32;
+        for pg in p.perguntas.iter() {
+            conferir_bloco(&escolhas, off, pg.opcoes, peso)?;
+            off += pg.opcoes;
         }
 
-        for j in 0..p.opcoes {
-            let k = Chave::TotalPublico(proposta.clone(), j);
-            let t: u32 = env.storage().persistent().get(&k).unwrap();
-            env.storage().persistent().set(&k, &(t + escolhas.get(j).unwrap()));
-            guardar_longo(&env, &k);
+        let mut off = 0u32;
+        for (q, pg) in p.perguntas.iter().enumerate() {
+            let q = q as u32;
+            for j in 0..pg.opcoes {
+                let k = Chave::TotalPublico(proposta.clone(), q, j);
+                let t: u32 = env.storage().persistent().get(&k).unwrap();
+                env.storage()
+                    .persistent()
+                    .set(&k, &(t + escolhas.get(off + j).unwrap()));
+                guardar_longo(&env, &k);
+            }
+            off += pg.opcoes;
         }
 
         let kc = Chave::Comparecimento(proposta.clone());
@@ -324,7 +417,10 @@ impl Tessera {
         if env.storage().persistent().has(&Chave::Resultado(proposta.clone())) {
             return Err(Erro::JaApurada);
         }
-        if totais.len() != p.opcoes || aberturas.len() != p.opcoes {
+        // `totais` e `aberturas` cobrem só as opções **confidenciais**, em
+        // ordem de pergunta. As públicas já estão somadas em claro.
+        let (n_conf, _n_publ, _n_perg_conf) = formato(&p);
+        if totais.len() != n_conf || aberturas.len() != n_conf {
             return Err(Erro::ArgumentoMalFormado);
         }
         if !p.mesa.iter().any(|m| m == membro) {
@@ -346,17 +442,6 @@ impl Tessera {
             return Err(Erro::AnonimatoInsuficiente);
         }
 
-        // Como a v1 é um-voto-por-pessoa, a soma dos totais confidenciais tem
-        // de ser exatamente o número de cédulas confidenciais. Pega uma mesa
-        // que invente votos sem nem precisar abrir o acumulador.
-        let mut soma_t = 0u32;
-        for t in totais.iter() {
-            soma_t += t;
-        }
-        if soma_t != conf {
-            return Err(Erro::TotalDiferenteDoComparecimento);
-        }
-
         let g = gerador_g(&env);
         let h: Bls12381G1Affine = env
             .storage()
@@ -366,30 +451,59 @@ impl Tessera {
         let bls = env.crypto().bls12_381();
 
         let mut resultado = Vec::new(&env);
-        for j in 0..p.opcoes {
-            let a: Bls12381G1Affine = env
-                .storage()
-                .persistent()
-                .get(&Chave::Acum(proposta.clone(), j))
-                .unwrap();
+        let mut off = 0u32;
+        for (q, pg) in p.perguntas.iter().enumerate() {
+            let q = q as u32;
 
-            // A_j == T_j·G + R_j·H, um MSM de 2 termos. 5.408.931 medidos.
-            let mut ps = Vec::new(&env);
-            let mut ss = Vec::new(&env);
-            ps.push_back(g.clone());
-            ps.push_back(h.clone());
-            ss.push_back(fr(&env, totais.get(j).unwrap()));
-            ss.push_back(aberturas.get(j).unwrap());
-            if bls.g1_msm(ps, ss) != a {
-                return Err(Erro::AberturaNaoFecha);
+            // Como a v1 é um-voto-por-pessoa, a soma dos totais confidenciais
+            // **de cada pergunta** tem de ser exatamente o número de cédulas
+            // em sigilo. Pega uma mesa que invente votos sem nem precisar
+            // abrir o acumulador — e agora pega também quem tente compensar
+            // uma pergunta com outra.
+            if pg.confidencial {
+                let mut soma_t = 0u32;
+                for j in 0..pg.opcoes {
+                    soma_t += totais.get(off + j).unwrap();
+                }
+                if soma_t != conf {
+                    return Err(Erro::TotalDiferenteDoComparecimento);
+                }
             }
 
-            let publico: u32 = env
-                .storage()
-                .persistent()
-                .get(&Chave::TotalPublico(proposta.clone(), j))
-                .unwrap();
-            resultado.push_back(totais.get(j).unwrap() + publico);
+            for j in 0..pg.opcoes {
+                let publico: u32 = env
+                    .storage()
+                    .persistent()
+                    .get(&Chave::TotalPublico(proposta.clone(), q, j))
+                    .unwrap();
+
+                if !pg.confidencial {
+                    resultado.push_back(publico);
+                    continue;
+                }
+
+                let a: Bls12381G1Affine = env
+                    .storage()
+                    .persistent()
+                    .get(&Chave::Acum(proposta.clone(), q, j))
+                    .unwrap();
+
+                // A_j == T_j·G + R_j·H, um MSM de 2 termos. 5.408.931 medidos.
+                let mut ps = Vec::new(&env);
+                let mut ss = Vec::new(&env);
+                ps.push_back(g.clone());
+                ps.push_back(h.clone());
+                ss.push_back(fr(&env, totais.get(off + j).unwrap()));
+                ss.push_back(aberturas.get(off + j).unwrap());
+                if bls.g1_msm(ps, ss) != a {
+                    return Err(Erro::AberturaNaoFecha);
+                }
+
+                resultado.push_back(totais.get(off + j).unwrap() + publico);
+            }
+            if pg.confidencial {
+                off += pg.opcoes;
+            }
         }
 
         // Daqui para baixo os números conferem. O que falta é quórum.
@@ -445,17 +559,45 @@ impl Tessera {
         env.storage().persistent().get(&Chave::Proposta(proposta))
     }
 
-    /// Os acumuladores, para quem quiser recalcular a apuração por fora.
+    /// Os acumuladores das perguntas sigilosas, achatados em ordem, para quem
+    /// quiser recalcular a apuração por fora.
     pub fn acumulador(env: Env, proposta: BytesN<32>) -> Vec<Bls12381G1Affine> {
         let mut v = Vec::new(&env);
         if let Some(p) = Self::proposta(env.clone(), proposta.clone()) {
-            for j in 0..p.opcoes {
-                if let Some(a) = env
-                    .storage()
-                    .persistent()
-                    .get::<_, Bls12381G1Affine>(&Chave::Acum(proposta.clone(), j))
-                {
-                    v.push_back(a);
+            for (q, pg) in p.perguntas.iter().enumerate() {
+                if !pg.confidencial {
+                    continue;
+                }
+                for j in 0..pg.opcoes {
+                    if let Some(a) = env
+                        .storage()
+                        .persistent()
+                        .get::<_, Bls12381G1Affine>(&Chave::Acum(
+                            proposta.clone(),
+                            q as u32,
+                            j,
+                        ))
+                    {
+                        v.push_back(a);
+                    }
+                }
+            }
+        }
+        v
+    }
+
+    /// Os totais públicos, achatados sobre **todas** as perguntas em ordem.
+    pub fn total_publico(env: Env, proposta: BytesN<32>) -> Vec<u32> {
+        let mut v = Vec::new(&env);
+        if let Some(p) = Self::proposta(env.clone(), proposta.clone()) {
+            for (q, pg) in p.perguntas.iter().enumerate() {
+                for j in 0..pg.opcoes {
+                    v.push_back(
+                        env.storage()
+                            .persistent()
+                            .get(&Chave::TotalPublico(proposta.clone(), q as u32, j))
+                            .unwrap_or(0),
+                    );
                 }
             }
         }
@@ -522,6 +664,42 @@ fn digest_da_apuracao(env: &Env, totais: &Vec<u32>, aberturas: &Vec<Bls12381Fr>)
         b.extend_from_array(&a.to_bytes().to_array());
     }
     env.crypto().sha256(&b).to_bytes()
+}
+
+/// O formato da cédula: `(opções confidenciais, opções públicas, perguntas
+/// confidenciais)`. É o que diz quantos argumentos cada chamada tem de trazer.
+fn formato(p: &Proposta) -> (u32, u32, u32) {
+    let (mut conf, mut publ, mut perg) = (0u32, 0u32, 0u32);
+    for q in p.perguntas.iter() {
+        if q.confidencial {
+            conf += q.opcoes;
+            perg += 1;
+        } else {
+            publ += q.opcoes;
+        }
+    }
+    (conf, publ, perg)
+}
+
+/// As duas regras de uma pergunta respondida em claro: cada opção é binária e
+/// a pergunta soma exatamente o peso.
+///
+/// É o espelho visível do que a disjuntiva e a prova de soma fazem na pergunta
+/// sigilosa — e é **por pergunta**, nunca sobre a cédula inteira, pelo mesmo
+/// motivo que a prova de soma é por pergunta.
+fn conferir_bloco(escolhas: &Vec<u32>, desde: u32, opcoes: u32, peso: u32) -> Result<(), Erro> {
+    let mut total = 0u32;
+    for j in 0..opcoes {
+        let v = escolhas.get(desde + j).unwrap();
+        if v > 1 {
+            return Err(Erro::EscolhaForaDoBinario);
+        }
+        total += v;
+    }
+    if total != peso {
+        return Err(Erro::SomaDiferenteDoPeso);
+    }
+    Ok(())
 }
 
 fn abrir_proposta(env: &Env, proposta: &BytesN<32>) -> Result<Proposta, Erro> {

@@ -92,9 +92,27 @@ fn para_desafio(env: &Env, buf: &Bytes) -> Bls12381Fr {
 /// **Sem isto, copiar o `C` e a prova de outra pessoa é um voto válido.** A
 /// prova convence de que `v ∈ {0,1}` e nada nela diz de quem é; `Votou` impede
 /// votar duas vezes, não impede votar com a cédula alheia.
-pub fn contexto(env: &Env, proposta: &BytesN<32>, votante: &Address, opcao: u32) -> Bytes {
+/// **O contexto amarra a prova a uma pergunta, não só a uma opção.**
+///
+/// Sem o índice da pergunta, a opção 0 da pergunta 1 e a opção 0 da pergunta 2
+/// produziriam o mesmo desafio de Fiat–Shamir — e uma disjuntiva feita para
+/// uma valeria para a outra. O eleitor copiaria a própria prova da pergunta 1
+/// para a 2 e marcaria a segunda sem provar nada sobre ela. Numa cédula de uma
+/// pergunta só isso não existia; numa cédula mista é a primeira coisa que
+/// quebra.
+///
+/// A prova de soma da pergunta `q` usa `(q, u32::MAX)`, então ela também não
+/// migra entre perguntas.
+pub fn contexto(
+    env: &Env,
+    proposta: &BytesN<32>,
+    votante: &Address,
+    pergunta: u32,
+    opcao: u32,
+) -> Bytes {
     let mut b = Bytes::from_array(env, &proposta.to_array());
     b.append(&votante.clone().to_xdr(env));
+    b.extend_from_array(&pergunta.to_be_bytes());
     b.extend_from_array(&opcao.to_be_bytes());
     b
 }
