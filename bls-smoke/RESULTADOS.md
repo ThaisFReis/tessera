@@ -1,7 +1,7 @@
 # Smoke BLS12-381 — resultado (2026-09-30)
 
 Ambiente: `rustc 1.97.1`, `soroban-sdk 28.0.0`, `soroban-env-host 28.0.2`,
-`stellar-cli 25.2.0`, alvo `wasm32v1-none`. Wasm: 13.102 bytes. 11/11 testes passam.
+`stellar-cli 25.2.0`, alvo `wasm32v1-none`. Wasm: 14.774 bytes. 12/12 testes passam.
 
 ## Veredito: Plano A está de pé
 
@@ -372,12 +372,60 @@ valores distintos, média do byte final em ~127,5, fração de bits 1 dentro de
 2%); e um teste que documenta em código executável por que o byte alto zerado
 perderia o corpo.
 
+## Sonda 12 — A prova disjuntiva CDS (smokes B4 e B3, 2026-10-01)
+
+Contrato: `CB5U66NKW5QJYRYAPCCQ6TNU7ZDVA7UBAQT3CRGV35MDKV6JMVX6H6FD`
+
+Era o **maior número do orçamento e o único grande que ainda era projeção**.
+
+| | custo | taxa |
+|---|---|---|
+| desafio de Fiat–Shamir (sha256 + from_bytes) | 45.338 | |
+| **`verify_cds`** (invocação cheia) | **10.980.243** | **14.144 stroops** |
+| projeção do SPEC | ~27.000.000 | |
+
+**A projeção errou por 2,5×, para o lado bom.** Ela supunha 8 `g1_mul` + 6
+`g1_add` = 26,3M. A implementação usa **um MSM de 2 termos por ramo** —
+2 × 5.398.553 = 10,8M. A conclusão 2 da sonda 2 (*toda verificação com
+múltiplos termos é um MSM único, nunca muls somados*) economizou 60% na maior
+linha do orçamento.
+
+### B3: provador nativo e verificador on-chain concordam
+
+O vetor de prova foi gerado pelo **`core`, em Rust nativo com arkworks**
+(voto `v=1`, acaso `r=31337`) e verificado pelo **host da testnet, em Wasm**:
+
+| invocação | resultado |
+|---|---|
+| prova do `core` | **`true`** |
+| ramos trocados (`a0 ↔ a1`) | `false` |
+| `e0` adulterado, `z0` adulterado | `false` (local) |
+| prova aplicada a outro compromisso | `false` (local) |
+
+É o cruzamento que o smoke B3 pedia, e ele fecha por construção: o host usa
+arkworks e o `core` usa o mesmo crate.
+
+### O orçamento de `votar()` fechou
+
+| item | custo |
+|---|---|
+| 2 × prova CDS | 21.960.486 |
+| prova de soma (Schnorr em H) | 6.737.614 |
+| validação de 6 pontos | 4.433.406 |
+| 2 × `g1_add` no acumulador | 221.496 |
+| **total** | **33.353.002** |
+
+**8,3% do teto de 400M. Folga de 12×.**
+
+O Portão 1 do plano mandava seguir sem cortes com ≤200M. Passa por margem de
+6×, e a última incógnita grande do caminho do contrato deixou de existir.
+
 ## O que este smoke NÃO cobre
 
 Sem autorização, sem armazenamento, sem nullifier, sem mesa k-de-n (Shamir) e
-sem a prova disjuntiva CDS implementada (smoke B4) — o custo dela (~27M) é estimado a
-partir das primitivas medidas, não medido diretamente. A sonda 6 mede o custo
-de *verificar* um Groth16, não de gerar a prova nem de escrever o circuito.
+sem mesa k-de-n (Shamir). A prova CDS passou a ser medida (sonda 12). A sonda 6
+mede o custo de *verificar* um Groth16, não de gerar a prova nem de escrever o
+circuito.
 
 ## Rodar
 

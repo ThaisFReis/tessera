@@ -159,7 +159,7 @@ Pendência §9.1, o maior número projetado do orçamento (~27M).
 
 **Decisão que destrava.** O Portão 1 do plano, direto: ≤200M segue, 200–350M corta opções, >350M troca o sistema de prova.
 
-**Tempo.** 2h (é implementação, não só medição) · **Se falhar em custo:** Portão 1 decide. **Se falhar em corretude:** não há produto — uma prova de boa formação que aceita `v=2` deixa recher a urna.
+**Tempo.** 2h · **RESULTADO 2026-10-01: PASSA, e a projeção errou por 2,5×.** 10.980.243 instruções, 14.144 stroops. `votar()` fecha em 33.353.002, 8,3% do teto, folga de 12×. Corretude: aceita `v∈{0,1}`, recusa prova forjada para `v=2`, ramos trocados, `e0`/`z0` adulterados e prova migrada de compromisso.
 
 ### B5 · Shamir sobre `Fr` soma como precisa somar?
 

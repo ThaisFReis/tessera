@@ -49,6 +49,7 @@ Teto de CPU por transação, achado por bissecção na testnet: **400.000.000**.
 | `hash_to_g1` | 2.653.011 | |
 | `pairing_check(k)` | 10.571.128 + 6.746.479 por par | |
 | verificação Schnorr | 6.737.614 | 9.558 stroops |
+| **prova disjuntiva CDS** | **10.980.243** | **14.144 stroops** |
 | **apuração Pedersen** | **5.408.931** | **8.622 stroops** |
 | apuração ElGamal (desenho anterior) | 6.712.183 | 11.852 stroops |
 | verificação Groth16 (4 entradas públicas) | 47.371.348 | |
@@ -64,6 +65,9 @@ Três conclusões que mudaram o desenho:
 3. **O desenho com sigilo permanente é também o mais barato.** Pedersen é 19%
    mais barato em CPU e 27% em taxa que o ElGamal que ele substituiu. Não houve
    trade-off a pagar.
+
+E o orçamento fechou: **um voto completo custa 33.353.002 instruções, 8,3% de
+uma transação, com folga de 12×.** Nenhuma linha desse orçamento é projeção.
 
 E uma que responde à pergunta mais comum: **ZK cabe.** `pairing_check`
 compartilha a exponenciação final entre os pares, então uma verificação Groth16
@@ -83,6 +87,9 @@ usa 11,8% de uma transação e caberiam 8 numa só. O gargalo de ZK na Stellar n
 | 7 | O desenho Pedersen fecha, e recusa mesa mentindo? | sim, e é mais barato |
 | 8 | Por quanto tempo o verificador consegue ler o passado? | **7 dias** no RPC |
 | 9 | O estado arquiva? | **TTL padrão de 7 dias**, teto de 180 |
+| 10 | Quanto custa validar um ponto que chega? | 738.901, ou 1,1% da transação |
+| 11 | `H` é um gerador honesto? | sim, e não é `±k·G` para k em 1..512 |
+| 12 | A prova de boa formação cabe? | **sim, 10,98M — a projeção errava 2,5×** |
 
 Detalhes e método em [`bls-smoke/RESULTADOS.md`](bls-smoke/RESULTADOS.md).
 
@@ -111,20 +118,25 @@ RPC sete dias depois de feitas. Depois disso, leia dos arquivos de histórico.
 ## Reproduzir
 
 ```bash
-cd bls-smoke
-cargo test --lib -- --nocapture --test-threads=1
-stellar contract build
+cd bls-smoke && cargo test --lib -- --nocapture --test-threads=1   # 12 sondas
+cd ../core   && cargo test                                          # 20 testes
 ```
 
 Requer `rustc 1.97+`, `stellar-cli 25.2+`, alvo `wasm32v1-none`.
-Nove testes, todos passando, sem rede. Os testes de custo asseram teto: uma
+Trinta e dois testes, todos passando, sem rede.
+
+O crate `core/` é a matemática compartilhada entre contrato, cliente e
+verificador. Ele usa **arkworks, o mesmo crate do host do Soroban** — o que
+elimina pela raiz a divergência entre o provador nativo e o verificador Wasm.
+Dois testes travam isso: o agregado Pedersen e a prova CDS geradas no `core`
+reproduzem byte a byte o que o contrato produziu na testnet. Os testes de custo asseram teto: uma
 regressão de custo quebra o build em vez de aparecer na demo.
 
 Contratos na testnet:
 
 | | |
 |---|---|
-| sondas 1–7 (cripto) | `CCC4KNBCXIMXLHVEH3LG6CL32ZZJTTRNBRBTTSHH5ZYL6MUGTSGIDGKY` |
+| sondas 1–12 (cripto, CDS incluído) | `CB5U66NKW5QJYRYAPCCQ6TNU7ZDVA7UBAQT3CRGV35MDKV6JMVX6H6FD` |
 | sonda 9 (TTL) | `CCCZ4HPW3ESHO6BMNFGXX6DJRSWPWA7FBQH2MS6QGHC3U67DIZ434KFC` |
 
 Vetores de teste em [`bls-smoke/vetores.env`](bls-smoke/vetores.env).

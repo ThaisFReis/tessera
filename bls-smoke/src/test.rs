@@ -677,3 +677,82 @@ fn sonda11_h_e_gerador_honesto() {
     println!("DST participa ....... sim");
     println!("vetor da testnet .... travado em sonda7");
 }
+
+/// SONDA 12 (smoke B4) — a prova disjuntiva CDS, verificada no contrato.
+///
+/// O vetor abaixo foi gerado pelo `core` em Rust NATIVO (arkworks) e e
+/// verificado aqui em Wasm pelo host do Soroban. Se fechar, provador e
+/// verificador concordam no caminho CDS — que e o smoke B3, e e onde a
+/// maioria dos projetos de cripto quebra.
+///
+/// Voto v=1, acaso r=31337.
+#[test]
+fn sonda12_cds_verifica_e_custa() {
+    let (env, client) = setup();
+    let g = generator(&env);
+    let h = client.gerador_h();
+
+    let c = G1::from_bytes(bytesn!(&env, 0x191fab693fe01641555a088dd540a16d9ee62312feb3f752ffa55ebba270cfc49c96b4ad1ebd7098f21995333839ea8b1742141021a3d2c3834c415e63cbeeff2236cb95127faa339c7a05e21181eaa28f3b80e64bd506262cd1d45f7ce6df7a));
+    let a0 = G1::from_bytes(bytesn!(&env, 0x153730e4e4a5d57c774119f37fa07f4bec68741934ce1f4c5dad6584d8e63aa5ff78aa6543b2426e429230194cd40ce20be2e4d403ddfb1c5b195bd883a89a437ae7e77a033e04f4e0b418970764976cac0e48a81b8ed9705b54df2ad07bc72c));
+    let a1 = G1::from_bytes(bytesn!(&env, 0x03a1e4a301a681cc0024c375fb86364da96ae773fb2d3f4131af1c3490651497f292926f822a491ac54f64edb3920ec10c813d8135b948f37c3716416bf115eed635fa362b6ba12ad28fe1a33a51e398aed4e711973dddb976e4de1898b08529));
+    let e0 = Fr::from_bytes(bytesn!(&env, 0x709dce372550d44aa0b33083323149d14be674ea27181d945750c6619e7ac050));
+    let z0 = Fr::from_bytes(bytesn!(&env, 0x540de293552c98c9363bcb6c028870b2021a5181c76d433fb7ceb8ac6d973580));
+    let e1 = Fr::from_bytes(bytesn!(&env, 0x03a64ddf3ed244944e2b922db48781d277a780636c3c74f457fe4eec891d4770));
+    let z1 = Fr::from_bytes(bytesn!(&env, 0x5225db38c6cf1177518ef0b1b16ddea0ead83e461a465d97d8de160394553cd8));
+
+    // --- a prova do core verifica no contrato
+    assert!(
+        client.verify_cds(&g, &h, &c, &a0, &a1, &e0, &z0, &e1, &z1),
+        "prova gerada pelo core NAO verifica no contrato: provador e \
+         verificador divergem"
+    );
+
+    // --- adulteracoes tem de ser recusadas
+    let um = fr(&env, 1);
+    let bls = env.crypto().bls12_381();
+    assert!(
+        !client.verify_cds(&g, &h, &c, &a0, &a1, &bls.fr_add(&e0, &um), &z0, &e1, &z1),
+        "e0 adulterado passou"
+    );
+    assert!(
+        !client.verify_cds(&g, &h, &c, &a0, &a1, &e0, &bls.fr_add(&z0, &um), &e1, &z1),
+        "z0 adulterado passou"
+    );
+    assert!(
+        !client.verify_cds(&g, &h, &c, &a1, &a0, &e0, &z0, &e1, &z1),
+        "ramos trocados passaram"
+    );
+    // a prova esta presa ao SEU compromisso
+    let outro_c = client.commit(&g, &h, &1u32, &fr(&env, 99));
+    assert!(
+        !client.verify_cds(&g, &h, &outro_c, &a0, &a1, &e0, &z0, &e1, &z1),
+        "prova migrou de compromisso"
+    );
+
+    // --- custo
+    let c_desafio = cpu(&env, || client.desafio_cds(&c, &a0, &a1));
+    let c_cds = cpu(&env, || {
+        client.verify_cds(&g, &h, &c, &a0, &a1, &e0, &z0, &e1, &z1)
+    });
+
+    println!("\n== SONDA 12 (B4): prova disjuntiva CDS ==");
+    println!("desafio (sha256 + from_bytes) .... {:>10}", c_desafio);
+    println!("verify_cds (invocacao cheia) ..... {:>10}", c_cds);
+    println!("   projecao do SPEC era ~27M");
+    println!("   erro da projecao .............. {:.0}%",
+        100.0 * (27_000_000.0 - c_cds as f64) / 27_000_000.0);
+    println!("\n-- orcamento de votar(), m=2 --");
+    let votar = 2 * c_cds + 6_737_614 + 4_433_406 + 221_496;
+    println!("2 CDS + soma + validacao + adds .. {:>10}", votar);
+    println!("   % do teto de 400M ............. {:.1}%",
+        100.0 * votar as f64 / TX_CPU_LIMIT as f64);
+    println!("   folga ......................... {:.1}x",
+        TX_CPU_LIMIT as f64 / votar as f64);
+
+    // PORTAO 1 do PLANO: <=200M segue o plano sem corte.
+    assert!(
+        votar <= 200_000_000,
+        "votar() custa {}, acima dos 200M do Portao 1",
+        votar
+    );
+}

@@ -27,6 +27,10 @@ const DST: &[u8] = b"KARN-URNA-V0-CHALLENGE";
 /// governanca. Se alguem souber h tal que H = h*G, abre qualquer compromisso.
 const DST_H: &[u8] = b"TESSERA-V1-GENERATOR-H";
 
+/// DST do desafio de Fiat-Shamir do CDS. Tem de ser byte a byte igual ao do
+/// `core`: um DST divergente faz TODA prova falhar, sem dizer por que.
+const DST_DESAFIO: &[u8] = b"TESSERA-V1-FIAT-SHAMIR";
+
 #[contract]
 pub struct BlsSmoke;
 
@@ -262,6 +266,68 @@ impl BlsSmoke {
         a == bls.g1_msm(ps, ss)
     }
 
+    // ---------- Sonda 12 (B4): prova disjuntiva CDS ----------
+    //
+    // Prova que o compromisso abre para 0 OU para 1, sem revelar qual. Sem
+    // isso nao ha urna: um voto com v=1000 encheria a apuracao.
+    //
+    // Dois ramos Schnorr sobre a base H, com o desafio dividido de modo que
+    // e0 + e1 = e. Cada ramo e um MSM de 2 termos, nao dois muls somados:
+    // a sonda 2 mediu msm(k=2) em 5,4M contra 6,58M de dois muls.
+
+    /// Desafio de Fiat-Shamir do CDS, ligado ao compromisso e aos dois anuncios.
+    pub fn desafio_cds(
+        env: Env,
+        c: Bls12381G1Affine,
+        a0: Bls12381G1Affine,
+        a1: Bls12381G1Affine,
+    ) -> Bls12381Fr {
+        desafio_fr(&env, &c, &a0, &a1)
+    }
+
+    /// Verifica a prova disjuntiva. Tres igualdades, todas tem de fechar.
+    pub fn verify_cds(
+        env: Env,
+        g: Bls12381G1Affine,
+        h: Bls12381G1Affine,
+        c: Bls12381G1Affine,
+        a0: Bls12381G1Affine,
+        a1: Bls12381G1Affine,
+        e0: Bls12381Fr,
+        z0: Bls12381Fr,
+        e1: Bls12381Fr,
+        z1: Bls12381Fr,
+    ) -> bool {
+        let bls = env.crypto().bls12_381();
+
+        // 1. os desafios parciais somam o desafio ligado a (C, a0, a1)
+        if bls.fr_add(&e0, &e1) != desafio_fr(&env, &c, &a0, &a1) {
+            return false;
+        }
+        let zero = u32_fr(&env, 0);
+
+        // 2. ramo 0: z0*H - e0*C == a0
+        let mut ps = Vec::new(&env);
+        let mut ss = Vec::new(&env);
+        ps.push_back(h.clone());
+        ps.push_back(c.clone());
+        ss.push_back(z0);
+        ss.push_back(bls.fr_sub(&zero, &e0));
+        if bls.g1_msm(ps, ss) != a0 {
+            return false;
+        }
+
+        // 3. ramo 1: z1*H - e1*(C - G) == a1
+        let c_menos_g = bls.g1_add(&c, &(-g));
+        let mut ps = Vec::new(&env);
+        let mut ss = Vec::new(&env);
+        ps.push_back(h);
+        ps.push_back(c_menos_g);
+        ss.push_back(z1);
+        ss.push_back(bls.fr_sub(&zero, &e1));
+        bls.g1_msm(ps, ss) == a1
+    }
+
     // ---------- Sonda 10 (C1): desserializacao e checagem de subgrupo ----------
     //
     // Todo ponto G1 que entra por argumento precisa ser validado on-curve e
@@ -338,6 +404,23 @@ impl BlsSmoke {
         env.storage().persistent().extend_ttl(&id, m - 1, m);
         m
     }
+}
+
+fn desafio_fr(
+    env: &Env,
+    c: &Bls12381G1Affine,
+    a0: &Bls12381G1Affine,
+    a1: &Bls12381G1Affine,
+) -> Bls12381Fr {
+    let mut buf = Bytes::from_slice(env, DST_DESAFIO);
+    buf.extend_from_array(&c.to_array());
+    buf.extend_from_array(&a0.to_array());
+    buf.extend_from_array(&a1.to_array());
+    let mut e = env.crypto().sha256(&buf).to_array();
+    // from_bytes nao reduz modulo r; zerar o byte alto garante e < 2^248 < r.
+    // Seguro para um DESAFIO. Seria errado para o acaso do compromisso.
+    e[0] = 0;
+    Bls12381Fr::from_bytes(BytesN::from_array(env, &e))
 }
 
 fn u32_fr(env: &Env, v: u32) -> Bls12381Fr {

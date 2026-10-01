@@ -426,8 +426,10 @@ Verifier:
 
 Tamanho: 2 pontos G1 (192 B) + 4 escalares (128 B) = **320 bytes por opção**.
 
-Custo: cada verificação é 1 MSM de 2 termos, duas vezes. Projetado em ~27M
-instruções por prova a partir das primitivas medidas. **NÃO MEDIDO** — ver §9.1.
+Custo: cada verificação é 1 MSM de 2 termos, duas vezes. **Medido em
+10.980.243 instruções e 14.144 stroops** (sonda 12, 2026-10-01). A projeção
+anterior de ~27M supunha muls somados; o MSM de 2 termos por ramo a derrubou
+em 60%.
 
 ### 6.2 Soma correta: Schnorr em base H
 
@@ -593,15 +595,15 @@ MSM único, nunca muls somados.**
 
 | item | custo | fonte |
 |---|---|---|
-| 2 × prova CDS | ~54M | projetado |
-| 1 × prova de soma | ~6,7M | medido |
+| 2 × prova CDS | 21.960.486 | medido |
+| 1 × prova de soma | 6.737.614 | medido |
 | validação de 6 pontos G1 | 4.433.406 | medido |
-| caminho de Merkle (depth 16, sha256) | ~1M | estimado |
-| 2 × `g1_add` no acumulador | 221k | medido |
-| **total** | **~66M** | |
+| caminho de Merkle (depth 8, sha256) | ~1M | estimado |
+| 2 × `g1_add` no acumulador | 221.496 | medido |
+| **total** | **33.353.002** | |
 
-Folga contra os 400M: **~6×**. A validação de ponto, que era a incógnita,
-saiu em 1,1% da transação.
+Folga contra os 400M: **12×**. O orçamento usa 8,3% de uma transação, e não
+sobrou nenhuma projeção grande: tudo acima foi medido em invocação real.
 
 **O host não valida subgrupo sozinho:** `g1_add` custa 110.748, que é 15% de
 uma checagem isolada, e uma operação não contém algo 7× mais caro que ela.
@@ -704,13 +706,14 @@ semana, em silêncio.
 
 Ordenadas por risco. As três primeiras são de dia 1.
 
-### 9.1 Prova disjuntiva CDS — ~27M projetado, não medido
+### 9.1 Prova disjuntiva CDS — ✅ RESOLVIDO
 
-É o maior número do orçamento e o único grande que não veio de uma invocação
-real. Inferência de custo em Soroban erra por fator 2 com alguma frequência.
-Mesmo com fator 2 cabe nos 400M, mas o número publicado precisa ser medido.
+**Medido em 2026-10-01 (sonda 12): 10.980.243 instruções, 14.144 stroops.**
+A projeção de ~27M errou por 2,5×, para o lado seguro, porque supunha muls
+somados em vez de um MSM de 2 termos por ramo.
 
-**Ação:** implementar `verify_cds` na sonda e medir na testnet.
+E o vetor de prova veio do `core` em Rust nativo e verificou no host da
+testnet — provador e verificador concordam (smoke B3).
 
 ### 9.2 Desserialização de ponto com checagem de subgrupo — ✅ RESOLVIDO
 
