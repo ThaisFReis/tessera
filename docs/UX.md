@@ -290,6 +290,10 @@ Por que é seguro de prometer: ~4h, zero risco para o contrato, e **completament
 
 Onde entra no cronograma: **domingo 08:00–12:00, em paralelo às correções.** Se o Portão 3 falhou no sábado, não acontece.
 
+> **Feito em 2026-10-01, antes do previsto**, porque o Portão 3 passou na quarta. Está em `console/index.html`: HTML estático, sem backend, com uma rodada real da testnet embutida para abrir mostrando algo em vez de um formulário vazio. `?p=<proposta>` lê o JSON ao lado; o seletor de arquivo abre qualquer outro.
+>
+> A grade de blocos indistinguíveis existe e é o que o terminal não conseguia dar: **dez objetos de 96 bytes, cinco cometendo um voto e cinco a ausência dele, idênticos em forma.** Os dados são reais e estão no ledger.
+
 E o README diz o que ele é: *"console de demonstração sobre a saída da CLI"*. Escrever isso custa nada e é a diferença entre escopo e maquiagem.
 
 ### Nível 3 — não vai acontecer: o aplicativo

@@ -30,6 +30,7 @@ computacional, para sempre. O voto em si transita fora da cadeia e é destruído
 | Contrato de urna (`abrir`/`votar`/`apurar`) | ✅ no ar, 20 testes |
 | Cliente CLI | ✅ rodada completa na testnet |
 | Verificador público | ✅ no `tessera verificar` |
+| Console de demonstração | ✅ visor sobre a saída da CLI |
 
 **O que está no ar hoje é a sonda que estabelece o modelo de custo, não a urna.**
 Todo número abaixo veio de uma invocação real na testnet da Stellar, nunca de
@@ -235,6 +236,10 @@ decimal errado.
 | [`docs/UX-CLI.md`](docs/UX-CLI.md) | a saída exata da CLI, medida em colunas |
 
 Decks: [português](index.html) · [inglês](index.en.html)
+
+Console: [`console/`](console/) — visor sobre uma rodada real, com a grade de
+compromissos indistinguíveis que não cabe num terminal. É um **visor**, não um
+aplicativo: sem carteira, sem servidor, e não assina nada.
 
 ---
 
