@@ -1,0 +1,369 @@
+# Tessera — Catálogo de smoke tests
+
+**Data:** 2026-10-01 (dia 1 do [PLANO.md](PLANO.md))
+**Pergunta que este doc responde:** o que ainda não sabemos, e qual decisão cada resposta destrava.
+
+Um smoke test aqui não é teste de regressão. É **uma pergunta que, respondida errado, muda a arquitetura.** Se a resposta não muda nenhuma decisão, não é smoke: é teste, e vai para a suíte normal.
+
+Cada entrada tem: a pergunta, o método, o critério, **a decisão que destrava**, o custo em tempo e o que acontece se falhar.
+
+---
+
+## 0. A lacuna que está escondida em plena vista
+
+As seis sondas em `../bls-smoke/` parecem cobrir tudo. Elas não cobrem o produto.
+
+> **A sonda mediu ElGamal exponencial. O spec especifica Pedersen.**
+> A apuração por abertura do agregado — que é o desenho final, a razão do sigilo
+> permanente e o conteúdo dos dois decks — **nunca foi executada uma vez.**
+
+Isso não invalida nenhuma medição: as primitivas são as mesmas (`g1_add`, `g1_msm`), e o modelo de custo transfere. Mas "o modelo de custo transfere" é uma afirmação, e ninguém a testou.
+
+**É o smoke B1, e é o mais importante da lista.** Quarenta minutos. Se passar, o projeto inteiro está de pé. Se falhar, existe um plano B *já medido* (ElGamal, §3.3 deste doc).
+
+E há um segundo grupo que ninguém registrou: **três riscos de plataforma que quebram a verificabilidade em silêncio, depois da demo.** Grupo A. Falhar hoje é barato; descobrir em frente ao jurado, não.
+
+---
+
+## 1. O que já está respondido
+
+Para não re-medir. Tudo abaixo veio de invocação real na testnet, 2026-09-30.
+
+| # | pergunta | resposta |
+|---|---|---|
+| S1 | Host functions BLS12-381 existem no SDK 28? | sim |
+| S1 | Host aceita `be_bytes(X) ‖ be_bytes(Y)`, 96 B? | sim |
+| S2 | Custo das primitivas? | add 110.748 · mul 3.290.524 · msm 2.454.719 + 1.471.917/termo · hash_to_g1 2.653.011 |
+| S3 | Sigma-protocolo verifica dentro do contrato? | sim, 6.737.614 |
+| S4 | Apuração homomórfica fecha ponta a ponta? | sim (ElGamal, pesos 5+3+1 → 9) |
+| S5 | Buscar o total é viável? | **não**, ~124k/unidade, teto ~3.218. Conferir: 6.712.183 constante |
+| S5 | Contrato recusa total falso? | sim |
+| S6 | Groth16 cabe? | sim, 47.371.348 = 11,8% do teto · `pairing_check(k) = 10.571.128 + 6.746.479k` |
+| — | Teto de CPU real? | 400.000.000, por bissecção |
+| — | Taxas? | 9.558 / 11.852 stroops |
+
+---
+
+## 2. Grupo A — Plataforma: os que quebram em silêncio
+
+Estes são os perigosos. Não falham no `cargo test`. Falham semanas depois, ou na frente de quem está avaliando, e quebram justamente **P4 e P5** — a verificabilidade, que é a metade do pitch que não é sigilo.
+
+### A1 · Arquivamento de estado apaga a urna?
+
+**Pergunta.** Entradas persistentes do Soroban têm TTL e são **arquivadas** quando ele expira. Uma transação cuja footprint referencia uma entrada persistente arquivada **falha** até alguém restaurar com `RestoreFootprintOp`. Os acumuladores `Acum(id, j)` e as 50 entradas `Votou(id, addr)` são persistentes. Então: uma votação aberta hoje e apurada em duas semanas ainda funciona? E o verificador, seis meses depois?
+
+**Método.** Abrir uma proposta na testnet, escrever as entradas, ler o TTL de cada uma (`extend_ttl` / consulta de TTL), e calcular quantos ledgers faltam para arquivar. Testar o caminho de restauração.
+
+**Critério.** O TTL de toda entrada que a apuração e o verificador precisam é conhecido, e existe uma política explícita de extensão.
+
+**Decisão que destrava.** Se o TTL padrão for menor que um ciclo de governança plausível, `abrir()` precisa **estender o TTL de tudo na abertura**, e isso tem custo e entra no orçamento de §7 do spec. Se não, a cláusula "qualquer pessoa recalcula a apuração a partir da rede" tem prazo de validade — e aí o deck está prometendo mais do que o protocolo entrega, exatamente o pecado que o §1.3 proíbe.
+
+**Tempo.** 45 min · **RESULTADO 2026-10-01: TTL padrão 7,00 dias, teto 180 dias, 0,207 XLM por entrada estendida.** O TTL padrão coincide com a janela do RPC: sem intervenção os dois níveis do verificador morrem no dia 7. `abrir()` estende só `Proposta` e `Acum` (~0,6 XLM fixo); `Votou` pode arquivar. Ver SPEC §5.1.
+
+### A2 · O verificador consegue ler o passado?
+
+**Pergunta.** O verificador público relê todos os `votar()` da proposta e reconstrói o agregado. Ele depende do histórico do RPC. **A janela de retenção de transações e eventos do RPC é uma configuração, expressa em número de ledgers** — não é infinita.
+
+Se a janela for curta, o verificador funciona no dia da votação e para de funcionar depois. P5 vira decorativa, que é precisamente o que [UX-CLI.md](UX-CLI.md) §7 diz que não pode acontecer.
+
+**Método.** `getEvents` / `getTransactions` no RPC público da testnet buscando o ledger mais antigo disponível. Medir a janela real em ledgers e em dias.
+
+**Critério.** A janela é conhecida e escrita no README.
+
+**Decisão que destrava.** Três caminhos, e a medição escolhe:
+1. Janela confortável → verificador lê do RPC, como planejado.
+2. Janela curta → o verificador precisa **indexar continuamente** ou tirar um snapshot assinado. É trabalho novo, e muda o escopo de sábado.
+3. Alternativa → ler dos *arquivos de histórico* em vez do RPC, que é mais lento e mais correto.
+
+**Tempo.** 30 min · **RESULTADO 2026-10-01: a janela é 120.960 ledgers = 7,00 dias, e é aplicada.** Não afeta leitura de estado nem arquivos de histórico. O verificador passa a ter dois níveis (SPEC §8.3) e lê dos arquivos por padrão. **Era mesmo a falha mais provável, e aconteceu.**
+
+### A3 · A transação de voto cabe, em bytes e em footprint?
+
+**Pergunta.** Todo o orçamento de §7 do spec é de **CPU**. Nunca olhamos tamanho. Uma chamada `votar()` leva, para `m=2`: 2 compromissos (192 B) + 2 provas CDS (640 B) + 1 prova de soma (128 B) + caminho de Merkle profundidade 8 (256 B) + assinatura e envelope. E a footprint declara `Proposta`, `Acum(j)` para cada `j`, `Votou`, `GeradorH` — e **cada entrada tocada conta contra os limites de leitura e escrita por transação.**
+
+**Método.** Montar a transação com dados sintéticos do tamanho real, submeter na testnet, ler tamanho e contagem de footprint contra os limites vigentes.
+
+**Critério.** Cabe com folga ≥ 2× nos limites de tamanho, leitura e escrita.
+
+**Decisão que destrava.** Se não couber: menos opções por transação, ou pontos comprimidos (48 B em vez de 96 — mas só se o host desserializar comprimido, que é um smoke por si), ou caminho de Merkle mais curto.
+
+**Tempo.** 45 min · **Se falhar:** corte de `m` ou de profundidade, e o Portão 1 do plano ganha um critério novo.
+
+### A4 · Aluguel de estado para `n` grande
+
+Pendência §9.3 do spec. 50 entradas `Votou` na demo; 10.000 numa assembleia real.
+
+**Método.** Escrever 1.000 entradas e ler a taxa total.
+
+**Critério.** Um número, e a extrapolação para 10.000 escrita no spec.
+
+**Decisão que destrava.** Se o aluguel for alto, o desenho de armazenamento muda (bitmap em vez de uma entrada por votante — mas bitmap colide com a v2 desvinculada, então é decisão de arquitetura, não de otimização).
+
+**Tempo.** 30 min · **Se falhar:** só o spec muda. Não bloqueia a demo de 50 votantes.
+
+---
+
+## 3. Grupo B — Criptografia: o desenho final nunca rodou
+
+### B1 · Pedersen e a abertura do agregado fecham on-chain? ★
+
+**O smoke mais importante do projeto.**
+
+**Pergunta.** Com `C_i = v_i·G + r_i·H`, a soma `A = Σ C_i` abre como `T·G + R·H` com `T = Σv_i` e `R = Σr_i`? E o contrato confere isso com um MSM de 2 termos, aceitando `(T, R)` da mesa?
+
+**Método.** Função nova na sonda: `verify_aggregate(A, T, R, G, H) -> bool`. Montar 5 compromissos no teste, somar, abrir, conferir. Testar também com `T+1` e com `R+1`.
+
+**Critério.**
+- honesto → `true`
+- `T` alterado em 1 → `false`
+- `R` alterado em 1 → `false`
+- custo ≤ 8M (projetado 5,4M)
+
+**Decisão que destrava.** Tudo. É o desenho do spec, da §3.3, do slide `solution` dos dois decks, e a razão pela qual o projeto afirma sigilo permanente.
+
+**Se falhar:** plano B já medido — voltar a ElGamal exponencial com `tally_checked` (6.712.183, sonda 5, funcionando na testnet hoje). **Custo da queda: perde-se o sigilo permanente como propriedade entregue**, e os dois decks precisam de edição real, não cosmética. Por isso este smoke é o primeiro de hoje.
+
+**Tempo.** 40 min · **RESULTADO 2026-10-01: PASSA.** 5.408.931 e 8.622 stroops, 19% e 27% mais barato que ElGamal. Projeção errou 0,2%. Negativos recusam. Plano B arquivado sem uso.
+
+### B2 · `H` é um gerador com log discreto desconhecido?
+
+**Pergunta.** `H = hash_to_g1(DST_H)` está na curva, no subgrupo de ordem `r`, e não é `G` nem múltiplo trivial dele?
+
+**Método.** `g1_is_on_curve(H)`, `g1_is_in_subgroup(H)`, `H != G`, `H != -G`, `H != identidade`. E determinismo: duas derivações dão o mesmo ponto.
+
+**Critério.** Todas verdadeiras, e `H` idêntico entre duas execuções e entre cliente e contrato.
+
+**Decisão que destrava.** Se `H` não for determinístico entre o provador off-chain e o contrato, **nenhuma prova verifica** e o bug é dos que custam meio dia para achar. Trinta minutos aqui economizam isso.
+
+**Tempo.** 20 min · **Se falhar:** `H` passa a ser constante fixa auditável no código em vez de derivada.
+
+### B3 · O provador fora da cadeia e o verificador dentro concordam?
+
+**Pergunta.** Até agora o provador viveu dentro do teste. No produto, a CLI gera a prova em Rust nativo e o contrato a verifica em Wasm. Mesma aritmética? Mesmo Fiat–Shamir? Mesma serialização?
+
+**Método.** CLI gera `(C, π)` e grava em arquivo. `stellar contract invoke` passa o arquivo. O contrato devolve `true`.
+
+**Critério.** `true` numa invocação real na testnet, com a prova vinda de um processo separado.
+
+**Decisão que destrava.** É o ponto exato em que a maioria dos projetos de cripto quebra, e a causa é quase sempre uma destas três: ordem de bytes, DST divergente, ou redução módulo `r`. A armadilha do `Fr::from_bytes` que não reduz (§10.3 do spec) já mordeu uma vez.
+
+**Tempo.** 1h · **Se falhar:** é bug, não decisão — mas é o bug mais caro possível no sábado. Por isso roda na sexta, não no sábado.
+
+### B4 · CDS disjunctiva: custo e corretude
+
+Pendência §9.1, o maior número projetado do orçamento (~27M).
+
+**Método.** Implementar `verify_cds` e medir. Testar que aceita `v=0` e `v=1`, e **recusa** `v=2`, `v=-1`, ramos trocados e desafio adulterado.
+
+**Critério.** Os quatro negativos recusam. Custo medido entra no Portão 1.
+
+**Decisão que destrava.** O Portão 1 do plano, direto: ≤200M segue, 200–350M corta opções, >350M troca o sistema de prova.
+
+**Tempo.** 2h (é implementação, não só medição) · **Se falhar em custo:** Portão 1 decide. **Se falhar em corretude:** não há produto — uma prova de boa formação que aceita `v=2` deixa recher a urna.
+
+### B5 · Shamir sobre `Fr` soma como precisa somar?
+
+**Pergunta.** A mesa `k`-de-`N` depende de o compartilhamento de Shamir ser **aditivamente homomórfico nas shares**: cada membro soma localmente, e `k` membros reconstroem `Σr_i` sem nunca reconstruir um `r_i`. Isso funciona sobre `Fr` com a aritmética disponível? Interpolação de Lagrange sobre `Fr` com `fr_inv`?
+
+**Método.** Em Rust puro: dividir 5 valores `r_i` em 5 shares com limiar 3; somar as shares por membro; reconstruir com 3 membros; conferir que dá `Σr_i`. E conferir que 2 membros **não** reconstroem nada útil.
+
+**Critério.** Reconstrução com 3 confere. Com 2, não.
+
+**Decisão que destrava.** É o smoke de **P2** — sigilo contra a própria mesa. Sem ele, o corte 2 do plano escala: a mesa vira endereço único, que *vê todos os votos*, e isso precisa ir para o §1.3 do spec como lacuna declarada e para o slide `properties`.
+
+**Tempo.** 1h · **Se falhar:** mesa única + lacuna declarada em voz alta. Enfraquece o pitch de forma honesta.
+
+### B6 · Aleatoriedade do cliente
+
+**Pergunta.** `r_i` vem de um CSPRNG de verdade?
+
+**Método.** Ler o código. Confirmar `getrandom` / `OsRng`, nunca `rand::thread_rng` semeado de forma determinística, nunca timestamp. Gerar 10.000 `r` e checar que não repetem e passam um teste de uniformidade grosseiro.
+
+**Critério.** Fonte do SO, zero colisões.
+
+**Decisão que destrava.** Nenhuma — mas é o **único ponto do sistema em que um bug de implementação anula uma garantia information-theoretic.** `r` previsível torna o compromisso abrível por qualquer um. O sigilo permanente inteiro, provado em §3.2 do spec, repousa sobre esta linha de código.
+
+**Tempo.** 20 min · **Se falhar:** é a falha mais grave possível, e é silenciosa. Nada na tela muda.
+
+---
+
+## 4. Grupo C — Orçamento restante
+
+### C1 · Desserialização de ponto com checagem de subgrupo
+
+Pendência §9.2. São ~6 pontos por `votar()` e o custo nunca foi isolado.
+
+**Método.** `deserialize_n(pontos: Vec<G1>, n: u32)` que só valida; isolar por diferença.
+
+**Critério.** Um número, e o orçamento de §7.2 do spec fechado com ✅.
+
+**Decisão que destrava.** Entra no Portão 1. E resolve o aviso do Tyler: *não venda Groth16 no pitch sem medir desserialização com checagem de subgrupo.*
+
+**Tempo.** 30 min.
+
+### C2 · `verify_reveal` — o campo público
+
+Pendência §9.4, o caminho do voto semi-confidencial (§6.5). Projetado em ~5,4M.
+
+**Método.** Conferir `C == v·G + r·H` com `(v, r)` em claro. Medir. Testar que recusa `v` ou `r` alterado.
+
+**Critério.** Número medido, negativos recusam.
+
+**Decisão que destrava.** Confirma a afirmação que foi para os dois decks: **publicidade é mais barata que sigilo.** Se for mais caro que a CDS, a frase sai do deck.
+
+**Tempo.** 30 min.
+
+### C3 · Caminho de Merkle e `require_auth` de `k` membros
+
+**Método.** Medir o caminho de profundidade 8 com sha256, e o `require_auth` multiassinatura de 3 de 5.
+
+**Critério.** Dois números no orçamento.
+
+**Tempo.** 40 min · **Se falhar:** profundidade menor; mesa com menos membros.
+
+---
+
+## 5. Grupo D — Ponta a ponta
+
+### D1 · A rodada completa na testnet
+
+O roteiro do vídeo é o smoke. Cinco votantes, um divergente, apuração 3-de-5, verificador fechando.
+
+**Critério.** Os seis passos de [UX-CLI.md](UX-CLI.md), em sequência, sem intervenção manual entre eles.
+
+**Decisão que destrava.** O **Portão 3** do plano, sábado 20:00. Falha aqui aciona o fallback nuclear.
+
+**Tempo.** 3h incluindo correções.
+
+### D2 · Mesa mentindo recusa de verdade
+
+**Método.** `--forcar-total` com total inválido.
+
+**Critério.** Contrato devolve falso, nada é publicado, e o estado fica inalterado — não parcialmente escrito.
+
+**Decisão que destrava.** É o passo 6 do vídeo e o que separa verificabilidade real de afirmada. **Não é cortável.**
+
+**Tempo.** 20 min.
+
+### D3 · A recusa por `τ`
+
+**Método.** Votação com 4 confidenciais e 46 públicos. Tentar apurar.
+
+**Critério.** Recusa, nada publicado, nenhum voto perdido, e a votação volta a ser apurável se mais gente votar em segredo.
+
+**Decisão que destrava.** É o teorema da partição (§6.6) executando. Quinze segundos de vídeo, e o estado que mais impressiona quem entende de votação.
+
+**Tempo.** 30 min.
+
+### D4 · O verificador é realmente independente?
+
+**Pergunta.** Ele roda sem o contrato, sem a CLI, sem nenhum arquivo local de estado?
+
+**Método.** Em diretório limpo, com só o id da proposta e o endereço do contrato, rodar o verificador. Sem `./estado/`, sem `./recibos/`.
+
+**Critério.** Reconstrói tudo e fecha.
+
+**Decisão que destrava.** Se ele precisar de arquivo local, **não é verificador, é visualizador** — e o `Confia em ....... nada` do cabeçalho é falso. Melhor descobrir antes de escrever a linha.
+
+**Tempo.** 30 min.
+
+---
+
+## 6. Grupo E — Confiança (os meus)
+
+Smokes de UX não medem usabilidade. Medem se a confiança se formou.
+
+### E1 · O teste das duas perguntas
+
+Uma pessoa de fora vota na demo. Depois:
+
+1. *"Quem consegue descobrir em que você votou?"*
+   **Passa:** "ninguém". **Falha:** "não sei", "a plataforma", "depende".
+2. *"Seu voto entrou na conta?"*
+   **Passa:** "sim, vi a posição 27". **Falha:** "acho que sim".
+
+**Decisão que destrava.** Se a 1 falhar, o bloco de hex não está convencendo e nada mais na tela importa — e a correção é de cópia e de hierarquia, não de código. Trinta minutos de conserto, se descoberto na sexta. Zero, se descoberto no domingo.
+
+**Tempo.** 20 min, uma pessoa.
+
+### E2 · A cédula sobrevive a `| cat`
+
+**Método.** `tessera cedula … | cat` e `NO_COLOR=1 tessera cedula …`.
+
+**Critério.** Os glyphs e as palavras carregam tudo; nada de essencial depende de cor.
+
+**Decisão que destrava.** Vídeo comprimido come saturação, e o terminal de quem avalia não é o seu.
+
+**Tempo.** 5 min.
+
+### E3 · Setenta e duas colunas em tela cheia
+
+**Método.** Gravar 10 segundos a 1920×1080 e assistir no celular.
+
+**Critério.** O hex é legível.
+
+**Decisão que destrava.** A largura é escolha de demo, não de estilo. Se não der, a régua muda antes de os sete comandos existirem — depois são sete reescritas.
+
+**Tempo.** 10 min.
+
+---
+
+## 7. Árvore de decisão
+
+```
+B1 Pedersen fecha?
+├── não → volta para ElGamal (medido). Sigilo permanente sai
+│         como propriedade entregue. Editar os 2 decks e o spec.
+└── sim → segue
+    │
+    A2 janela do RPC comporta o verificador?
+    ├── não → verificador ganha modo indexador. +3h no sábado.
+    └── sim → segue
+        │
+        B4 + C1: soma de votar() com números reais
+        ├── > 350M → troca o sistema de prova, ou 1 opção por tx
+        ├── 200–350M → m=2 fixo, Merkle 8
+        └── ≤ 200M → segue o plano
+            │
+            A1 TTL arquiva antes de um ciclo de governança?
+            ├── sim → abrir() estende TTL. Custo no orçamento.
+            └── não → segue
+                │
+                B5 Shamir soma?
+                ├── não → mesa única, lacuna declarada no deck
+                └── sim → P2 entregue
+                    │
+                    D1 rodada completa fecha? → PORTÃO 3
+                    ├── não → fallback nuclear (PLANO §5)
+                    └── sim → gravar vídeo
+```
+
+---
+
+## 8. O que rodar hoje
+
+O plano reservou 08:30–12:00. Não cabem vinte smokes. Cabem **quatro**, e são os quatro que podem mudar a arquitetura:
+
+| ordem | smoke | tempo | por que hoje |
+|---|---|---|---|
+| 1 | **B1** Pedersen fecha | 40 min | o desenho final nunca rodou |
+| 2 | **A2** janela do RPC | 30 min | falha mais provável da lista |
+| 3 | **B2** `H` determinístico | 20 min | evita meio dia de bug na sexta |
+| 4 | **C1** desserialização | 30 min | fecha o Portão 1 |
+
+Sobra ~1h de folga, que some sozinha. Se sobrar de verdade: **B6** (aleatoriedade, 20 min) — é o único smoke cuja falha é invisível.
+
+**Sexta de manhã, antes do contrato:** B4 (CDS, 2h, é implementação) · B3 (provador ↔ verificador, 1h).
+**Sexta à tarde:** A3 (tamanho de transação) · C2 · C3.
+**Sábado:** A1, A4, B5, D1, D2, D3, D4.
+**Domingo de manhã:** E1, E2, E3 — antes de gravar, não depois.
+
+Se o tempo apertar, corte nesta ordem: **A4** (só muda o spec) → **C3** (dá para estimar) → **B5** (vira lacuna declarada). **B1, A2, B4, D1, D2 e D3 não são cortáveis.** Os três últimos são o vídeo; os três primeiros são a arquitetura.
+
+---
+
+## 9. Regra de registro
+
+Todo smoke escreve uma linha em `../bls-smoke/RESULTADOS.md`: a pergunta, o número, o veredito e a data. Um smoke sem resultado registrado é um smoke que vai ser refeito.
+
+E dois números não podem viver em dois lugares (o deck já teve esse problema): **`RESULTADOS.md` é a fonte.** Spec, plano e decks citam, nunca republicam.
