@@ -9,7 +9,7 @@
 
 use ark_bls12_381::{Fq, G1Affine};
 use ark_ec::AffineRepr;
-use ark_ff::{BigInteger, PrimeField, Zero};
+use ark_ff::{BigInteger, PrimeField};
 
 pub const TAMANHO: usize = 96;
 

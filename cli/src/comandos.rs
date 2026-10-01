@@ -1,0 +1,1110 @@
+//! Os sete comandos.
+//!
+//! A ordem das telas segue `docs/UX-CLI.md`, e as frases que estão lá entre
+//! aspas estão aqui entre aspas. Duas delas não podem ser suavizadas, e os
+//! comentários dizem por quê.
+
+use crate::cadeia::Cadeia;
+use crate::cedula::{self, Cedula};
+use crate::estado::{Apuracao, Estado, Mesa, Verificacao, Voto};
+use crate::recibo::{self, Recibo};
+use crate::tela;
+use sha2::{Digest, Sha256};
+use tessera_core::ark::{Fr, G1Affine};
+use tessera_core::{cds, merkle, pedersen, ponto};
+
+type R = Result<(), String>;
+
+/// O id de 32 bytes que o contrato usa, derivado do nome que o humano digita.
+///
+/// Assim quem opera escreve `contas-2025` e o ledger recebe um identificador
+/// de tamanho fixo, sem uma tabela de tradução em lugar nenhum.
+fn id32(nome: &str) -> [u8; 32] {
+    let mut h = Sha256::new();
+    h.update(b"TESSERA-V1-PROPOSTA");
+    h.update(nome.as_bytes());
+    h.finalize().into()
+}
+
+fn hex(b: &[u8]) -> String {
+    b.iter().map(|x| format!("{:02x}", x)).collect()
+}
+
+fn de_hex(s: &str) -> Result<Vec<u8>, String> {
+    if s.len() % 2 != 0 {
+        return Err("hex de tamanho ímpar".into());
+    }
+    (0..s.len() / 2)
+        .map(|i| u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).map_err(|e| e.to_string()))
+        .collect()
+}
+
+/// `--aptos a,b,c` ou `--aptos arquivo.txt` (um nome por linha).
+fn lista(arg: &str) -> Result<Vec<String>, String> {
+    if std::path::Path::new(arg).exists() {
+        let s = std::fs::read_to_string(arg).map_err(|e| e.to_string())?;
+        return Ok(s
+            .lines()
+            .map(|l| l.split('#').next().unwrap_or("").trim().to_string())
+            .filter(|l| !l.is_empty())
+            .collect());
+    }
+    Ok(arg.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+}
+
+/// `2h`, `30m`, `90s` ou um número de ledgers. Um ledger fecha em ~5 s.
+fn prazo_em_ledgers(s: &str) -> Result<u64, String> {
+    let s = s.trim();
+    let (n, mult) = match s.chars().last() {
+        Some('h') => (&s[..s.len() - 1], 720),
+        Some('m') => (&s[..s.len() - 1], 12),
+        Some('s') => (&s[..s.len() - 1], 1),
+        _ => (s, 1),
+    };
+    let v: u64 = n.parse().map_err(|_| format!("não entendi o prazo {:?}", s))?;
+    Ok(v * mult)
+}
+
+fn relogio(ledgers: i64) -> String {
+    if ledgers <= 0 {
+        return "encerrada".into();
+    }
+    let s = ledgers * 5;
+    if s < 3600 {
+        format!("em {}min", s / 60)
+    } else {
+        format!("em {}h{:02}", s / 3600, (s % 3600) / 60)
+    }
+}
+
+fn h_do_contrato(e: &Estado) -> Result<G1Affine, String> {
+    ponto::de_hex(&e.gerador_h).map_err(|x| format!("H do contrato ilegível: {:?}", x))
+}
+
+// ===================== abrir =========================================
+
+#[allow(clippy::too_many_arguments)]
+pub fn abrir(
+    proposta: &str,
+    pergunta: &str,
+    opcoes: &str,
+    aptos: &str,
+    mesa: &str,
+    limiar: u32,
+    prazo: &str,
+    contrato: &str,
+    rede: &str,
+    governanca: &str,
+) -> R {
+    let opcoes: Vec<String> = lista(opcoes)?;
+    if opcoes.len() < 2 || opcoes.len() > 16 {
+        return Err(format!("são 2 a 16 opções, e você deu {}", opcoes.len()));
+    }
+    let nomes_aptos = lista(aptos)?;
+    let nomes_mesa = lista(mesa)?;
+    if nomes_aptos.is_empty() {
+        return Err("a lista de aptos está vazia".into());
+    }
+    if limiar == 0 || limiar as usize > nomes_mesa.len() {
+        return Err(format!(
+            "o limiar é {} e a mesa tem {} membros",
+            limiar,
+            nomes_mesa.len()
+        ));
+    }
+
+    let c = Cadeia::nova(contrato, rede);
+    let enderecos_aptos: Vec<String> = nomes_aptos
+        .iter()
+        .map(|n| resolver(n))
+        .collect::<Result<_, _>>()?;
+    let enderecos_mesa: Vec<String> = nomes_mesa
+        .iter()
+        .map(|n| resolver(n))
+        .collect::<Result<_, _>>()?;
+
+    // A árvore: folhas H(0x00 ‖ addr_xdr ‖ peso), na ORDEM da lista. A ordem é
+    // o documento — a raiz muda se ela mudar.
+    let folhas: Vec<merkle::Apto> = enderecos_aptos
+        .iter()
+        .map(|a| cedula::xdr(a).map(|e| merkle::Apto { endereco: e, peso: 1 }))
+        .collect::<Result<_, _>>()?;
+    let arvore = merkle::Arvore::montar(&folhas).map_err(|e| format!("{:?}", e))?;
+    let raiz = arvore.raiz();
+
+    let agora = Cadeia::ledger_atual(rede).ok_or("não consegui ler o ledger atual")?;
+    let fecha_em = agora + prazo_em_ledgers(prazo)?;
+    let pid = id32(proposta);
+
+    tela::titulo("abrindo votação");
+    tela::branco();
+    tela::linha(pergunta);
+    tela::branco();
+    tela::campo("Opções", &opcoes.join(" · "));
+    tela::campo(
+        "Aptos",
+        &format!("{}  (raiz de Merkle {})", enderecos_aptos.len(), tela::abreviar(&hex(&raiz), 4, 4)),
+    );
+    tela::campo("Peso", "um voto por pessoa");
+    tela::campo(
+        "Mesa",
+        &format!("{} membros, {} assinaturas para apurar", enderecos_mesa.len(), limiar),
+    );
+    tela::campo("Sigilo mínimo", "5 votos confidenciais");
+    tela::campo(
+        "Encerra",
+        &format!("{}  (ledger {})", relogio(prazo_em_ledgers(prazo)? as i64), fecha_em),
+    );
+
+    let r = c
+        .invocar(
+            governanca,
+            true,
+            "abrir",
+            &[
+                ("governanca", resolver(governanca)?),
+                ("proposta", hex(&pid)),
+                ("opcoes", opcoes.len().to_string()),
+                ("raiz_aptos", hex(&raiz)),
+                ("mesa", cedula::enderecos_json(&enderecos_mesa)),
+                ("limiar", limiar.to_string()),
+                ("fecha_em", fecha_em.to_string()),
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+
+    let tx = r.tx.clone().unwrap_or_default();
+    let (taxa, ledger) = c.detalhes(&tx).unwrap_or((0, 0));
+
+    // H vem do contrato, não é recalculado aqui: é o ponto em que cliente e
+    // cadeia precisam concordar, e pedir é mais seguro que deduzir.
+    let gh = c
+        .invocar(governanca, false, "gerador_h", &[])
+        .map_err(|e| e.to_string())?
+        .valor
+        .trim_matches('"')
+        .to_string();
+
+    tela::secao("publicado");
+    tela::campo("Contrato", &tela::abreviar(contrato, 8, 4));
+    tela::campo("Transação", &format!("{}       ledger {}", &tx[..8.min(tx.len())], ledger));
+    tela::campo("Taxa", &format!("{} stroops", taxa));
+    tela::confere("votação aberta");
+
+    Estado {
+        proposta: proposta.into(),
+        pergunta: pergunta.into(),
+        opcoes,
+        contrato: contrato.into(),
+        rede: rede.into(),
+        gerador_h: gh,
+        raiz_aptos: hex(&raiz),
+        aptos: enderecos_aptos,
+        identidades: nomes_aptos,
+        sigilo_minimo: 5,
+        mesa: Mesa { membros: enderecos_mesa.len(), limiar, enderecos: enderecos_mesa, identidades: nomes_mesa },
+        prazo_ledger: fecha_em,
+        abertura_tx: tx,
+        votos: vec![],
+        aberturas: vec![],
+        apuracao: None,
+        verificacao: None,
+    }
+    .gravar()?;
+
+    tela::proximo(
+        "Compartilhe com quem vota:",
+        &format!("tessera cedula --proposta {} --identidade SEU_NOME", proposta),
+    );
+    Ok(())
+}
+
+fn resolver(identidade: &str) -> Result<String, String> {
+    if identidade.starts_with('G') && identidade.len() == 56 {
+        return Ok(identidade.to_string());
+    }
+    Cadeia::endereco(identidade).map_err(|e| e.to_string())
+}
+
+// ===================== cedula ========================================
+
+/// **O comando que ganha a demo.** Ele não vota: ele mostra.
+pub fn mostrar_cedula(proposta: &str, identidade: &str) -> R {
+    let e = Estado::ler(proposta)?;
+    let endereco = resolver(identidade)?;
+    let h = h_do_contrato(&e)?;
+    let pid = id32(proposta);
+    let addr = cedula::xdr(&endereco)?;
+
+    let apta = e.indice_do_apto(&endereco).is_some();
+    let votou = e.ja_votou(&endereco).is_some();
+    let agora = Cadeia::ledger_atual(&e.rede).unwrap_or(0);
+
+    tela::titulo("cédula");
+    tela::branco();
+    tela::linha(&e.pergunta);
+    tela::branco();
+    tela::linha(&format!(
+        "Encerra {} · você {} · {}",
+        relogio(e.prazo_ledger as i64 - agora as i64),
+        if apta { "é apta" } else { "NÃO está na lista" },
+        if votou { "já votou" } else { "ainda não votou" }
+    ));
+
+    if !apta {
+        return nao_apta(&e);
+    }
+
+    // Dois exemplos, com acaso DESCARTÁVEL: o voto real sorteia um `r` novo.
+    let a = cedula::montar(&h, &pid, &addr, e.opcoes.len(), 0)?;
+    let b = cedula::montar(&h, &pid, &addr, e.opcoes.len(), 1)?;
+
+    tela::secao("o que a rede guardaria, para sempre");
+    tela::blocos_lado_a_lado(
+        &ponto::serializar(&a.compromissos[0]),
+        &ponto::serializar(&b.compromissos[0]),
+        "Se você votar  A",
+        "Se você votar  B",
+    );
+    tela::branco();
+    tela::linha(&format!(
+        "96 bytes cada. Um é \"{}\" e o outro é \"{}\".",
+        e.opcoes[0], e.opcoes[1]
+    ));
+    tela::branco();
+    // Esta frase NÃO pode ser suavizada. É a única vez no produto em que um
+    // superlativo é literalmente correto, porque a garantia é
+    // information-theoretic e não computacional. "Praticamente impossível"
+    // seria impreciso E mais fraco. UX-CLI §2.2.
+    tela::linha("Não existe cálculo, computador ou tempo que diga qual é qual.");
+    tela::linha("Nem hoje, nem em cinquenta anos. É o que você está publicando.");
+
+    tela::secao("seu sigilo");
+    let conf = e.confidenciais();
+    // A regra de τ aqui é previsão, não veredito: quem lê ainda não votou.
+    // Dizer "⚠ abaixo do mínimo" para quem seria a primeira é assustar sem
+    // informar — o número só vira veredito na apuração.
+    if conf == 0 {
+        tela::linha(&format!(
+            "Ninguém votou em segredo ainda. Você seria a 1ª, e a apuração",
+        ));
+        tela::linha(&format!(
+            "só acontece com {} ou mais — ou com ninguém em segredo.",
+            e.sigilo_minimo
+        ));
+    } else if conf < e.sigilo_minimo {
+        tela::linha(&format!(
+            "{} de {} em segredo. Faltam {} para a apuração acontecer.",
+            conf,
+            e.aptos.len(),
+            e.sigilo_minimo - conf
+        ));
+    } else {
+        tela::linha(&format!(
+            "{} de {} estão em segredo. Mínimo é {}.  ✓ folgado",
+            conf,
+            e.aptos.len(),
+            e.sigilo_minimo
+        ));
+    }
+    tela::branco();
+    tela::regua();
+
+    if votou {
+        tela::proximo(
+            "Você já votou. Para conferir que seu voto está na contagem:",
+            &format!("tessera status --proposta {}", proposta),
+        );
+    } else {
+        tela::proximo(
+            "Para votar:",
+            &format!(
+                "tessera votar --proposta {} --opcao {} --identidade {}",
+                proposta, e.opcoes[1], identidade
+            ),
+        );
+    }
+    Ok(())
+}
+
+fn nao_apta(e: &Estado) -> R {
+    tela::recusa("esta conta não está na lista de aptos");
+    tela::branco();
+    tela::campo(
+        "Raiz de aptos",
+        &format!("{}  ({} aptos)", tela::abreviar(&e.raiz_aptos, 4, 4), e.aptos.len()),
+    );
+    tela::branco();
+    // A última frase não é desculpa, é arquitetura: o módulo não opina sobre
+    // aptidão (SPEC §0). Dizer isso no erro ensina o modelo a quem integra.
+    tela::linha("Se você deveria estar, fale com quem abriu a votação. Tessera");
+    tela::linha("não decide quem vota.");
+    tela::branco();
+    Ok(())
+}
+
+// ===================== votar =========================================
+
+pub fn votar(proposta: &str, opcao: &str, identidade: &str, publico: bool) -> R {
+    let mut e = Estado::ler(proposta)?;
+    let endereco = resolver(identidade)?;
+
+    let escolha = e
+        .opcoes
+        .iter()
+        .position(|o| o == opcao)
+        .ok_or_else(|| format!("{:?} não é uma das opções: {}", opcao, e.opcoes.join(", ")))?;
+
+    let indice = match e.indice_do_apto(&endereco) {
+        Some(i) => i,
+        None => return nao_apta(&e),
+    };
+    if let Some(v) = e.ja_votou(&endereco) {
+        return ja_votou(v);
+    }
+
+    let folhas: Vec<merkle::Apto> = e
+        .aptos
+        .iter()
+        .map(|a| cedula::xdr(a).map(|x| merkle::Apto { endereco: x, peso: 1 }))
+        .collect::<Result<_, _>>()?;
+    let arvore = merkle::Arvore::montar(&folhas).map_err(|x| format!("{:?}", x))?;
+    let caminho = arvore.caminho(indice).map_err(|x| format!("{:?}", x))?;
+
+    tela::titulo("votando");
+    tela::branco();
+    tela::linha(&e.pergunta);
+    tela::branco();
+    // A escolha aparece em caixa alta uma vez, no topo, e nunca mais: repetir
+    // a escolha na tela é ensaiar o hábito de deixá-la visível. UX-CLI §3.1.
+    tela::campo("Sua escolha", &opcao.to_uppercase());
+    tela::campo("Sigilo", if publico { "PÚBLICO — vai em claro para o ledger" } else { "em segredo" });
+
+    let c = Cadeia::nova(&e.contrato, &e.rede);
+    let tx;
+
+    if publico {
+        let escolhas: Vec<u32> = (0..e.opcoes.len())
+            .map(|j| if j == escolha { 1 } else { 0 })
+            .collect();
+        tela::secao("o que a rede vai guardar");
+        tela::linha(&format!(
+            "a escolha em claro: [{}]",
+            escolhas.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ")
+        ));
+        tela::branco();
+        tela::linha("Uma cédula pública não tem o que ocultar — e por isso ela");
+        tela::linha("encolhe o conjunto de anonimato de quem escolheu sigilo.");
+
+        let r = c
+            .invocar(
+                identidade,
+                true,
+                "votar_publico",
+                &[
+                    ("proposta", hex(&id32(proposta))),
+                    ("votante", endereco.clone()),
+                    ("escolhas", serde_json::to_string(&escolhas).unwrap()),
+                    ("caminho", cedula::hashes_json(&caminho.irmaos)),
+                    ("indice", caminho.indice.to_string()),
+                    ("peso", "1".into()),
+                ],
+            )
+            .map_err(|x| x.to_string())?;
+        tx = r.tx.unwrap_or_default();
+        registrar(
+            &mut e, proposta, identidade, &endereco, vec![], vec![], String::new(),
+            true, Some(escolhas), &tx, &c,
+        )?;
+    } else {
+        let h = h_do_contrato(&e)?;
+        let addr = cedula::xdr(&endereco)?;
+        let ced: Cedula = cedula::montar(&h, &id32(proposta), &addr, e.opcoes.len(), escolha)?;
+
+        tela::secao("o que a rede vai guardar");
+        tela::bloco_hex(&ponto::serializar(&ced.compromissos[escolha]));
+
+        let r = c
+            .invocar(
+                identidade,
+                true,
+                "votar",
+                &[
+                    ("proposta", hex(&id32(proposta))),
+                    ("votante", endereco.clone()),
+                    ("compromissos", cedula::pontos_json(&ced.compromissos)),
+                    ("provas", cedula::provas_json(&ced.provas)),
+                    ("prova_soma", cedula::soma_json(&ced.soma)),
+                    ("caminho", cedula::hashes_json(&caminho.irmaos)),
+                    ("indice", caminho.indice.to_string()),
+                    ("peso", "1".into()),
+                ],
+            )
+            .map_err(|x| x.to_string())?;
+        tx = r.tx.unwrap_or_default();
+        let compromissos_hex: Vec<String> = ced.compromissos.iter().map(ponto::para_hex).collect();
+
+        // As shares vão para a mesa. Nenhum lugar reúne os `r` de uma pessoa.
+        let por_membro = cedula::dividir_para_a_mesa(&ced.acasos, e.mesa.limiar, e.mesa.membros)?;
+        entregar_shares(proposta, &por_membro)?;
+
+        registrar(
+            &mut e, proposta, identidade, &endereco, compromissos_hex,
+            ced.provas.iter().map(|p| hex(&p.serializar())).collect(),
+            hex(&ced.soma.serializar()),
+            false, None, &tx, &c,
+        )?;
+
+        // No recibo vai **só o segredo**. As provas são públicas e ficam no
+        // estado, para que queimar o recibo não custe auditabilidade.
+        recibo::gravar(&Recibo {
+            identidade: identidade.into(),
+            proposta: proposta.into(),
+            escolha,
+            acasos: ced.acasos.iter().map(|r| hex(&pedersen::fr_para_bytes_be(r))).collect(),
+        })?;
+    }
+
+    let (taxa, ledger) = c.detalhes(&tx).unwrap_or((0, 0));
+    let e = Estado::ler(proposta)?;
+    let posicao = e.votos.len();
+    let conf = e.confidenciais();
+
+    tela::secao("enviado");
+    tela::campo("Transação", &format!("{}       ledger {}", &tx[..8.min(tx.len())], ledger));
+    tela::campo("Taxa", &format!("{} stroops", taxa));
+    if !publico {
+        // Verificabilidade individual numa frase que Dona Marta entende: não é
+        // "seu commitment está no acumulador", é "você é a 27ª de 43".
+        tela::campo("Posição", &format!("{} de {} em segredo", posicao, conf));
+    }
+    tela::confere("seu voto está na contagem");
+    tela::branco();
+    tela::regua();
+
+    if publico {
+        tela::proximo(
+            "Sua escolha é pública e não há recibo a queimar. Para conferir:",
+            &format!("tessera status --proposta {}", proposta),
+        );
+        return Ok(());
+    }
+
+    // O aviso de coação é o último bloco e o maior. A última coisa na tela é a
+    // que fica na memória e a que sobra no scroll — é a decisão de design mais
+    // importante deste comando. UX-CLI §3.1, UX §5.2.
+    //
+    // E não é vermelho: vermelho é da apuração recusada. Aqui não é erro, é a
+    // verdade sobre o estado do mundo.
+    tela::atencao(&format!(
+        "A CHAVE EM ./recibos/{}.key PROVA O SEU VOTO",
+        identidade
+    ));
+    tela::branco();
+    tela::linha("   Enquanto ela existir, você consegue provar a qualquer pessoa");
+    tela::linha("   em que votou — e quem te obrigar a mostrar consegue conferir.");
+    tela::branco();
+    tela::linha("   A rede nunca vai saber. Mas você pode ser forçada a contar.");
+    tela::proximo(
+        "   Apague agora:",
+        &format!("  tessera queimar --identidade {}", identidade),
+    );
+    Ok(())
+}
+
+fn ja_votou(v: &Voto) -> R {
+    // Sem tom de reprimenda: o erro mais comum é a pessoa não ter certeza se o
+    // voto entrou, então a mensagem responde essa pergunta. UX-CLI §8.3.
+    tela::recusa("você já votou nesta proposta");
+    tela::branco();
+    tela::linha(&format!(
+        "Voto registrado no ledger {}, posição {}.",
+        v.ledger, v.posicao
+    ));
+    tela::linha("Uma pessoa apta vota uma vez. Isso é conferível por qualquer um.");
+    tela::branco();
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn registrar(
+    e: &mut Estado,
+    proposta: &str,
+    identidade: &str,
+    endereco: &str,
+    compromissos: Vec<String>,
+    provas: Vec<String>,
+    prova_soma: String,
+    publico: bool,
+    escolhas: Option<Vec<u32>>,
+    tx: &str,
+    c: &Cadeia,
+) -> R {
+    let (_, ledger) = c.detalhes(tx).unwrap_or((0, 0));
+    e.votos.push(Voto {
+        posicao: e.votos.len() + 1,
+        identidade: identidade.into(),
+        endereco: endereco.into(),
+        compromissos,
+        provas,
+        prova_soma,
+        publico,
+        escolhas,
+        tx: tx.into(),
+        ledger,
+    });
+    let _ = proposta;
+    e.gravar()
+}
+
+/// As shares viajariam por canal autenticado e cifrado até cada membro. Aqui
+/// vão para `./shares/<membro>/`, que é a simulação honesta: o que importa é
+/// que nenhum lugar reúne os `r` de uma pessoa.
+fn entregar_shares(proposta: &str, por_membro: &[Vec<String>]) -> R {
+    for (l, shares) in por_membro.iter().enumerate() {
+        let dir = std::path::PathBuf::from("shares").join((l + 1).to_string());
+        std::fs::create_dir_all(&dir).map_err(|x| x.to_string())?;
+        let p = dir.join(format!("{}.jsonl", proposta));
+        let linha = serde_json::to_string(shares).map_err(|x| x.to_string())?;
+        let mut s = std::fs::read_to_string(&p).unwrap_or_default();
+        s.push_str(&linha);
+        s.push('\n');
+        std::fs::write(&p, s).map_err(|x| x.to_string())?;
+    }
+    Ok(())
+}
+
+// ===================== queimar =======================================
+
+/// A tela mais curta e a de maior carga emocional do produto.
+pub fn queimar(identidade: &str) -> R {
+    tela::titulo("queimando o recibo");
+    tela::branco();
+    let feitos = recibo::queimar(identidade)?;
+    if feitos.is_empty() {
+        tela::linha(&format!(
+            "Não há recibo em ./recibos/{}.key — nada a queimar.",
+            identidade
+        ));
+        tela::branco();
+        return Ok(());
+    }
+    for f in &feitos {
+        let vago = tela::LARGURA.saturating_sub(f.chars().count() + 11);
+        tela::linha(&format!("{}{}{}", f, " ".repeat(vago), "sobrescrito"));
+    }
+    tela::confere("pronto");
+    tela::branco();
+    // A frase que o Tessera inteiro existe para poder dizer. Não acrescente
+    // nada em volta dela.
+    tela::linha("Agora nem você consegue provar em que votou.");
+    tela::branco();
+    // E esta é indispensável: sem ela a ação assusta e ninguém a executa.
+    tela::linha("Seu voto continua na contagem, e você continua podendo conferir");
+    tela::linha("que ele está lá.");
+    tela::branco();
+    Ok(())
+}
+
+// ===================== status ========================================
+
+/// Dois números, grandes, centrados. A única tela que alguém olha de longe.
+pub fn status(proposta: &str) -> R {
+    let e = Estado::ler(proposta)?;
+    let agora = Cadeia::ledger_atual(&e.rede).unwrap_or(0);
+    let (conf, publ) = (e.confidenciais(), e.publicos());
+
+    tela::titulo_com(proposta, &format!("encerra {}", relogio(e.prazo_ledger as i64 - agora as i64)));
+    tela::branco();
+    let esq = format!("{} de {} votaram", e.votos.len(), e.aptos.len());
+    tela::centrado(&format!("{}            {} em segredo", esq, conf));
+    tela::centrado(&format!("{}{} públicos", " ".repeat(esq.chars().count() + 13), publ));
+    tela::branco();
+
+    let pode = conf == 0 || conf >= e.sigilo_minimo;
+    tela::campo_veredito(
+        "Sigilo mínimo",
+        &format!("{}", e.sigilo_minimo),
+        pode,
+    );
+    tela::campo(
+        "Mesa",
+        &format!("{} de {} assinaturas para apurar", e.mesa.limiar, e.mesa.membros),
+    );
+    tela::branco();
+    tela::regua();
+
+    if let Some(a) = &e.apuracao {
+        tela::proximo(
+            &format!("Já apurada: {:?}. Conferir por conta própria:", a.afirmado),
+            &format!("tessera verificar --proposta {}", proposta),
+        );
+    } else if agora >= e.prazo_ledger {
+        tela::proximo("Apurar:", &format!("tessera apurar --proposta {}", proposta));
+    } else {
+        tela::proximo(
+            "Enquanto está aberta:",
+            &format!("tessera cedula --proposta {} --identidade SEU_NOME", proposta),
+        );
+    }
+    Ok(())
+}
+
+// ===================== apurar ========================================
+
+pub fn apurar(proposta: &str, forcar: Option<&str>) -> R {
+    let mut e = Estado::ler(proposta)?;
+    let h = h_do_contrato(&e)?;
+    let g = pedersen::gerador();
+    let c = Cadeia::nova(&e.contrato, &e.rede);
+
+    tela::titulo("apurando");
+    tela::branco();
+
+    // 1. a mesa soma localmente as shares que recebeu, e k membros reconstroem
+    let somas = ler_shares(proposta, e.opcoes.len(), e.mesa.membros)?;
+    let aberturas = cedula::reconstruir_aberturas(&somas, e.mesa.limiar, e.opcoes.len())?;
+    tela::campo(
+        "Mesa",
+        &format!("{} de {} reconstruíram a abertura agregada", e.mesa.limiar, e.mesa.membros),
+    );
+    let conf = e.confidenciais();
+    tela::campo_veredito(
+        "Sigilo",
+        &format!("{} confidenciais, mínimo {}", conf, e.sigilo_minimo),
+        conf == 0 || conf >= e.sigilo_minimo,
+    );
+
+    // 2. a mesa PROCURA o total. Fora da cadeia procurar é de graça; é a outra
+    //    metade da descoberta da sonda 5.
+    let acumuladores = acumuladores_da_cadeia(&c, proposta, e.opcoes.len())?;
+    let mut totais = Vec::new();
+    for j in 0..e.opcoes.len() {
+        let t = pedersen::descobrir_total(&acumuladores[j], &g, &h, &aberturas[j], e.aptos.len() as u64)
+            .ok_or_else(|| {
+                format!(
+                    "a mesa não achou total nenhum para {:?}: as shares não abrem o acumulador",
+                    e.opcoes[j]
+                )
+            })?;
+        totais.push(t as u32);
+    }
+
+    // `--forcar-total` existe para gravar a recusa. É a mesa mentindo.
+    if let Some(f) = forcar {
+        totais = f
+            .split(',')
+            .map(|s| s.trim().parse::<u32>().map_err(|x| x.to_string()))
+            .collect::<Result<_, _>>()?;
+        if totais.len() != e.opcoes.len() {
+            return Err("--forcar-total precisa de um número por opção".into());
+        }
+    }
+
+    tela::secao("a mesa afirmou");
+    for (j, o) in e.opcoes.iter().enumerate() {
+        tela::campo(&o.to_uppercase(), &totais[j].to_string());
+    }
+
+    // 3. o contrato confere. Esta ordem — a mesa afirmou → o contrato conferiu
+    //    → o resultado — é a arquitetura de confiança impressa de cima para
+    //    baixo, e ensina sozinha por que não é preciso confiar na mesa.
+    tela::secao("o contrato conferiu");
+    let mut fecha_local = true;
+    for j in 0..e.opcoes.len() {
+        let ok = pedersen::verifica_agregado(&acumuladores[j], &g, &h, totais[j] as u64, &aberturas[j]);
+        fecha_local &= ok;
+        tela::campo_veredito(
+            &format!("Acumulado {}", e.opcoes[j].to_uppercase()),
+            &format!("{}·G + R·H", totais[j]),
+            ok,
+        );
+    }
+
+    // **Um endosso por membro, uma transação por pessoa.**
+    //
+    // `k` autorizações numa transação só não é expressável pelo ferramental da
+    // Stellar: `stellar tx sign` assina o envelope, não as entradas de
+    // autorização do Soroban, e a rede recusa com `TxBadAuthExtra`. Cada
+    // membro manda a sua, e o contrato conta — que é também como `k` pessoas
+    // em `k` máquinas realmente trabalham.
+    let aberturas_dec: Vec<String> = aberturas.iter().map(cedula::dec_escalar).collect();
+    let args = [
+        ("proposta", hex(&id32(proposta))),
+        ("totais", serde_json::to_string(&totais).unwrap()),
+        ("aberturas", serde_json::to_string(&aberturas_dec).unwrap()),
+    ];
+
+    let mut envio = Ok(crate::cadeia::Resposta { valor: String::new(), tx: None });
+    let mut fechou = false;
+    let mut abriu_secao = false;
+    for (i, membro) in e.mesa.identidades.iter().take(e.mesa.limiar as usize).enumerate() {
+        let mut com_membro = args.to_vec();
+        com_membro.push(("membro", e.mesa.enderecos[i].clone()));
+        envio = c.invocar(membro, true, "apurar", &com_membro);
+        match &envio {
+            Err(x) => {
+                return recusada(&x.to_string(), conf, e.sigilo_minimo, &totais, fecha_local)
+            }
+            Ok(r) => {
+                if !abriu_secao {
+                    tela::secao("a mesa endossa");
+                    abriu_secao = true;
+                }
+                fechou = !r.valor.trim().is_empty() && r.valor.trim() != "null";
+                tela::campo(
+                    membro,
+                    &format!(
+                        "endossou  ({} de {})",
+                        i + 1,
+                        e.mesa.limiar
+                    ),
+                );
+            }
+        }
+    }
+    let _ = fechou;
+
+    match envio {
+        Err(x) => recusada(&x.to_string(), conf, e.sigilo_minimo, &totais, fecha_local),
+        Ok(r) => {
+            let tx = r.tx.unwrap_or_default();
+            let (taxa, ledger) = c.detalhes(&tx).unwrap_or((0, 0));
+            tela::branco();
+            tela::campo("Transação", &format!("{}       ledger {}", &tx[..8.min(tx.len())], ledger));
+            tela::campo("Taxa", &format!("{} stroops", taxa));
+            tela::branco();
+            tela::regua();
+
+            let vencedora = totais.iter().enumerate().max_by_key(|(_, t)| **t).map(|(j, _)| j).unwrap();
+            let resultado: Vec<u32> = (0..e.opcoes.len())
+                .map(|j| totais[j] + e.votos.iter().filter(|v| v.publico).filter_map(|v| v.escolhas.as_ref()).map(|x| x[j]).sum::<u32>())
+                .collect();
+            // O resultado vem DEPOIS da conferência e é a única linha centrada:
+            // a ordem comunica que o número só vale porque passou pelo bloco
+            // acima.
+            // O placar sai da vencedora para baixo, não na ordem das opções:
+            // "REJEITAR · 3 a 4" leria o número errado como o dela.
+            let mut placar: Vec<u32> = resultado.clone();
+            placar.sort_unstable_by(|a, b| b.cmp(a));
+            tela::centrado_grande(&format!(
+                "{} · {}",
+                e.opcoes[vencedora].to_uppercase(),
+                placar.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(" a ")
+            ));
+
+            e.apuracao = Some(Apuracao { afirmado: totais, confere: true, tx, ledger });
+            e.aberturas = aberturas.iter().map(cedula::dec_escalar).collect();
+            e.gravar()?;
+
+            tela::proximo(
+                "Conferir por conta própria:",
+                &format!("tessera verificar --proposta {}", proposta),
+            );
+            Ok(())
+        }
+    }
+}
+
+fn recusada(erro: &str, conf: u32, minimo: u32, totais: &[u32], fecha_local: bool) -> R {
+    tela::recusa("apuração recusada · nada foi publicado");
+    tela::branco();
+    if erro.contains("AnonimatoInsuficiente") {
+        // O estado que mais impressiona quem entende de votação: o produto
+        // recusando um resultado que PODERIA publicar, para proteger quem
+        // está em minoria. UX-CLI §8.2.
+        tela::linha(&format!(
+            "Com apenas {} votos em segredo, publicar o total revelaria",
+            conf
+        ));
+        tela::linha("esses votos por subtração: quem publicou é conhecido, e o");
+        tela::linha("resto sai por diferença.");
+        tela::branco();
+        // Obrigatória: sem ela, a recusa parece perda de dados.
+        tela::linha("A apuração volta a ser possível se mais pessoas votarem em");
+        tela::linha("segredo. Nenhum voto foi perdido.");
+        let _ = minimo;
+    } else if erro.contains("AberturaNaoFecha") || !fecha_local {
+        tela::linha("O total afirmado não corresponde aos compromissos no ledger.");
+        tela::linha(&format!(
+            "Para publicar {} a mesa teria de resolver um log discreto",
+            totais.first().copied().unwrap_or(0)
+        ));
+        tela::linha("em BLS12-381.");
+        tela::branco();
+        // A tese da verificabilidade em oito palavras.
+        tela::linha("Não é denúncia depois. É recusa na hora.");
+    } else {
+        tela::linha(erro);
+    }
+    tela::branco();
+    Ok(())
+}
+
+/// Cada membro soma **localmente** as shares que recebeu. Esta função é o que
+/// cada um rodaria na própria máquina; aqui ela lê os diretórios porque a
+/// entrega é simulada, mas a aritmética é a mesma.
+fn ler_shares(proposta: &str, opcoes: usize, membros: usize) -> Result<Vec<(u32, Vec<Fr>)>, String> {
+    let mut saida = Vec::new();
+    for l in 1..=membros {
+        let p = std::path::PathBuf::from("shares").join(l.to_string()).join(format!("{}.jsonl", proposta));
+        let Ok(s) = std::fs::read_to_string(&p) else { continue };
+        let mut soma = vec![pedersen::escalar(0); opcoes];
+        for linha in s.lines().filter(|l| !l.trim().is_empty()) {
+            let v: Vec<String> = serde_json::from_str(linha).map_err(|e| e.to_string())?;
+            for (j, dec) in v.iter().enumerate().take(opcoes) {
+                soma[j] += decimal_para_fr(dec)?;
+            }
+        }
+        saida.push((l as u32, soma));
+    }
+    Ok(saida)
+}
+
+fn decimal_para_fr(s: &str) -> Result<Fr, String> {
+    use std::str::FromStr;
+    Fr::from_str(s).map_err(|_| format!("escalar decimal inválido: {}", s))
+}
+
+fn acumuladores_da_cadeia(c: &Cadeia, proposta: &str, opcoes: usize) -> Result<Vec<G1Affine>, String> {
+    let r = c
+        .invocar("urna-smoke", false, "acumulador", &[("proposta", hex(&id32(proposta)))])
+        .map_err(|e| e.to_string())?;
+    let v: Vec<String> = serde_json::from_str(&r.valor)
+        .map_err(|e| format!("não entendi os acumuladores: {} ({})", e, r.valor))?;
+    if v.len() != opcoes {
+        return Err(format!("o contrato devolveu {} acumuladores e a proposta tem {} opções", v.len(), opcoes));
+    }
+    v.iter()
+        .map(|s| ponto::de_hex(s).map_err(|e| format!("acumulador ilegível: {:?}", e)))
+        .collect()
+}
+
+// ===================== verificar =====================================
+
+/// A tela do cético, e do jurado. **Não fala com a CLI: relê o ledger.**
+pub fn verificar(proposta: &str) -> R {
+    let mut e = Estado::ler(proposta)?;
+    let g = pedersen::gerador();
+    let c = Cadeia::nova(&e.contrato, &e.rede);
+    let h = h_do_contrato(&e)?;
+
+    tela::titulo("verificador independente");
+    tela::branco();
+    tela::campo("Fonte", &format!("contrato {} na {}", tela::abreviar(&e.contrato, 8, 4), e.rede));
+    // Honesto: o que o verificador confia é o conjunto de compromissos
+    // individuais do arquivo local — e mesmo esse está preso pela soma, que
+    // vem da cadeia. Tudo o mais é lido do contrato.
+    tela::campo("Confia em", "nada que a CLI gravou e ela não possa provar");
+    tela::branco();
+
+    // 1. a raiz de aptos, recalculada da lista
+    let folhas: Vec<merkle::Apto> = e
+        .aptos
+        .iter()
+        .map(|a| cedula::xdr(a).map(|x| merkle::Apto { endereco: x, peso: 1 }))
+        .collect::<Result<_, _>>()?;
+    let arvore = merkle::Arvore::montar(&folhas).map_err(|x| format!("{:?}", x))?;
+    let raiz_local = hex(&arvore.raiz());
+    let prop = c
+        .invocar("urna-smoke", false, "proposta", &[("proposta", hex(&id32(proposta)))])
+        .map_err(|x| x.to_string())?;
+    let raiz_na_cadeia = prop.valor.split("\"raiz_aptos\":\"").nth(1).and_then(|s| s.split('"').next()).unwrap_or("").to_string();
+    let aptidao = raiz_local == raiz_na_cadeia && !raiz_na_cadeia.is_empty();
+    tela::campo_veredito(
+        "Aptidão",
+        &format!("{} de {} na raiz {}", e.aptos.len(), e.aptos.len(), tela::abreviar(&raiz_local, 4, 4)),
+        aptidao,
+    );
+
+    // 2. unicidade
+    let mut vistos = std::collections::HashSet::new();
+    let repetidos = e.votos.iter().filter(|v| !vistos.insert(&v.endereco)).count();
+    tela::campo_veredito("Unicidade", &format!("{} repetidos", repetidos), repetidos == 0);
+
+    // 3. boa formação: cada prova CDS, reverificada do zero
+    let mut boa = true;
+    let (mut checadas, mut somas_ok, mut cedulas) = (0usize, 0usize, 0usize);
+    for v in e.votos.iter().filter(|v| !v.publico) {
+        let (provas, prova_soma) = (&v.provas, &v.prova_soma);
+        if provas.is_empty() {
+            continue;
+        }
+        let addr = cedula::xdr(&v.endereco)?;
+        cedulas += 1;
+        if provas.len() != e.opcoes.len() {
+            boa = false;
+            continue;
+        }
+
+        // cada v_j ∈ {0,1}
+        let mut cs = Vec::with_capacity(provas.len());
+        for (j, ph) in provas.iter().enumerate() {
+            let cj = ponto::de_hex(&v.compromissos[j]).map_err(|x| format!("{:?}", x))?;
+            match cds::Prova::desserializar(&de_hex(ph)?) {
+                Ok(p) => {
+                    if cds::verificar(&cedula::contexto(&id32(proposta), &addr, j as u32), &g, &h, &cj, &p) {
+                        checadas += 1;
+                    } else {
+                        boa = false;
+                    }
+                }
+                Err(_) => boa = false,
+            }
+            cs.push(cj);
+        }
+
+        // e Σ v_j = 1. As duas provas são necessárias e nenhuma é suficiente:
+        // sem esta, v = (3, −2) passaria pelas disjuntivas de cima.
+        match tessera_core::soma::Prova::desserializar(&de_hex(prova_soma)?) {
+            Ok(p) => {
+                let d = tessera_core::soma::alvo(&g, &cs, 1);
+                if tessera_core::soma::verificar(
+                    &cedula::contexto(&id32(proposta), &addr, cedula::OPCAO_DA_SOMA),
+                    &h, &d, &p,
+                ) {
+                    somas_ok += 1;
+                } else {
+                    boa = false;
+                }
+            }
+            Err(_) => boa = false,
+        }
+    }
+    tela::campo_veredito("Boa formação", &format!("{} disjuntivas válidas", checadas), boa);
+    tela::campo_veredito(
+        "Soma das cédulas",
+        &format!("{} de {} somam 1", somas_ok, cedulas),
+        somas_ok == cedulas && cedulas > 0,
+    );
+
+    // 4. aberturas públicas: estão em claro no ledger, basta somar
+    let pub_ok = e.votos.iter().filter(|v| v.publico).all(|v| {
+        v.escolhas.as_ref().map(|x| x.iter().sum::<u32>() == 1).unwrap_or(false)
+    });
+    tela::campo_veredito(
+        "Aberturas públicas",
+        &format!("{} de {} conferem", e.publicos(), e.publicos()),
+        pub_ok,
+    );
+
+    // 5. o limiar de anonimato
+    let conf = e.confidenciais();
+    let tau = conf == 0 || conf >= e.sigilo_minimo;
+    tela::campo_veredito(
+        "Sigilo mínimo",
+        &format!("{} confidenciais ≥ {}", conf, e.sigilo_minimo),
+        tau,
+    );
+
+    // 6. o agregado, refeito dos compromissos e conferido contra a cadeia
+    let acumuladores = acumuladores_da_cadeia(&c, proposta, e.opcoes.len())?;
+    let apuracao = e.apuracao.clone();
+    let mut agregado = true;
+    tela::branco();
+    for j in 0..e.opcoes.len() {
+        let meus: Vec<G1Affine> = e
+            .votos
+            .iter()
+            .filter(|v| !v.publico)
+            .map(|v| ponto::de_hex(&v.compromissos[j]).map_err(|x| format!("{:?}", x)))
+            .collect::<Result<_, _>>()?;
+        let soma_local = pedersen::agregar(&meus);
+        let mesmo = soma_local == acumuladores[j];
+
+        let mut abre = true;
+        if let (Some(a), false) = (&apuracao, e.aberturas.is_empty()) {
+            let r = decimal_para_fr(&e.aberturas[j])?;
+            abre = pedersen::verifica_agregado(&acumuladores[j], &g, &h, a.afirmado[j] as u64, &r);
+        }
+        agregado &= mesmo && abre;
+        let rotulo = if j == 0 { "Agregado refeito" } else { "" };
+        tela::campo_veredito(
+            rotulo,
+            &format!(
+                "{:<9} {}·G + R·H",
+                e.opcoes[j].to_uppercase(),
+                apuracao.as_ref().map(|a| a.afirmado[j]).unwrap_or(0)
+            ),
+            mesmo && abre,
+        );
+    }
+
+    tela::branco();
+    tela::regua();
+    let tudo = aptidao && repetidos == 0 && boa && pub_ok && tau && agregado;
+    if tudo && apuracao.is_some() {
+        tela::confere("o resultado publicado é o resultado correto");
+    } else if tudo {
+        tela::confere("tudo o que já existe confere · ainda não apurada");
+    } else {
+        tela::recusa("alguma coisa não fecha · veja as linhas acima");
+    }
+
+    tela::branco();
+    // O bloco que resolve o problema de design: o valor é uma ausência, e aqui
+    // a ausência vira saída afirmativa de uma ferramenta hostil. Não é o
+    // produto prometendo sigilo — é um auditor que tentou tudo, provou o que
+    // podia, e relata o que não conseguiu.
+    tela::linha("E o que este verificador NÃO conseguiu descobrir:");
+    tela::linha(&format!(
+        "  em que cada uma das {} pessoas votou.",
+        conf
+    ));
+    tela::branco();
+
+    e.verificacao = Some(Verificacao {
+        aptidao,
+        unicidade: repetidos == 0,
+        boa_formacao: boa,
+        aberturas: pub_ok,
+        sigilo_minimo: tau,
+        agregado,
+    });
+    e.gravar()?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    #[test]
+    fn o_id_da_proposta_e_estavel_e_separado_por_dominio() {
+        let a = id32("contas-2025");
+        assert_eq!(a, id32("contas-2025"));
+        assert_ne!(a, id32("contas-2026"));
+        // e não é o sha256 cru do nome: o DST impede colisão com outro
+        // sistema que hasheie o mesmo texto
+        let cru: [u8; 32] = Sha256::digest(b"contas-2025").into();
+        assert_ne!(a, cru);
+    }
+
+    #[test]
+    fn prazo_aceita_relogio_e_ledgers() {
+        assert_eq!(prazo_em_ledgers("2h").unwrap(), 1440);
+        assert_eq!(prazo_em_ledgers("30m").unwrap(), 360);
+        assert_eq!(prazo_em_ledgers("100").unwrap(), 100);
+        assert!(prazo_em_ledgers("amanhã").is_err());
+    }
+
+    #[test]
+    fn relogio_nunca_mente_sobre_votacao_encerrada() {
+        assert_eq!(relogio(0), "encerrada");
+        assert_eq!(relogio(-50), "encerrada");
+        assert_eq!(relogio(1440), "em 2h00");
+        assert_eq!(relogio(360), "em 30min");
+    }
+
+    #[test]
+    fn lista_aceita_virgula_e_arquivo() {
+        assert_eq!(lista("a, b ,c").unwrap(), vec!["a", "b", "c"]);
+        let p = std::env::temp_dir().join(format!("tessera-lista-{}.txt", std::process::id()));
+        std::fs::write(&p, "marta\n# comentário\njoao   # inline\n\n").unwrap();
+        assert_eq!(
+            lista(p.to_str().unwrap()).unwrap(),
+            vec!["marta", "joao"]
+        );
+        let _ = std::fs::remove_file(&p);
+    }
+}

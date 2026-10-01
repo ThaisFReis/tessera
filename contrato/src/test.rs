@@ -123,6 +123,44 @@ impl Cenario {
         (v, c.indice)
     }
 
+    /// **A mesa endossando, um membro por chamada.**
+    ///
+    /// Cada membro manda a sua própria transação; o contrato conta os endossos
+    /// e publica no `k`-ésimo. Devolve o resultado, ou o erro do primeiro
+    /// membro que for recusado — porque todo endosso confere tudo, e números
+    /// falsos são recusados no primeiro que tentar, não no último.
+    fn endossar_um(
+        &self,
+        i: usize,
+        totais: &Vec<u32>,
+        aberturas: &Vec<Bls12381Fr>,
+    ) -> Result<Option<Vec<u32>>, soroban_sdk::Error> {
+        match self
+            .cliente
+            .try_apurar(&self.proposta, &self.mesa[i], totais, aberturas)
+        {
+            Ok(v) => Ok(v.unwrap()),
+            Err(Ok(e)) => Err(e.into()),
+            Err(Err(_)) => panic!("o contrato devolveu um erro que o cliente não entende"),
+        }
+    }
+
+    fn endossar(
+        &self,
+        quantos: usize,
+        totais: &Vec<u32>,
+        aberturas: &Vec<Bls12381Fr>,
+    ) -> Result<Option<Vec<u32>>, soroban_sdk::Error> {
+        let mut ultimo = Ok(None);
+        for i in 0..quantos {
+            ultimo = self.endossar_um(i, totais, aberturas);
+            if ultimo.is_err() {
+                return ultimo;
+            }
+        }
+        ultimo
+    }
+
     fn mesa_sdk(&self, k: usize) -> Vec<Address> {
         let mut v = Vec::new(&self.env);
         for m in self.mesa.iter().take(k) {
@@ -229,11 +267,67 @@ fn rodada_completa_confidencial() {
     }
 
     c.env.ledger().set_sequence_number(FECHA_EM + 1);
-    let r = c.cliente.apurar(&c.proposta, &c.mesa_sdk(3), &totais, &aberturas);
 
+    // dois endossos nao publicam nada
+    assert_eq!(c.endossar(2, &totais, &aberturas).unwrap(), None);
+    assert_eq!(c.cliente.resultado(&c.proposta), None);
+    assert_eq!(c.cliente.endossos(&c.proposta, &totais, &aberturas), 2);
+
+    // o terceiro fecha
+    let r = c.endossar_um(2, &totais, &aberturas).unwrap().unwrap();
     assert_eq!(r.get(0).unwrap(), 4);
     assert_eq!(r.get(1).unwrap(), 2);
     assert_eq!(c.cliente.resultado(&c.proposta).unwrap(), r);
+}
+
+/// **Um membro endossa estes números, não "a apuração".**
+///
+/// Dois membros endossam `(4,2)` e um terceiro endossa `(2,4)` — que tambem
+/// fecharia a soma, mas nao abre o acumulador. Nenhum dos dois digests atinge
+/// o limiar, e nada e publicado. Sem a ligacao ao digest, tres autorizacoes
+/// genericas publicariam o que a mesa quisesse.
+#[test]
+fn endosso_esta_preso_aos_numeros() {
+    let c = montar(16);
+    let mut soma_r = [ArkFr::from(0u64); OPCOES as usize];
+    for i in 0..6 {
+        let rs = c.votar(i, if i < 4 { 0 } else { 1 });
+        for j in 0..OPCOES as usize {
+            soma_r[j] += rs[j];
+        }
+    }
+    c.env.ledger().set_sequence_number(FECHA_EM + 1);
+
+    let mut ab = Vec::new(&c.env);
+    for j in 0..OPCOES as usize {
+        ab.push_back(escalar(&c.env, &soma_r[j]));
+    }
+    let mut certo = Vec::new(&c.env);
+    certo.push_back(4u32);
+    certo.push_back(2u32);
+
+    assert_eq!(c.endossar(2, &certo, &ab).unwrap(), None);
+    assert_eq!(c.cliente.endossos(&c.proposta, &certo, &ab), 2);
+    // e o digest dos outros numeros nao tem endosso nenhum
+
+    // o terceiro membro endossa OUTROS numeros: e recusado, e o digest certo
+    // continua com dois endossos
+    let mut outro = Vec::new(&c.env);
+    outro.push_back(2u32);
+    outro.push_back(4u32);
+    assert_eq!(
+        c.cliente.try_apurar(&c.proposta, &c.mesa[2], &outro, &ab),
+        Err(Ok(Erro::AberturaNaoFecha))
+    );
+    assert_eq!(c.cliente.resultado(&c.proposta), None);
+    assert_eq!(c.cliente.endossos(&c.proposta, &certo, &ab), 2);
+
+    // e um membro nao endossa duas vezes para fechar o quorum sozinho
+    assert_eq!(
+        c.cliente.try_apurar(&c.proposta, &c.mesa[0], &certo, &ab),
+        Err(Ok(Erro::MembroJaEndossou))
+    );
+    assert_eq!(c.cliente.resultado(&c.proposta), None);
 }
 
 /// **A mesa mentindo.** O compromisso é computacionalmente vinculante, então
@@ -267,16 +361,16 @@ fn mesa_que_mente_no_total_e_recusada() {
 
     // inverter o resultado mantendo a soma: 4,2 vira 2,4
     assert_eq!(
-        c.cliente.try_apurar(&c.proposta, &c.mesa_sdk(3), &tot(&c.env, 2, 4), &ab(&c.env)),
-        Err(Ok(Erro::AberturaNaoFecha))
+        c.endossar(3, &tot(&c.env, 2, 4), &ab(&c.env)).unwrap_err(),
+        Erro::AberturaNaoFecha.into()
     );
     // inflar um lado: a soma deixa de bater com o comparecimento
     assert_eq!(
-        c.cliente.try_apurar(&c.proposta, &c.mesa_sdk(3), &tot(&c.env, 5, 2), &ab(&c.env)),
-        Err(Ok(Erro::TotalDiferenteDoComparecimento))
+        c.endossar(3, &tot(&c.env, 5, 2), &ab(&c.env)).unwrap_err(),
+        Erro::TotalDiferenteDoComparecimento.into()
     );
     // e o honesto passa
-    let r = c.cliente.apurar(&c.proposta, &c.mesa_sdk(3), &tot(&c.env, 4, 2), &ab(&c.env));
+    let r = c.endossar(3, &tot(&c.env, 4, 2), &ab(&c.env)).unwrap().unwrap();
     assert_eq!(r.get(0).unwrap(), 4);
 }
 
@@ -284,8 +378,12 @@ fn mesa_que_mente_no_total_e_recusada() {
 #[test]
 fn mesa_abaixo_do_limiar_nao_apura() {
     let c = montar(16);
+    let mut soma_r = [ArkFr::from(0u64); OPCOES as usize];
     for i in 0..5 {
-        c.votar(i, 0);
+        let rs = c.votar(i, 0);
+        for j in 0..OPCOES as usize {
+            soma_r[j] += rs[j];
+        }
     }
     c.env.ledger().set_sequence_number(FECHA_EM + 1);
 
@@ -293,30 +391,30 @@ fn mesa_abaixo_do_limiar_nao_apura() {
     t.push_back(5u32);
     t.push_back(0u32);
     let mut a = Vec::new(&c.env);
-    a.push_back(escalar(&c.env, &ArkFr::from(0u64)));
-    a.push_back(escalar(&c.env, &ArkFr::from(0u64)));
+    for j in 0..OPCOES as usize {
+        a.push_back(escalar(&c.env, &soma_r[j]));
+    }
 
-    assert_eq!(
-        c.cliente.try_apurar(&c.proposta, &c.mesa_sdk(2), &t, &a),
-        Err(Ok(Erro::MesaAbaixoDoLimiar))
-    );
+    // dois endossos nao publicam, mesmo com os numeros certos
+    assert_eq!(c.endossar(2, &t, &a).unwrap(), None);
+    assert_eq!(c.cliente.resultado(&c.proposta), None);
 
-    // três assinantes, mas um não é da mesa
-    let mut intrusa = c.mesa_sdk(2);
-    intrusa.push_back(c.aptos[0].clone());
+    // quem nao e da mesa nao endossa
     assert_eq!(
-        c.cliente.try_apurar(&c.proposta, &intrusa, &t, &a),
+        c.cliente.try_apurar(&c.proposta, &c.aptos[0], &t, &a),
         Err(Ok(Erro::NaoEMembroDaMesa))
     );
+    assert_eq!(c.cliente.resultado(&c.proposta), None);
 
-    // três assinantes, mas o mesmo repetido — reduziria o limiar em silêncio
-    let mut repetida = c.mesa_sdk(1);
-    repetida.push_back(c.mesa[0].clone());
-    repetida.push_back(c.mesa[1].clone());
+    // e o mesmo membro nao endossa duas vezes para fechar o quorum sozinho
     assert_eq!(
-        c.cliente.try_apurar(&c.proposta, &repetida, &t, &a),
-        Err(Ok(Erro::MembroRepetido))
+        c.cliente.try_apurar(&c.proposta, &c.mesa[1], &t, &a),
+        Err(Ok(Erro::MembroJaEndossou))
     );
+    assert_eq!(c.cliente.resultado(&c.proposta), None);
+
+    // o terceiro membro de verdade fecha
+    assert!(c.endossar_um(2, &t, &a).unwrap().is_some());
 }
 
 // ===================== o que `votar` recusa ==========================
@@ -515,7 +613,7 @@ fn nao_se_apura_antes_do_prazo() {
     a.push_back(escalar(&c.env, &ArkFr::from(0u64)));
     a.push_back(escalar(&c.env, &ArkFr::from(0u64)));
     assert_eq!(
-        c.cliente.try_apurar(&c.proposta, &c.mesa_sdk(3), &t, &a),
+        c.cliente.try_apurar(&c.proposta, &c.mesa[0], &t, &a),
         Err(Ok(Erro::VotacaoAindaAberta))
     );
 }
@@ -552,7 +650,7 @@ fn voto_publico_soma_no_resultado() {
     for j in 0..OPCOES as usize {
         a.push_back(escalar(&c.env, &soma_r[j]));
     }
-    let r = c.cliente.apurar(&c.proposta, &c.mesa_sdk(3), &t, &a);
+    let r = c.endossar(3, &t, &a).unwrap().unwrap();
     assert_eq!(r.get(0).unwrap(), 5, "5 confidenciais na opcao 0");
     assert_eq!(r.get(1).unwrap(), 2, "2 publicas na opcao 1");
 }
@@ -587,7 +685,7 @@ fn abaixo_de_tau_a_apuracao_trava_em_vez_de_vazar() {
         a.push_back(escalar(&c.env, &soma_r[j]));
     }
     assert_eq!(
-        c.cliente.try_apurar(&c.proposta, &c.mesa_sdk(3), &t, &a),
+        c.cliente.try_apurar(&c.proposta, &c.mesa[0], &t, &a),
         Err(Ok(Erro::AnonimatoInsuficiente))
     );
 }
@@ -612,7 +710,7 @@ fn votacao_toda_publica_apura() {
     let mut a = Vec::new(&c.env);
     a.push_back(escalar(&c.env, &ArkFr::from(0u64)));
     a.push_back(escalar(&c.env, &ArkFr::from(0u64)));
-    let r = c.cliente.apurar(&c.proposta, &c.mesa_sdk(3), &t, &a);
+    let r = c.endossar(3, &t, &a).unwrap().unwrap();
     assert_eq!(r.get(0).unwrap(), 3);
 }
 
@@ -850,11 +948,10 @@ fn apurar_nao_cresce_com_o_comparecimento() {
         for j in 0..OPCOES as usize {
             a.push_back(escalar(&c.env, &soma_r[j]));
         }
-        let mesa = c.mesa_sdk(3);
-
         // leitura pura, sem nenhuma operação de curva
         let leitura = cpu(&c.env, || c.cliente.comparecimento(&c.proposta));
-        let apuracao = cpu(&c.env, || c.cliente.apurar(&c.proposta, &mesa, &t, &a));
+        // o primeiro endosso, que confere tudo e ainda não publica
+        let apuracao = cpu(&c.env, || c.cliente.apurar(&c.proposta, &c.mesa[0], &t, &a));
         (apuracao, leitura)
     };
 

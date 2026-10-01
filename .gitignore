@@ -2,3 +2,5 @@ target/
 *.key
 recibos/
 estado/
+shares/
+demo/

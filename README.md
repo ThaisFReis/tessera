@@ -28,8 +28,8 @@ computacional, para sempre. O voto em si transita fora da cadeia e é destruído
 | Sonda criptográfica medida na testnet | ✅ no ar |
 | Desenho Pedersen verificado on-chain | ✅ medido |
 | Contrato de urna (`abrir`/`votar`/`apurar`) | ✅ no ar, 20 testes |
-| Cliente CLI | ❌ em construção |
-| Verificador público | ❌ em construção |
+| Cliente CLI | ✅ rodada completa na testnet |
+| Verificador público | ✅ no `tessera verificar` |
 
 **O que está no ar hoje é a sonda que estabelece o modelo de custo, não a urna.**
 Todo número abaixo veio de uma invocação real na testnet da Stellar, nunca de
@@ -105,6 +105,34 @@ Detalhes e método em [`bls-smoke/RESULTADOS.md`](bls-smoke/RESULTADOS.md).
 
 ---
 
+## A rodada completa, na testnet
+
+```bash
+tessera abrir   --proposta contas --pergunta "Aprovar as contas de 2025?" \
+                --opcoes aprovar,rejeitar --aptos marta,joao,ana,… \
+                --mesa mesa1,…,mesa5 -k 3 --prazo 8m
+tessera cedula  --proposta contas --identidade marta     # mostra, não vota
+tessera votar   --proposta contas --opcao rejeitar --identidade marta
+tessera queimar --identidade marta
+tessera apurar  --proposta contas
+tessera verificar --proposta contas
+```
+
+Custo real por voto, medido:
+
+| | |
+|---|---|
+| `abrir` | 1,83 XLM |
+| `votar` confidencial | **157.267 stroops ≈ 0,0157 XLM** |
+| `votar --publico` | 118.448 stroops |
+| manter o contrato vivo 180 dias | 181,70 XLM, uma vez |
+
+O `cedula` é o comando que não vota: mostra os dois compromissos possíveis
+lado a lado, rotulados A e B, sem dizer qual é qual. Quem assiste tenta
+descobrir, falha, e a falha é a demonstração.
+
+---
+
 ## Três descobertas que valem aviso
 
 **As sondas 8 e 9 encontraram o mesmo número por caminhos diferentes.** A janela
@@ -138,6 +166,20 @@ isso quebra a primeira cédula de toda votação, e só a primeira. Está travad
 dos dois lados, em `core/src/ponto.rs` e no teste
 `o_infinito_do_host_e_a_flag_zcash_nao_zeros`.
 
+**A mesa `k`-de-`n` não co-assina: endossa.** A primeira versão pedia `k`
+autorizações numa transação só, e isso **não é expressável** pelo ferramental
+da Stellar — `stellar tx sign` assina o envelope, não as entradas de
+autorização do Soroban, e a rede recusa com `TxBadAuthExtra`.
+
+A correção ficou melhor que o desenho original. Cada membro manda **a sua**
+transação e o contrato conta os endossos, que é como `k` pessoas em `k`
+máquinas realmente trabalham. E cada endosso está preso ao
+`sha256(totais ‖ aberturas)`: ninguém endossa "a apuração" em abstrato, endossa
+**estes números**. Discordar é não endossar.
+
+Como todo endosso confere tudo, uma apuração falsa é recusada no **primeiro**
+membro que tentar, não no último.
+
 **Para quem for reproduzir:** as invocações registradas aqui saem da janela do
 RPC sete dias depois de feitas. Depois disso, leia dos arquivos de histórico.
 
@@ -148,11 +190,12 @@ RPC sete dias depois de feitas. Depois disso, leia dos arquivos de histórico.
 ```bash
 cd bls-smoke && cargo test --lib -- --nocapture --test-threads=1   # 13 sondas
 cd ../core   && cargo test                                          # 48 testes
-cd ../contrato && cargo test                                        # 20 testes
+cd ../contrato && cargo test                                        # 21 testes
+cd ../cli    && cargo test                                          # 23 testes
 ```
 
 Requer `rustc 1.97+`, `stellar-cli 25.2+`, alvo `wasm32v1-none`.
-Oitenta e um testes, todos passando, sem rede.
+Cento e seis testes, todos passando, sem rede.
 
 O crate `core/` é a matemática compartilhada entre contrato, cliente e
 verificador. Ele usa **arkworks, o mesmo crate do host do Soroban** — o que
@@ -170,7 +213,7 @@ Contratos na testnet:
 
 | | |
 |---|---|
-| **Tessera (`abrir`/`votar`/`apurar`)** | `CBD5QTEJPKQGNLFBEGVRXDKJ6CUBGYS2CHEUFEXPERR7W7TXBFH4X43W` |
+| **Tessera (`abrir`/`votar`/`apurar`)** | `CBLUSE2LCPPELS7GIQ5MRYKSW7KTILMWY7VBRFRSWAVG3L7TSRQYHP7H` |
 | sondas 1–13 (cripto, CDS e Merkle) | `CCL4CPAJ4ZVP25FP2PO7T3AMYGIVQZLYJZYZS53UAM5IFA5NFYGLUISR` |
 | sonda 9 (TTL) | `CCCZ4HPW3ESHO6BMNFGXX6DJRSWPWA7FBQH2MS6QGHC3U67DIZ434KFC` |
 

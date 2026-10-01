@@ -32,7 +32,7 @@ use cripto::*;
 use soroban_sdk::{
     contract, contractimpl, symbol_short,
     crypto::bls12_381::{Bls12381Fr, Bls12381G1Affine},
-    Address, BytesN, Env, Vec,
+    Address, Bytes, BytesN, Env, Vec,
 };
 use tipos::{Chave, Instancia, MAX_OPCOES, TAU};
 
@@ -276,25 +276,46 @@ impl Tessera {
 
     // ===================== apurar ========================================
 
-    /// Apura. Chamada por `k` membros da mesa, que assinam juntos.
+    /// Apura — **um endosso por vez, uma transação por membro.**
     ///
     /// A mesa publica `(T_j, R_j)` e o contrato **confere** `A_j == T_j·G +
     /// R_j·H`. Não procura o total: a sonda 5 mostrou que procurar por força
     /// bruta custa 124.277 por unidade de peso e tem teto de ~3.218, enquanto
     /// conferir custa 5.408.931 **constante no comparecimento** — medido
-    /// idêntico para 250 e para 1.000.000.
+    /// idêntico para 250 e para 1.000.000. Quem procura é a mesa, fora da
+    /// cadeia, onde procurar é de graça.
     ///
     /// Revelar `R_j = Σ r_{i,j}` não revela nenhum `r_{i,j}`: é a soma de `n`
     /// valores uniformes, e conhecer a soma de `n` incógnitas não determina
     /// nenhuma delas. E `R_j` chega à mesa por shares de Shamir, então nenhum
     /// `r` individual se junta em lugar algum (SPEC §4.3).
+    ///
+    /// ## Por que endosso e não co-assinatura
+    ///
+    /// A primeira versão pedia `k` autorizações numa transação só. Isso não é
+    /// expressável pelo ferramental da Stellar — `stellar tx sign` assina o
+    /// envelope, não as entradas de autorização do Soroban, e a rede recusa
+    /// com `TxBadAuthExtra`.
+    ///
+    /// E a correção é melhor que o desenho original: os `k` membros são `k`
+    /// pessoas em `k` máquinas, que não têm como passar um envelope de mão em
+    /// mão com conforto. Cada uma manda **a sua** transação, e o contrato
+    /// conta. Além disso cada endosso fica preso ao digest de `(totais,
+    /// aberturas)`, então ninguém endossa "a apuração" em abstrato: endossa
+    /// **estes números**, e discordar é não endossar.
+    ///
+    /// Toda chamada confere tudo. Um endosso de números falsos é recusado
+    /// na hora, no primeiro membro que tentar — não no último.
+    ///
+    /// Devolve o resultado quando o `k`-ésimo endosso fecha, e `None` antes.
     pub fn apurar(
         env: Env,
         proposta: BytesN<32>,
-        assinantes: Vec<Address>,
+        membro: Address,
         totais: Vec<u32>,
         aberturas: Vec<Bls12381Fr>,
-    ) -> Result<Vec<u32>, Erro> {
+    ) -> Result<Option<Vec<u32>>, Erro> {
+        membro.require_auth();
         let p = abrir_proposta(&env, &proposta)?;
 
         if env.ledger().sequence() < p.fecha_em {
@@ -306,27 +327,16 @@ impl Tessera {
         if totais.len() != p.opcoes || aberturas.len() != p.opcoes {
             return Err(Erro::ArgumentoMalFormado);
         }
-
-        // k-de-N: todo assinante tem de ser membro, distinto, e autorizar.
-        if assinantes.len() < p.limiar {
-            return Err(Erro::MesaAbaixoDoLimiar);
-        }
-        for (i, a) in assinantes.iter().enumerate() {
-            if !p.mesa.iter().any(|m| m == a) {
-                return Err(Erro::NaoEMembroDaMesa);
-            }
-            if assinantes.iter().take(i).any(|o| o == a) {
-                return Err(Erro::MembroRepetido);
-            }
-            a.require_auth();
+        if !p.mesa.iter().any(|m| m == membro) {
+            return Err(Erro::NaoEMembroDaMesa);
         }
 
         // **A regra de τ.** Ver SPEC §6.6. Ou ninguém votou em sigilo — e não
         // há sigilo a proteger — ou pelo menos τ votaram. Uma coligação que
-        // publique os próprios votos de propósito encolheria o conjunto secreto
-        // até determiná-lo; aqui ela trava a apuração em vez de ler os votos.
-        // A troca é deliberada: uma votação travada é contestável e repetível,
-        // um voto vazado não volta atrás.
+        // publique os próprios votos de propósito encolheria o conjunto
+        // secreto até determiná-lo; aqui ela trava a apuração em vez de ler os
+        // votos. A troca é deliberada: uma votação travada é contestável e
+        // repetível, um voto vazado não volta atrás.
         let (conf, _publ): (u32, u32) = env
             .storage()
             .persistent()
@@ -382,6 +392,28 @@ impl Tessera {
             resultado.push_back(totais.get(j).unwrap() + publico);
         }
 
+        // Daqui para baixo os números conferem. O que falta é quórum.
+        let digest = digest_da_apuracao(&env, &totais, &aberturas);
+        let meu = Chave::Endosso(proposta.clone(), digest.clone(), membro.clone());
+        if env.storage().persistent().has(&meu) {
+            return Err(Erro::MembroJaEndossou);
+        }
+        env.storage().persistent().set(&meu, &true);
+
+        let conta = Chave::Endossos(proposta.clone(), digest.clone());
+        let quantos: u32 = env.storage().persistent().get(&conta).unwrap_or(0) + 1;
+        env.storage().persistent().set(&conta, &quantos);
+        guardar_longo(&env, &conta);
+
+        env.events().publish(
+            (symbol_short!("endosso"), proposta.clone(), membro),
+            (digest.clone(), quantos, p.limiar),
+        );
+
+        if quantos < p.limiar {
+            return Ok(None);
+        }
+
         let k = Chave::Resultado(proposta.clone());
         env.storage().persistent().set(&k, &resultado);
         guardar_longo(&env, &k);
@@ -390,24 +422,21 @@ impl Tessera {
             (symbol_short!("apurar"), proposta),
             (totais, aberturas, resultado.clone()),
         );
-        Ok(resultado)
+        Ok(Some(resultado))
     }
 
-    /// Paga o aluguel do próprio contrato: estende instância e código ao teto
-    /// da rede. **Qualquer pessoa chama**, e é um bem público — enquanto
-    /// alguém pagar, todas as propostas continuam utilizáveis.
-    ///
-    /// Custa ~181 XLM por 180 dias, porque o aluguel é proporcional ao tamanho
-    /// e o Wasm tem 21 KB. É um custo de operação do módulo, não de uma
-    /// votação: separá-lo de `abrir()` é o que impede a primeira governança a
-    /// usar o contrato de pagar a conta de todas as outras.
-    ///
-    /// Sem ninguém chamar, instância e código arquivam em 7 dias (sonda 9) e
-    /// voltam com `RestoreFootprintOp`. É degradação, não perda.
-    pub fn manter(env: Env) -> u32 {
-        let m = env.storage().max_ttl();
-        env.storage().instance().extend_ttl(m - 1, m);
-        m
+    /// Quantos membros já endossaram exatamente estes números.
+    pub fn endossos(
+        env: Env,
+        proposta: BytesN<32>,
+        totais: Vec<u32>,
+        aberturas: Vec<Bls12381Fr>,
+    ) -> u32 {
+        let d = digest_da_apuracao(&env, &totais, &aberturas);
+        env.storage()
+            .persistent()
+            .get(&Chave::Endossos(proposta, d))
+            .unwrap_or(0)
     }
 
     // ===================== leitura =======================================
@@ -477,6 +506,22 @@ fn infinito(env: &Env) -> Bls12381G1Affine {
     let mut b = [0u8; 96];
     b[0] = 0x40;
     Bls12381G1Affine::from_bytes(BytesN::from_array(env, &b))
+}
+
+/// `sha256(totais ‖ aberturas)` — o que um membro da mesa endossa.
+///
+/// Prender o endosso ao digest é o que impede um membro de autorizar "a
+/// apuração" e a mesa publicar outros números. Discordar é simplesmente não
+/// endossar aquele digest.
+fn digest_da_apuracao(env: &Env, totais: &Vec<u32>, aberturas: &Vec<Bls12381Fr>) -> BytesN<32> {
+    let mut b = Bytes::from_slice(env, b"TESSERA-V1-APURACAO");
+    for t in totais.iter() {
+        b.extend_from_array(&t.to_be_bytes());
+    }
+    for a in aberturas.iter() {
+        b.extend_from_array(&a.to_bytes().to_array());
+    }
+    env.crypto().sha256(&b).to_bytes()
 }
 
 fn abrir_proposta(env: &Env, proposta: &BytesN<32>) -> Result<Proposta, Erro> {

@@ -13,7 +13,7 @@
 //! - ramo 0 afirma `C = r·H`        (ou seja `v = 0`)
 //! - ramo 1 afirma `C − G = r·H`    (ou seja `v = 1`)
 
-use crate::acaso;
+
 use crate::pedersen;
 use crate::ponto;
 use ark_bls12_381::{Fr, G1Affine, G1Projective};

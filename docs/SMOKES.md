@@ -233,7 +233,12 @@ O roteiro do vídeo é o smoke. Cinco votantes, um divergente, apuração 3-de-5
 
 **Decisão que destrava.** O **Portão 3** do plano, sábado 20:00. Falha aqui aciona o fallback nuclear.
 
-**Tempo.** 3h incluindo correções.
+**Tempo.** 3h incluindo correções · **RESULTADO 2026-10-01: PASSA.** Sete pessoas numa votação na testnet: cinco em segredo, duas em público, uma divergente. Contrato `CBLUSE2L…HP7H`. Custo real por voto confidencial: **157.267 stroops**, 0,0157 XLM. Público: 118.448.
+
+**O que o smoke encontrou, e que nenhum teste de unidade encontraria:**
+
+1. **Multi-auth do Soroban numa transação só não é expressável pela `stellar` CLI.** `stellar tx sign` assina o envelope, não as entradas de autorização, e a rede recusa com `TxBadAuthExtra`. `apurar()` foi redesenhado para **um endosso por membro, uma transação por pessoa**, com cada endosso preso ao `sha256(totais ‖ aberturas)`. O desenho novo é melhor: é como `k` pessoas em `k` máquinas trabalham, e ninguém endossa "a apuração" em abstrato.
+2. **Cada voto confidencial leva ~30 s de relógio** pela `stellar` CLI. Uma votação de 7 pessoas precisa de janela de 8 min, não de 3. Importa para o roteiro do vídeo.
 
 ### D2 · Mesa mentindo recusa de verdade
 

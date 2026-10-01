@@ -51,6 +51,7 @@ pub enum Erro {
     EscolhaForaDoBinario = 21,
     SomaDiferenteDoPeso = 22,
     TotalDiferenteDoComparecimento = 23,
+    MembroJaEndossou = 24,
 }
 
 #[contracttype]
@@ -68,6 +69,12 @@ pub enum Chave {
     /// `(confidenciais, públicas)`. É o que a regra de `TAU` consulta.
     Comparecimento(BytesN<32>),
     Resultado(BytesN<32>),
+    /// `Endosso(proposta, digest, membro)`: um membro da mesa endossou esta
+    /// apuração exata. O digest é `sha256(totais ‖ aberturas)`, então endossar
+    /// é endossar **estes números**, não "a apuração" em abstrato.
+    Endosso(BytesN<32>, BytesN<32>, Address),
+    /// Quantos membros já endossaram aquele digest.
+    Endossos(BytesN<32>, BytesN<32>),
 }
 
 /// Chave de instância do segundo gerador.

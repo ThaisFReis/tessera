@@ -354,13 +354,15 @@ fn votar(
     peso: u32,                               // w, conferido contra a folha
 ) -> Result<(), Erro>;
 
-/// Apura. Chamada por k membros da mesa (multi-auth).
+/// Apura. UM ENDOSSO POR MEMBRO, uma transação por pessoa.
+/// Devolve o resultado quando o k-ésimo endosso fecha, e None antes.
 fn apurar(
     env: Env,
     proposta: BytesN<32>,
+    membro: Address,                         // require_auth
     totais: Vec<u32>,                        // T_j
     aberturas: Vec<Bls12381Fr>,              // R_j
-) -> Result<Vec<u32>, Erro>;
+) -> Result<Option<Vec<u32>>, Erro>;
 
 /// Leitura. Qualquer pessoa.
 fn acumulador(env: Env, proposta: BytesN<32>) -> Vec<Bls12381G1Affine>;

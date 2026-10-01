@@ -18,7 +18,7 @@
 use crate::acaso;
 use crate::ponto;
 use ark_bls12_381::{Fr, G1Affine, G1Projective};
-use ark_ec::{AffineRepr, PrimeGroup};
+use ark_ec::PrimeGroup;
 use ark_ff::PrimeField;
 
 /// O gerador canônico de G1.
@@ -217,6 +217,34 @@ mod testes {
         assert_eq!(resto, G1Affine::identity());
     }
 
+    /// A mesa recebe `R_j` das shares e **procura** `T_j`; a cadeia só
+    /// confere. Procurar fora da cadeia é de graça — é a outra metade da
+    /// descoberta da sonda 5.
+    #[test]
+    fn a_mesa_descobre_o_total_que_a_cadeia_so_confere() {
+        let g = gerador();
+        let h = ponto::de_hex(H_HEX).unwrap();
+
+        let votos: [u64; 7] = [1, 0, 1, 1, 0, 1, 1];
+        let rs: Vec<Fr> = (0..7).map(|_| acaso_fr().unwrap()).collect();
+        let cs: Vec<G1Affine> = votos
+            .iter()
+            .zip(rs.iter())
+            .map(|(v, r)| comprometer(&g, &h, &escalar(*v), r))
+            .collect();
+        let a = agregar(&cs);
+        let soma_r = rs.iter().fold(escalar(0), |acc, r| acc + r);
+
+        assert_eq!(descobrir_total(&a, &g, &h, &soma_r, 100), Some(5));
+        // e com o R errado nao se acha total nenhum
+        assert_eq!(descobrir_total(&a, &g, &h, &(soma_r + escalar(1)), 100), None);
+        // nem alem do teto da busca
+        assert_eq!(descobrir_total(&a, &g, &h, &soma_r, 3), None);
+
+        // e o que a mesa achou e o que a cadeia confere
+        assert!(verifica_agregado(&a, &g, &h, 5, &soma_r));
+    }
+
     /// `Fr` vai para a CLI em decimal. Travar isso em teste porque a armadilha
     /// já mordeu uma vez: hex com só dígitos é aceito como o decimal errado.
     #[test]
@@ -235,4 +263,31 @@ pub fn fr_para_bytes_be(f: &Fr) -> [u8; 32] {
     let mut b = [0u8; 32];
     b[32 - v.len()..].copy_from_slice(&v);
     b
+}
+
+/// Descobre `T` tal que `A = T·G + soma_r·H`, por busca em `0..=max`.
+///
+/// **Isto roda fora da cadeia, e é a outra metade da sonda 5.** Lá, procurar o
+/// total *dentro* do contrato custava 124.277 por unidade e tinha teto de
+/// ~3.218: inviável. Aqui, na máquina da mesa, procurar é de graça — e a mesa
+/// precisa procurar, porque as shares de Shamir lhe dão `R_j`, nunca `T_j`.
+///
+/// A assimetria é o desenho inteiro em duas linhas: **a mesa procura, a cadeia
+/// confere.** Procurar é O(n) e livre; conferir é um MSM de 2 termos, constante
+/// no comparecimento.
+pub fn descobrir_total(
+    a: &G1Affine,
+    g: &G1Affine,
+    h: &G1Affine,
+    soma_r: &Fr,
+    max: u64,
+) -> Option<u64> {
+    let mut acc: G1Projective = (*h * soma_r).into();
+    for t in 0..=max {
+        if acc == G1Projective::from(*a) {
+            return Some(t);
+        }
+        acc += *g;
+    }
+    None
 }

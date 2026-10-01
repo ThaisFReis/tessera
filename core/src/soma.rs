@@ -217,3 +217,14 @@ mod testes {
         assert_eq!(p.serializar().len(), 128);
     }
 }
+
+impl Prova {
+    /// 128 bytes, para o verificador reler a prova do ledger.
+    pub fn desserializar(b: &[u8]) -> Result<Prova, Erro> {
+        if b.len() != TAMANHO {
+            return Err(Erro::TamanhoErrado(b.len()));
+        }
+        let a = ponto::desserializar(&b[..96]).map_err(|_| Erro::PontoInvalido)?;
+        Ok(Prova { a, z: Fr::from_be_bytes_mod_order(&b[96..]) })
+    }
+}

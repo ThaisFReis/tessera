@@ -252,6 +252,18 @@ Dois números, grandes, centrados, e o resto pequeno. É a única tela do produt
 
 ## 6. `tessera apurar`
 
+> **Mudou na implementação.** A mesa não co-assina uma transação: **endossa, uma transação por membro.** `k` autorizações do Soroban numa transação só não é expressável pela `stellar` CLI — `tx sign` assina o envelope, não as entradas de autorização, e a rede recusa com `TxBadAuthExtra`. A tela ganhou um bloco:
+>
+> ```
+>   ── a mesa endossa ───────────────────────────────────────────────────
+>
+>   mesa1 .............. endossou  (1 de 3)
+>   mesa2 .............. endossou  (2 de 3)
+>   mesa3 .............. endossou  (3 de 3)
+> ```
+>
+> E ficou melhor de mostrar do que o original: o quórum se formando na tela, um nome por linha, é a arquitetura da mesa acontecendo à vista. Cada endosso está preso ao `sha256(totais ‖ aberturas)`, então ninguém endossa "a apuração" em abstrato.
+
 ```
 $ tessera apurar --proposta contas-2025 --shares ./shares/
 ```
@@ -457,6 +469,10 @@ Todo comando escreve `./estado/<proposta>.json`:
 ```
 
 Nada de `r` neste arquivo, nunca. A chave vive só em `./recibos/<identidade>.key`, que é o arquivo que `queimar` sobrescreve.
+
+**E o contrário também vale, e só ficou claro na implementação: as provas são públicas e por isso moram no estado, não no recibo.** Na primeira versão elas estavam no `.key`, e `queimar` apagava junto a capacidade de qualquer pessoa reverificar a boa formação daquela cédula — proteger quem vota passava a custar auditabilidade. Não custa. O recibo guarda **só o segredo**; o que já está no ledger fica no estado.
+
+A separação é a regra: `recibos/` tem o que ninguém mais pode ter, `estado/` tem o que todo mundo já tem.
 
 ---
 
