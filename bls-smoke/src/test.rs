@@ -630,3 +630,50 @@ fn sonda10_desserializacao_e_checagem_de_subgrupo() {
         custo_val
     );
 }
+
+/// SONDA 11 (smoke B2) — `H` e um gerador honesto?
+///
+/// O compromisso so e perfeitamente ocultante se ninguem souber `h` tal que
+/// `H = h*G`. Nao da para PROVAR que ninguem sabe — esse e o ponto de um
+/// nothing-up-my-sleeve. Da para provar que H nao e um multiplo TRIVIAL de G,
+/// que e como o desenho quebraria na pratica se o DST fosse mal escolhido.
+#[test]
+fn sonda11_h_e_gerador_honesto() {
+    let (env, client) = setup();
+    let g = generator(&env);
+    let bls = env.crypto().bls12_381();
+    let h = client.gerador_h();
+
+    // na curva, no subgrupo de ordem r
+    assert!(bls.g1_is_on_curve(&h));
+    assert!(bls.g1_is_in_subgroup(&h));
+
+    // nao e G, nem -G, nem o ponto no infinito
+    let identidade = bls.g1_add(&g, &(-g.clone()));
+    assert!(h != g, "H == G");
+    assert!(h != -g.clone(), "H == -G");
+    assert!(h != identidade, "H e a identidade");
+
+    // nao e k*G para k pequeno: se o DST tivesse dado azar e produzido um
+    // multiplo conhecido, o compromisso seria abrivel por qualquer um.
+    let mut kg = g.clone();
+    for k in 1..=512u32 {
+        assert!(h != kg, "H == {}*G — DST produziu multiplo trivial", k);
+        assert!(h != -kg.clone(), "H == -{}*G", k);
+        kg = bls.g1_add(&kg, &g);
+    }
+
+    // o DST participa de verdade: trocar a string troca o ponto
+    let outro = client.hash_g1(&Bytes::from_array(&env, b"TESSERA-V1-GENERATOR-H"));
+    assert!(
+        outro != h,
+        "DST nao participa — hash_to_g1 ignora a tag e H nao e separado por dominio"
+    );
+
+    println!("\n== SONDA 11 (B2): H e gerador honesto ==");
+    println!("on-curve ............ sim");
+    println!("in-subgroup ......... sim");
+    println!("!= k*G, k em 1..512 . sim");
+    println!("DST participa ....... sim");
+    println!("vetor da testnet .... travado em sonda7");
+}

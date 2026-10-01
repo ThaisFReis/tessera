@@ -135,7 +135,7 @@ Pendência §9.3 do spec. 50 entradas `Votou` na demo; 10.000 numa assembleia re
 
 **Decisão que destrava.** Se `H` não for determinístico entre o provador off-chain e o contrato, **nenhuma prova verifica** e o bug é dos que custam meio dia para achar. Trinta minutos aqui economizam isso.
 
-**Tempo.** 20 min · **Se falhar:** `H` passa a ser constante fixa auditável no código em vez de derivada.
+**Tempo.** 20 min · **RESULTADO 2026-10-01: PASSA.** On-curve, in-subgroup, `≠ ±k·G` para k em 1..512, DST participa, e o vetor da testnet está travado no teste.
 
 ### B3 · O provador fora da cadeia e o verificador dentro concordam?
 
@@ -183,7 +183,7 @@ Pendência §9.1, o maior número projetado do orçamento (~27M).
 
 **Decisão que destrava.** Nenhuma — mas é o **único ponto do sistema em que um bug de implementação anula uma garantia information-theoretic.** `r` previsível torna o compromisso abrível por qualquer um. O sigilo permanente inteiro, provado em §3.2 do spec, repousa sobre esta linha de código.
 
-**Tempo.** 20 min · **Se falhar:** é a falha mais grave possível, e é silenciosa. Nada na tela muda.
+**Tempo.** 20 min · **RESULTADO 2026-10-01: PASSA**, e achou uma armadilha. Zerar o byte alto serve para um desafio de Fiat-Shamir e **não serve** para `r`: cobriria <1% de Fr e quebraria a ocultação perfeita. `core/src/acaso.rs` usa rejeição, não redução. Quatro testes escritos antes do cliente que eles guardam.
 
 ---
 

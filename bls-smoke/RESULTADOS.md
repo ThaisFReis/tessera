@@ -1,7 +1,7 @@
 # Smoke BLS12-381 — resultado (2026-09-30)
 
 Ambiente: `rustc 1.97.1`, `soroban-sdk 28.0.0`, `soroban-env-host 28.0.2`,
-`stellar-cli 25.2.0`, alvo `wasm32v1-none`. Wasm: 13.102 bytes. 10/10 testes passam.
+`stellar-cli 25.2.0`, alvo `wasm32v1-none`. Wasm: 13.102 bytes. 11/11 testes passam.
 
 ## Veredito: Plano A está de pé
 
@@ -322,6 +322,55 @@ Mas basta `g1_add` para estabelecer que validação automática não existe.)
 
 O aviso do Tyler está respondido: incluir a checagem de subgrupo move o Groth16
 de 11,8% para 12,4% do orçamento. O número do deck sobrevive à objeção.
+
+## Sondas 11 e `core` — `H` honesto e o acaso do cliente (smokes B2 e B6, 2026-10-01)
+
+### B2 — `H` é um gerador honesto
+
+Não dá para provar que ninguém conhece `h` com `H = h·G`: esse é o ponto de um
+nothing-up-my-sleeve. Dá para provar que `H` não é um múltiplo **trivial**,
+que é como o desenho quebraria na prática se o DST desse azar.
+
+| checagem | resultado |
+|---|---|
+| on-curve, in-subgroup | sim |
+| `H ≠ G`, `≠ −G`, `≠` identidade | sim |
+| `H ≠ ±k·G` para `k` em 1..512 | sim |
+| o DST participa (trocar a string troca o ponto) | sim |
+| determinismo contra o vetor da testnet | travado na sonda 7 |
+
+### B6 — o acaso do cliente, e a distinção que quase passou batida
+
+Primeiro módulo do crate `core`: `acaso.rs`, o sorteio de `r`.
+
+**Este é o único ponto do sistema em que um bug de implementação anula uma
+garantia information-theoretic.** E ao escrevê-lo apareceu uma armadilha que
+não estava em nenhum documento:
+
+> Zerar o byte alto é aceitável para um desafio de Fiat-Shamir, e **não é
+> aceitável para o fator de aleatoriedade**.
+
+O contrato da sonda faz `e[0] = 0` em `challenge_fr`, porque `Fr::from_bytes`
+não reduz módulo `r` (§10.3). Está certo lá: um desafio só precisa ser
+imprevisível. Está **errado** para `r`, porque a prova de ocultação perfeita
+exige `r` uniforme sobre *todo* o corpo. Zerado, `r` cobriria `2^248` de
+`~2^255` — **menos de 1% de Fr**. O compromisso continuaria uniforme sobre um
+conjunto que *se desloca* conforme o voto, e um adversário sem limite de
+computação distinguiria os dois.
+
+São dois usos que parecem o mesmo e não são. A diferença é invisível em
+qualquer teste funcional.
+
+**Implementação:** 32 bytes do CSPRNG do SO, bit alto zerado (uniforme em
+`[0, 2^255)`), e **rejeição** se cair em `[r, 2^255)`. Aceitação de ~90,6% por
+tentativa. Rejeição e não redução módulo `r`: reduzir enviesaria os valores
+baixos, que é o mesmo tipo de viés por outro caminho.
+
+Quatro testes, que existem antes do cliente que eles guardam: sempre `< r`;
+sem repetição em 10.000; distribuição não degenerada (byte alto com >100
+valores distintos, média do byte final em ~127,5, fração de bits 1 dentro de
+2%); e um teste que documenta em código executável por que o byte alto zerado
+perderia o corpo.
 
 ## O que este smoke NÃO cobre
 

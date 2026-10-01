@@ -1,0 +1,9 @@
+[package]
+name = "tessera-core"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Matemática do Tessera, compartilhada entre contrato, cliente e verificador."
+
+[dependencies]
+getrandom = "0.2"
