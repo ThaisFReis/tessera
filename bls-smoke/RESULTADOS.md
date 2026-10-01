@@ -412,19 +412,53 @@ arkworks e o `core` usa o mesmo crate.
 | 2 × prova CDS | 21.960.486 |
 | prova de soma (Schnorr em H) | 6.737.614 |
 | validação de 6 pontos | 4.433.406 |
+| caminho de Merkle (profundidade 8) | 127.863 |
 | 2 × `g1_add` no acumulador | 221.496 |
-| **total** | **33.353.002** |
+| **total** | **33.480.865** |
 
-**8,3% do teto de 400M. Folga de 12×.**
+**8,4% do teto de 400M. Folga de 11,9×. Nenhuma linha é projeção.**
 
 O Portão 1 do plano mandava seguir sem cortes com ≤200M. Passa por margem de
-6×, e a última incógnita grande do caminho do contrato deixou de existir.
+6×, e a última incógnita do caminho do contrato deixou de existir.
+
+## Sonda 13 (C3): caminho de Merkle
+
+| | |
+|---|---|
+| folha sozinha (profundidade 0) | 22.839 |
+| caminho completo (profundidade 8) | **127.863** |
+| por nível | 13.128 |
+| taxa na testnet | **5.235 stroops** |
+| projeção do SPEC | ~1.000.000 — **errava por 8×** |
+
+`sha256` no host é barato, então a verificação de aptidão é ruído ao lado da
+criptografia. Profundidade 20 — um milhão de aptos — custaria 285.399, 0,07%
+de uma transação. A profundidade da lista não é restrição de desenho.
+
+O vetor foi montado no `core` (256 aptos determinísticos, caminho do índice
+173) e fechou na testnet: `sha256`, ordem de bytes e separação de domínio
+concordam entre Rust nativo e Wasm.
+
+Negativos recusados **na testnet**, não só em simulação:
+
+| ataque | veredito |
+|---|---|
+| peso inflado de 1 para 1000 | recusado |
+| índice trocado (mesmos irmãos, outros lados) | recusado |
+| irmãos reordenados | recusado |
+| caminho curto | recusado |
+| endereço que não está na lista | recusado |
+
+O peso inflado é o que o módulo existe para recusar: quem vota **afirma** o
+peso na chamada, e o contrato recalcula a folha a partir dele. Peso diferente,
+folha diferente, caminho não fecha.
 
 ## O que este smoke NÃO cobre
 
-Sem autorização, sem armazenamento, sem nullifier, sem mesa k-de-n (Shamir) e
-sem mesa k-de-n (Shamir). A prova CDS passou a ser medida (sonda 12). A sonda 6
-mede o custo de *verificar* um Groth16, não de gerar a prova nem de escrever o
+Sem autorização, sem armazenamento e sem nullifier. A prova CDS (sonda 12), o
+caminho de Merkle (sonda 13) e a mesa k-de-n (`core/src/shamir.rs`) passaram a
+ser medidos. Falta o `require_auth` multiassinatura de 3-de-5. A sonda 6 mede o
+custo de *verificar* um Groth16, não de gerar a prova nem de escrever o
 circuito.
 
 ## Rodar

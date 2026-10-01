@@ -311,6 +311,18 @@ informação necessária para ler um voto individual nunca se junta em lugar alg
 Isso é o que transforma o sigilo contra a mesa de "confie que eles apagam" em
 "menos de `k` não conseguem, mesmo guardando tudo".
 
+**Implementado em `core/src/shamir.rs`** (smoke B5, 2026-10-01). Sete testes,
+incluindo a rodada completa: cinco votantes, mesa de cinco, limiar três, quatro
+trios distintos reconstruindo `Σr_i` sem que nenhum `r_i` se junte. O teste de
+`k−1` prova a forma forte da garantia: dois pontos são consistentes com **todo**
+segredo possível, então não excluem nenhum — a ignorância abaixo do limiar é
+information-theoretic, não computacional.
+
+Shamir simples não detecta um membro que adultere a própria share, e o módulo
+tem um teste que trava essa expectativa. A detecção não vem daí: vem do
+compromisso. Se `R_j` estiver errado, `A_j == T_j·G + R_j·H` falha no contrato
+e a apuração é recusada publicamente.
+
 O que ainda resta procedimental: `k` membros em conluio *que tenham guardado as
 shares brutas* conseguem. Daí N3.
 
@@ -598,12 +610,18 @@ MSM único, nunca muls somados.**
 | 2 × prova CDS | 21.960.486 | medido |
 | 1 × prova de soma | 6.737.614 | medido |
 | validação de 6 pontos G1 | 4.433.406 | medido |
-| caminho de Merkle (depth 8, sha256) | ~1M | estimado |
+| caminho de Merkle (profundidade 8, sha256) | 127.863 | medido |
 | 2 × `g1_add` no acumulador | 221.496 | medido |
-| **total** | **33.353.002** | |
+| **total** | **33.480.865** | |
 
-Folga contra os 400M: **12×**. O orçamento usa 8,3% de uma transação, e não
-sobrou nenhuma projeção grande: tudo acima foi medido em invocação real.
+Folga contra os 400M: **11,9×**. O orçamento usa 8,4% de uma transação, e
+**nenhuma linha é projeção**: tudo acima foi medido em invocação real.
+
+O caminho de Merkle era a última estimativa do orçamento e estava errada por
+8×, para cima: `sha256` no host custa ~13.128 por nível, então a aptidão é
+ruído contra a criptografia. Profundidade 20 — um milhão de aptos — custaria
+285.399, ainda 0,07% da transação. **A profundidade da lista de aptos não é
+uma restrição de desenho.**
 
 **O host não valida subgrupo sozinho:** `g1_add` custa 110.748, que é 15% de
 uma checagem isolada, e uma operação não contém algo 7× mais caro que ela.
@@ -733,11 +751,21 @@ E o host **não** a faz sozinho: validação é obrigatória e aditiva.
 Introduzida por §6.5. Projetada em ~5,4M (um MSM de 2 termos, medido), mas o
 caminho completo com desserialização ainda não foi isolado.
 
-### 9.5 Menores
+### 9.5 Caminho de Merkle — ✅ RESOLVIDO
 
-- Custo do caminho de Merkle em função da profundidade.
+**Medido em 2026-10-01 (sonda 13): 127.863 instruções em profundidade 8,
+5.235 stroops.** A projeção de ~1M errava por 8×, para cima. Por nível:
+13.128. `sha256` no host é barato o bastante para que a aptidão seja ruído ao
+lado da criptografia, e profundidade 20 — um milhão de aptos — custaria
+285.399, ou 0,07% da transação.
+
+**Consequência de desenho:** a profundidade da lista de aptos não é uma
+restrição. O "se falhar: profundidade menor" do smoke C3 não precisa existir.
+
+### 9.6 Menores
+
 - Custo do `require_auth` multi-assinatura de `k` membros em `apurar()`.
-- Tamanho do wasm do contrato completo (a sonda tem 8.981 bytes).
+- Tamanho do wasm do contrato completo (a sonda tem 16.090 bytes).
 
 ---
 

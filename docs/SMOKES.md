@@ -171,7 +171,7 @@ Pendência §9.1, o maior número projetado do orçamento (~27M).
 
 **Decisão que destrava.** É o smoke de **P2** — sigilo contra a própria mesa. Sem ele, o corte 2 do plano escala: a mesa vira endereço único, que *vê todos os votos*, e isso precisa ir para o §1.3 do spec como lacuna declarada e para o slide `properties`.
 
-**Tempo.** 1h · **Se falhar:** mesa única + lacuna declarada em voz alta. Enfraquece o pitch de forma honesta.
+**Tempo.** 1h · **RESULTADO 2026-10-01: PASSA.** `core/src/shamir.rs`, 7 testes. Cinco votantes dividem `r_i` em 5 shares com limiar 3; cada membro soma localmente; quatro trios distintos reconstroem `Σr_i`, e nenhum `r_i` individual jamais se junta. Dois membros não reconstroem — e o teste prova a forma forte: dois pontos são consistentes com **todo** segredo, então não excluem nenhum. **P2 está de pé e o corte 2 do plano não precisa escalar.**
 
 ### B6 · Aleatoriedade do cliente
 
@@ -219,7 +219,7 @@ Pendência §9.4, o caminho do voto semi-confidencial (§6.5). Projetado em ~5,4
 
 **Critério.** Dois números no orçamento.
 
-**Tempo.** 40 min · **Se falhar:** profundidade menor; mesa com menos membros.
+**Tempo.** 40 min · **RESULTADO 2026-10-01 (metade do Merkle): PASSA.** Sonda 13. Caminho de profundidade 8 custa **127.863** instruções, **5.235 stroops** — a projeção do SPEC era ~1M e errava por 8×, para cima. Por nível: 13.128. Profundidade 20 (um milhão de aptos) custaria 285.399, 0,07% da transação. O vetor foi montado no `core` e fechou na testnet, o que estende o B3 ao caminho de Merkle. Negativos recusados na testnet: peso inflado de 1 para 1000, índice trocado, irmãos reordenados, caminho curto, intruso. **Falta medir o `require_auth` 3-de-5.**
 
 ---
 

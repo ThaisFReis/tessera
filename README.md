@@ -51,6 +51,7 @@ Teto de CPU por transação, achado por bissecção na testnet: **400.000.000**.
 | verificação Schnorr | 6.737.614 | 9.558 stroops |
 | **prova disjuntiva CDS** | **10.980.243** | **14.144 stroops** |
 | **apuração Pedersen** | **5.408.931** | **8.622 stroops** |
+| **caminho de Merkle (profundidade 8)** | **127.863** | **5.235 stroops** |
 | apuração ElGamal (desenho anterior) | 6.712.183 | 11.852 stroops |
 | verificação Groth16 (4 entradas públicas) | 47.371.348 | |
 
@@ -66,8 +67,8 @@ Três conclusões que mudaram o desenho:
    mais barato em CPU e 27% em taxa que o ElGamal que ele substituiu. Não houve
    trade-off a pagar.
 
-E o orçamento fechou: **um voto completo custa 33.353.002 instruções, 8,3% de
-uma transação, com folga de 12×.** Nenhuma linha desse orçamento é projeção.
+E o orçamento fechou: **um voto completo custa 33.480.865 instruções, 8,4% de
+uma transação, com folga de 11,9×.** Nenhuma linha desse orçamento é projeção.
 
 E uma que responde à pergunta mais comum: **ZK cabe.** `pairing_check`
 compartilha a exponenciação final entre os pares, então uma verificação Groth16
@@ -90,6 +91,7 @@ usa 11,8% de uma transação e caberiam 8 numa só. O gargalo de ZK na Stellar n
 | 10 | Quanto custa validar um ponto que chega? | 738.901, ou 1,1% da transação |
 | 11 | `H` é um gerador honesto? | sim, e não é `±k·G` para k em 1..512 |
 | 12 | A prova de boa formação cabe? | **sim, 10,98M — a projeção errava 2,5×** |
+| 13 | Quanto custa conferir a aptidão? | 127.863 — a projeção errava **8×** |
 
 Detalhes e método em [`bls-smoke/RESULTADOS.md`](bls-smoke/RESULTADOS.md).
 
@@ -118,18 +120,19 @@ RPC sete dias depois de feitas. Depois disso, leia dos arquivos de histórico.
 ## Reproduzir
 
 ```bash
-cd bls-smoke && cargo test --lib -- --nocapture --test-threads=1   # 12 sondas
-cd ../core   && cargo test                                          # 21 testes
+cd bls-smoke && cargo test --lib -- --nocapture --test-threads=1   # 13 sondas
+cd ../core   && cargo test                                          # 39 testes
 ```
 
 Requer `rustc 1.97+`, `stellar-cli 25.2+`, alvo `wasm32v1-none`.
-Trinta e três testes, todos passando, sem rede.
+Cinquenta e dois testes, todos passando, sem rede.
 
 O crate `core/` é a matemática compartilhada entre contrato, cliente e
 verificador. Ele usa **arkworks, o mesmo crate do host do Soroban** — o que
 elimina pela raiz a divergência entre o provador nativo e o verificador Wasm.
-Dois testes travam isso: o agregado Pedersen e a prova CDS geradas no `core`
-reproduzem byte a byte o que o contrato produziu na testnet.
+Três testes travam isso: o agregado Pedersen, a prova CDS e o caminho de
+Merkle gerados no `core` reproduzem byte a byte o que o contrato aceitou na
+testnet.
 
 Os testes de custo asseram teto: uma regressão de custo quebra o build em vez
 de aparecer na demo.
@@ -138,7 +141,7 @@ Contratos na testnet:
 
 | | |
 |---|---|
-| sondas 1–12 (cripto, CDS incluído) | `CB5U66NKW5QJYRYAPCCQ6TNU7ZDVA7UBAQT3CRGV35MDKV6JMVX6H6FD` |
+| sondas 1–13 (cripto, CDS e Merkle) | `CCL4CPAJ4ZVP25FP2PO7T3AMYGIVQZLYJZYZS53UAM5IFA5NFYGLUISR` |
 | sonda 9 (TTL) | `CCCZ4HPW3ESHO6BMNFGXX6DJRSWPWA7FBQH2MS6QGHC3U67DIZ434KFC` |
 
 Vetores de teste em [`bls-smoke/vetores.env`](bls-smoke/vetores.env).
@@ -173,8 +176,10 @@ sigilo além do que entrega é pior que um honesto.
   *consegue* provar o voto a um terceiro. O protocolo remove o registro público
   permanente; não remove a capacidade de alguém se auto-incriminar. É a lacuna
   mais séria da v1.
-- **Mesa que não destrói suas cópias.** O limiar `k`-de-`n` protege abaixo de
-  `k` conluios; acima dele, a proteção é procedimental.
+- **Mesa que não destrói suas cópias.** O limiar `k`-de-`n` está implementado
+  em `core/src/shamir.rs` e protege abaixo de `k` conluios: a mesa soma as
+  shares localmente e nenhum `r` individual se junta em lugar algum. Acima de
+  `k`, com as shares brutas guardadas, a proteção é procedimental.
 - **Resultado unânime**, que revela todo mundo em qualquer sistema de votação.
 - **Voto ponderado com pesos públicos distintos**, que é quebrado por
   subconjunto-soma. O contrato **recusa** essa configuração.

@@ -2,6 +2,7 @@ extern crate std;
 
 use super::{BlsSmoke, BlsSmokeClient};
 use soroban_sdk::{
+    BytesN,
     bytes, bytesn,
     crypto::bls12_381::{Bls12381Fr as Fr, Bls12381G1Affine as G1},
     testutils::arbitrary::std::println,
@@ -753,6 +754,121 @@ fn sonda12_cds_verifica_e_custa() {
     assert!(
         votar <= 200_000_000,
         "votar() custa {}, acima dos 200M do Portao 1",
+        votar
+    );
+}
+
+/// **SONDA 13 (C3) — caminho de Merkle, medido.**
+///
+/// Fecha o ultimo item do orcamento de `votar()` que ainda era estimativa: o
+/// SPEC §7.2 projetava ~1M para profundidade 8.
+///
+/// O vetor vem do `core` (`merkle::vetor::emitir_vetor_merkle_para_o_contrato`):
+/// 256 aptos deterministicos, caminho do indice 173. Se a raiz calculada aqui,
+/// em Wasm, bater com a montada la, em Rust nativo, entao as duas
+/// implementacoes de sha256, de ordem de bytes e de separacao de dominio
+/// concordam — smoke B3 para o caminho de Merkle.
+#[test]
+fn sonda13_merkle_verifica_e_custa() {
+    let env = Env::default();
+    let id = env.register(BlsSmoke, ());
+    let client = BlsSmokeClient::new(&env, &id);
+
+    let endereco: BytesN<32> =
+        bytesn!(&env, 0x00000000000000ad0000000000000000000000000000000000000000000000a7);
+    let raiz: BytesN<32> =
+        bytesn!(&env, 0x60900c5f790375233a0cdebc3c0e9d0b1a41dba6a05a324b84a5b18a8440b0fc);
+    let indice: u32 = 173;
+    let peso: u32 = 1;
+
+    let irmaos: Vec<BytesN<32>> = Vec::from_array(&env, [
+        bytesn!(&env, 0x4613df3a4daf7a1373785c20293ceda89b47349b51716ce8636c28681619d073),
+        bytesn!(&env, 0xdfb70ce2c38b0a937f4e2b683a7d7e33cb565000a44a8ea06bbf85868cfea84a),
+        bytesn!(&env, 0x208461337e72ef00cd23c248d3d3907e8e05d2006a7294310806494f33a2831d),
+        bytesn!(&env, 0xf756beac44fbe91b3d5c58db487b706efea44b4e8bc652f9fbbaa8246b03c702),
+        bytesn!(&env, 0x01db0bc465ea1284376e26ccbc9409740939bb7ef8be260b262c1f622d480872),
+        bytesn!(&env, 0x1f445e905a5c7d62f2b7a694a3c3769f90644b28f444cf0c51fd5625ef2a91e8),
+        bytesn!(&env, 0x3731b9b97729f8b4b36683ba8abfe321b328ff90ec65b929582bb5c3b354682d),
+        bytesn!(&env, 0xbb209aa101c383bc47df210c403eeab35a3ae0bc256f32ad1a0022c1fdd5b8cb),
+    ]);
+
+    // --- o caminho do core fecha no contrato
+    assert!(
+        client.verify_merkle(&endereco, &peso, &indice, &irmaos, &raiz),
+        "caminho montado no core NAO fecha no contrato: sha256 ou ordem de \
+         bytes divergem entre nativo e Wasm"
+    );
+
+    // --- peso inflado: o ataque que o modulo existe para recusar
+    assert!(
+        !client.verify_merkle(&endereco, &1000u32, &indice, &irmaos, &raiz),
+        "peso inflado foi aceito — o contrato esta confiando no peso informado"
+    );
+
+    // --- outro endereco com o mesmo caminho
+    let intruso: BytesN<32> = bytesn!(
+        &env,
+        0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+    );
+    assert!(
+        !client.verify_merkle(&intruso, &peso, &indice, &irmaos, &raiz),
+        "intruso provou pertencimento"
+    );
+
+    // --- indice trocado: os mesmos irmaos, outra ordem de lados
+    assert!(
+        !client.verify_merkle(&endereco, &peso, &172u32, &irmaos, &raiz),
+        "indice trocado passou"
+    );
+
+    // --- irmaos reordenados
+    let mut trocados = irmaos.clone();
+    let (a, b) = (trocados.get(0).unwrap(), trocados.get(1).unwrap());
+    trocados.set(0, b);
+    trocados.set(1, a);
+    assert!(
+        !client.verify_merkle(&endereco, &peso, &indice, &trocados, &raiz),
+        "irmaos reordenados passaram"
+    );
+
+    // --- caminho curto
+    let mut curto = irmaos.clone();
+    curto.pop_back();
+    assert!(
+        !client.verify_merkle(&endereco, &peso, &indice, &curto, &raiz),
+        "caminho curto passou"
+    );
+
+    // --- custo, por profundidade
+    let vazio: Vec<BytesN<32>> = Vec::new(&env);
+    let c0 = cpu(&env, || client.verify_merkle(&endereco, &peso, &0u32, &vazio, &raiz));
+    let c8 = cpu(&env, || {
+        client.verify_merkle(&endereco, &peso, &indice, &irmaos, &raiz)
+    });
+    let por_nivel = (c8 - c0) / 8;
+
+    println!("\n== SONDA 13 (C3): caminho de Merkle ==");
+    println!("folha so (profundidade 0) ........ {:>10}", c0);
+    println!("caminho completo (profundidade 8)  {:>10}", c8);
+    println!("   por nivel ..................... {:>10}", por_nivel);
+    println!("   projecao do SPEC era ~1.000.000");
+    println!("   erro da projecao .............. {:+.0}%",
+        100.0 * (1_000_000.0 - c8 as f64) / 1_000_000.0);
+    println!("\n-- profundidade suportada --");
+    println!("16 (65.536 aptos) ................ {:>10}", c0 + 16 * por_nivel);
+    println!("20 (1.048.576 aptos) ............. {:>10}", c0 + 20 * por_nivel);
+
+    println!("\n-- orcamento de votar(), m=2, COM Merkle --");
+    let votar = 2 * 10_980_243u64 + 6_737_614 + 4_433_406 + 221_496 + c8;
+    println!("2 CDS + soma + validacao + adds + merkle {:>10}", votar);
+    println!("   % do teto de 400M ............. {:.1}%",
+        100.0 * votar as f64 / TX_CPU_LIMIT as f64);
+    println!("   folga ......................... {:.1}x",
+        TX_CPU_LIMIT as f64 / votar as f64);
+
+    assert!(
+        votar <= 200_000_000,
+        "votar() com Merkle custa {}, acima dos 200M do Portao 1",
         votar
     );
 }

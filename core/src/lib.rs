@@ -6,5 +6,7 @@
 
 pub mod acaso;
 pub mod cds;
+pub mod merkle;
 pub mod pedersen;
 pub mod ponto;
+pub mod shamir;

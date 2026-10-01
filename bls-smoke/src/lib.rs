@@ -404,6 +404,49 @@ impl BlsSmoke {
         env.storage().persistent().extend_ttl(&id, m - 1, m);
         m
     }
+
+    // ====================== SONDA 13 (C3): caminho de Merkle ===============
+    //
+    // O ultimo item do orcamento de votar() que ainda era ESTIMATIVA (~1M no
+    // SPEC §7.2). A folha e H(0x00 || endereco || peso_be): o contrato
+    // RECALCULA a folha, entao um peso inflado produz outra folha e o caminho
+    // nao fecha. Essa e a defesa inteira contra peso falso (SPEC §6.4).
+    //
+    // Separacao de dominio entre folha (0x00) e no (0x01): sem ela, uma folha
+    // de 64 bytes bem escolhida seria apresentada como no interno.
+
+    /// Confere o caminho de Merkle de um apto ate a raiz da proposta.
+    pub fn verify_merkle(
+        env: Env,
+        endereco: BytesN<32>,
+        peso: u32,
+        indice: u32,
+        irmaos: Vec<BytesN<32>>,
+        raiz: BytesN<32>,
+    ) -> bool {
+        // folha = sha256(0x00 || endereco || peso_be)
+        let mut buf = Bytes::from_slice(&env, &[0x00u8]);
+        buf.extend_from_array(&endereco.to_array());
+        buf.extend_from_array(&peso.to_be_bytes());
+        let mut atual = env.crypto().sha256(&buf).to_bytes();
+
+        let mut i = indice;
+        for irmao in irmaos.iter() {
+            let mut b = Bytes::from_slice(&env, &[0x01u8]);
+            if i % 2 == 0 {
+                b.extend_from_array(&atual.to_array());
+                b.extend_from_array(&irmao.to_array());
+            } else {
+                b.extend_from_array(&irmao.to_array());
+                b.extend_from_array(&atual.to_array());
+            }
+            atual = env.crypto().sha256(&b).to_bytes();
+            i /= 2;
+        }
+        // o indice tem de ter se esgotado: um indice maior que a arvore seria
+        // outro caminho para a mesma raiz.
+        i == 0 && atual == raiz
+    }
 }
 
 fn desafio_fr(
