@@ -76,8 +76,8 @@ export default function Votacao() {
         </dd>
         <dt>quem pode abrir a sua cédula</dt>
         <dd>
-          {p.mesa.length === 0
-            ? "ninguém"
+          {p.anel
+            ? "ninguém — a cédula em anel não reparte o fator com a mesa, então não existe parcela a reunir"
             : p.mesa.length === 1
               ? `uma pessoa: ${p.mesa[0]}`
               : `${p.limiar} de ${p.mesa.length}, em conluio`}

@@ -108,8 +108,8 @@ export default function Votar() {
       </p>
       <p>
         quem pode abrir esta cédula:{" "}
-        {p.mesa.length === 0
-          ? "ninguém"
+        {p.anel
+          ? "ninguém — esta cédula não reparte o fator de aleatoriedade com a mesa"
           : p.mesa.length === 1
             ? "uma pessoa"
             : `${p.limiar} de ${p.mesa.length}, em conluio`}

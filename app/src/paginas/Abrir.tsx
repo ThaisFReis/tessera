@@ -49,9 +49,13 @@ export default function Abrir() {
       const proposta = Array.from(id, (b) => b.toString(16).padStart(2, "0")).join("");
 
       const membros = linhas(mesa);
+      if (!membros.length) throw new Error("o contrato exige ao menos um membro de mesa");
+      if (limiar < 1 || limiar > membros.length) {
+        throw new Error(`o limiar tem de estar entre 1 e ${membros.length}`);
+      }
       await abrir(
         c, proposta, [{ opcoes: n, confidencial: true }], raiz, membros,
-        membros.length ? limiar : 0, abre, fecha, anel, diario,
+        limiar, abre, fecha, anel, diario,
       );
 
       // A lista fica aqui porque não cabe na rede — e quem vota precisa dela.
@@ -103,12 +107,17 @@ export default function Abrir() {
         onChange={(e) => setMesa(e.target.value)}
         rows={3}
         cols={60}
-        placeholder="um endereço por linha — deixe vazio para não haver mesa"
+        placeholder="um endereço por linha"
       />
       <p>
-        sem mesa ninguém reconstrói a abertura, e por isso <strong>ninguém apura</strong> — e
-        ninguém consegue abrir um voto, nunca. Com mesa de uma pessoa, essa pessoa abre qualquer
-        cédula.
+        O contrato exige mesa: <code>limiar == 0 || limiar &gt; mesa</code> é{" "}
+        <code>LimiarInvalido</code>. Mas, <strong>numa cédula em anel, o dapp não reparte o fator
+        de aleatoriedade com ninguém</strong> — a mesa existe no contrato e não recebe parcela.
+        Logo ninguém reconstrói a abertura, ninguém apura, e ninguém abre um voto.
+      </p>
+      <p>
+        Assembleia aberta sem mesa nenhuma seria o desenho limpo, e exige mudar o contrato. Está
+        anotado.
       </p>
       <label>
         limiar{" "}
