@@ -532,7 +532,7 @@ cd cli && cargo build --release && cd ..
 ```
 
 ```bash
-export TESSERA_CONTRATO=CASXXJXD4XOZ2GPDPZKPNHD7DHXSZ4JBJBWTEWWBKY5ICGGJZQ4CAUTV
+export TESSERA_CONTRATO=CBL7Z4AFMDPPJEP7YWFXLCUGRLO5VF7XAONPIW26CURO3ETCGSRV565X
 python3 console/ponte.py
 ```
 
@@ -654,7 +654,7 @@ sempre a mesma pessoa, e o desenho inteiro fica incompreensível.
 
 ### O fechamento
 
-> Contrato de 28,0 KB, 129 testes, rodando na testnet. Compromisso de Pedersen,
+> Contrato de 29,2 KB, 129 testes, rodando na testnet. Compromisso de Pedersen,
 > prova disjuntiva, Shamir para a mesa. Sem setup confiável, sem cerimônia.
 >
 > E a cédula mista: a mesma assembleia decide o que é público e o que é secreto,
@@ -674,8 +674,8 @@ Nada fora desta tabela deve ser afirmado em quadro.
 
 | | |
 |---|---|
-| Contrato (testnet) | `CASXXJXD4XOZ2GPDPZKPNHD7DHXSZ4JBJBWTEWWBKY5ICGGJZQ4CAUTV` |
-| Wasm otimizado | 22.584 B = **28,0 KB** |
+| Contrato (testnet) | `CBL7Z4AFMDPPJEP7YWFXLCUGRLO5VF7XAONPIW26CURO3ETCGSRV565X` |
+| Wasm otimizado | 22.584 B = **29,2 KB** |
 | Testes | **112** · bls-smoke 13, core 49, contrato 25, cli 25 |
 | `votar`, custo | **9.805.000 + 13.501.500 por opção sigilosa** |
 | 1 pergunta sigilosa, 2 opções | 36.804.670 — **9,2%** do teto |

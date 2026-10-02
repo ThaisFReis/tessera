@@ -676,6 +676,36 @@ impl Tessera {
         env.storage().persistent().has(&Chave::Votou(proposta, votante))
     }
 
+    /// **O caderno, lido.** Quem compareceu — e, por subtração da lista de
+    /// aptos, quem faltou. É a leitura que o voto obrigatório precisa, e a
+    /// única sobre uma pessoa que esta proposta responde.
+    pub fn compareceu(env: Env, proposta: BytesN<32>, votante: Address) -> bool {
+        env.storage().persistent().has(&Chave::Compareceu(proposta, votante))
+    }
+
+    /// **O anel**, na ordem em que as pessoas compareceram.
+    ///
+    /// Quem vota precisa dele inteiro para assinar: anonimato de anel é
+    /// anonimato dentro de um conjunto conhecido, e o conjunto tem de ser
+    /// conhecido. Devolver isto não entrega nada — a ordem é a de chegada ao
+    /// caderno, que já é pública.
+    pub fn anel(env: Env, proposta: BytesN<32>) -> Vec<Bls12381G1Affine> {
+        env.storage()
+            .persistent()
+            .get(&Chave::Anel(proposta))
+            .unwrap_or_else(|| Vec::new(&env))
+    }
+
+    /// `Hp` desta proposta, para o cliente assinar o anel.
+    ///
+    /// **Sem isto o dapp não existe.** `Hp` vem de `hash_to_g1`, que é função do
+    /// host; reimplementá-la no cliente byte a byte seria pedir para divergir, e
+    /// uma divergência aqui faz toda assinatura falhar sem dizer por quê. O
+    /// mesmo motivo de `gerador_h` existir.
+    pub fn hp(env: Env, proposta: BytesN<32>) -> Bls12381G1Affine {
+        calcular_hp(&env, &proposta)
+    }
+
     /// `H`, para o cliente montar compromissos sem recalcular hash-to-curve.
     pub fn gerador_h(env: Env) -> Bls12381G1Affine {
         env.storage()
