@@ -99,32 +99,17 @@ E, atrás de tudo, a coluna da mecânica.
 └──────────────────────────────┴─────────────────────────────────┘
 ```
 
-**A coluna direita não resume: ela mostra.** As linhas de código são recortes
-literais de `core/src/*.rs`, com os valores desta rodada passando por elas. O
-comentário que já estava no crate explica o sigilo melhor do que qualquer
-parágrafo escrito em volta dele.
+**A coluna direita não resume: ela mostra.** Os valores desta rodada, com o
+porquê de cada um ao lado. **Os que a demo se recusa a mostrar aparecem
+tarjados**, com o motivo — `r` não está no estado, e não existe parcela de
+Shamir de um voto individual. A ausência é parte da explicação, não uma lacuna.
 
-> `// ramo 0 é o real; o ramo 1 é fabricado de trás para frente`
-
-**Os valores que a demo se recusa a mostrar aparecem tarjados**, com o motivo
-ao lado — `r` não está no estado, e não existe parcela de Shamir de um voto
-individual. A ausência é parte da explicação, não uma lacuna.
-
-**Esses recortes são cópias, e cópia envelhece** — se o crate mudar e o recorte
-não mudar junto, a demo passa a mentir com cara de código-fonte. Por isso existe
-uma guarda:
-
-```bash
-python3 console/guarda.py
-```
-
-O bloco `const ANCORAS` no topo do script da página declara, para cada arquivo
-citado, os trechos que têm de continuar existindo lá. A guarda confere os dois
-sentidos: nenhum terminal cita arquivo não declarado, e nenhuma âncora sumiu.
-
-**Constantes entram com o valor inteiro de propósito.** Trocar `τ` de 5 para 3
-sem mexer na tela é exatamente o erro que isto pega — testei trocando, e a
-guarda acusou.
+**Os recortes de Rust saíram.** Eram 56 linhas de fonte copiada em dez painéis,
+e cópia envelhece: se o crate mudasse e o recorte não mudasse junto, a demo
+passaria a mentir com cara de código-fonte. Tirar a cópia resolve na origem.
+Ficou o que nunca foi código — a disjuntiva com os dois ramos indistinguíveis,
+por que o `r` ausente deixa o compromisso compatível com 0 e com 1, por que a
+prova de soma é uma por pergunta.
 
 Com a mecânica carregando os dados, a esquerda pôde emagrecer. A regra passou a
 ser: **se o terminal já diz, a esquerda não repete.** A apuração perdeu dois
@@ -136,15 +121,46 @@ no meio da animação não a reinicia. O alvo vem do relógio, não de um contad
 ticks — se o navegador estrangular o temporizador durante a gravação, o tick
 seguinte emenda as linhas atrasadas em vez de deixar o terminal pela metade.
 
-**O nome do arquivo não aparece mais na tela.** Ele continua declarado em cada
-card, porque é o que `guarda.py` lê para saber quais recortes aquele painel
-promete — a procedência segue conferida a cada rodada da guarda, só não ocupa
-mais uma linha de cabeçalho em cada um dos dez painéis. A tabela abaixo é,
-portanto, o que a guarda vê, não o que o jurado lê.
+### A guarda, re-apontada
 
-Os dez traços:
+```bash
+python3 console/guarda.py
+```
 
-| Painel | Arquivo | O que mostra |
+Sem recortes não há cópia a envelhecer, e conferir que um símbolo existe num
+arquivo deixou de provar qualquer coisa sobre o que o jurado lê. A guarda passou
+a conferir **o que a tela ainda afirma** — números e garantias que vêm do
+código, e que só estão ligados a ele porque alguém digitou o mesmo valor duas
+vezes:
+
+| A tela afirma | E o código tem de dizer |
+|---|---|
+| o formulário recusa acima de 16 opções sigilosas | `MAX_OPCOES: u32 = 16` |
+| 4 de 7 fica abaixo do quórum e a apuração é recusada | `TAU: u32 = 5` |
+| a recusa por quórum é `Error(Contract, #19)` | `AnonimatoInsuficiente = 19` |
+| cada disjuntiva ocupa 320 B | `cds::TAMANHO = 320` |
+| cada soma 128 B, cada compromisso 96 B | `soma::TAMANHO = 96 + 32` |
+| não existe voto aberto | o comentário de remoção, **e nenhum `votar_publico`** |
+| `votar` não grava nada em disco | o teste da ausência, **e nenhum `recibo::gravar`** |
+| esta página não roda BLS12-381 | **nenhum `bls12_381`, `@noble` ou `pairing` na página** |
+
+Os dois lados são conferidos: se a afirmação sumir da tela sem o fato mudar, ou
+o contrário, a guarda acusa e diz **qual afirmação ficou órfã**. As três últimas
+são garantias de ausência — não dá para conferi-las por amostragem: ou o símbolo
+sumiu, ou a promessa é falsa.
+
+A guarda também confere que **toda `--flag` que a ponte manda existe na CLI**.
+Essa é a falha que já aconteceu em cima da hora: a ponte mandou `--abre_em` para
+um binário que não conhecia o argumento, e a tela mostrou `unexpected argument`
+no meio de uma demonstração.
+
+Testei as quatro quebras — `τ` de 5 para 3, `recibo::gravar` de volta,
+`bls12_381` na página, uma flag inexistente na ponte. As quatro acusam.
+
+Os dez traços — a coluna do meio é de onde vem a ideia, não um nome que a
+tela mostre ou que a guarda leia:
+
+| Painel | De onde vem | O que mostra |
 |---|---|---|
 | 1 | — | nada: a cédula ainda é rascunho, e só o diário tem o que dizer |
 | 2 | `core/src/merkle.rs` | `folha`, `no`, e a lista que nunca é publicada |
@@ -549,7 +565,7 @@ for c in core contrato cli bls-smoke; do (cd $c && cargo test); done
 python3 console/guarda.py
 ```
 
-112 testes e 27 âncoras.
+112 testes, 8 afirmações e 33 conferências na guarda.
 
 ### 11.2 O problema do prazo — leia antes de começar
 

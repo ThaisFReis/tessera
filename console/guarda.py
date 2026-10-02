@@ -1,116 +1,171 @@
 #!/usr/bin/env python3
-"""A guarda dos recortes de código da demo.
+"""Guarda dos acoplamentos da tela.
 
-Os terminais de `console/index.html` mostram trechos de `core/src/*.rs` e
-companhia. São **cópias**, e cópia envelhece: se o crate mudar e o recorte não
-mudar junto, a demo passa a mentir — com cara de código-fonte, que é o pior
-jeito de mentir.
+A versão anterior conferia **recortes**: a coluna da direita copiava trechos de
+`core/src/*.rs`, e a guarda avisava quando a cópia envelhecia. Os recortes
+saíram da tela — não há mais cópia a envelhecer, e conferir que um símbolo
+existe num arquivo deixou de provar coisa alguma sobre o que o jurado lê.
 
-Esta guarda confere duas coisas:
+O que sobrou é mais estreito e mais verdadeiro: a tela ainda **afirma** números
+e garantias que vêm do código, e nada liga os dois lados além de mim ter
+digitado o mesmo valor duas vezes. `16` no `if` do formulário é `MAX_OPCOES`.
+`4 de 7` no painel 9 só é uma recusa porque `TAU` vale 5. `320 B` é o tamanho
+da disjuntiva. Qualquer um desses pode mudar no Rust sem que nada quebre — e a
+demo passa a mentir com cara de medição.
 
-  1. todo arquivo citado no cabeçalho de um terminal está declarado em
-     `ANCORAS`, e existe no repositório;
-  2. todo trecho listado em `ANCORAS` ainda aparece, literalmente, no arquivo.
+Cada acoplamento é conferido **dos dois lados**: a afirmação tem de continuar na
+tela, e o fato tem de continuar no código. Se um sumir sem o outro, é falha, e a
+mensagem diz qual afirmação ficou órfã.
 
-Constantes entram com o valor inteiro de propósito. Trocar τ de 5 para 3 sem
-mexer na tela é exatamente o erro que isto existe para pegar.
+Três garantias são de **ausência** — o que a demo promete é que algo não existe.
+Essas não têm como ser conferidas por amostragem: ou o símbolo sumiu, ou a
+promessa é falsa.
 
     python3 console/guarda.py
-
-Sai com 0 se a tela ainda corresponde ao código, e 1 se alguma âncora sumiu.
 """
 
-import json
 import re
 import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
-PAGINA = RAIZ / "console" / "index.html"
+TELA = "console/index.html"
+PONTE = "console/ponte.py"
+CLI = "cli/src/main.rs"
+
+# Cada entrada: o que a tela afirma, o literal que afirma, e o fato no código.
+ACOPLAMENTOS = [
+    {
+        "afirma": "o formulário recusa acima de 16 opções sigilosas",
+        "tela": ["total>16", "O máximo é 16 opções sigilosas no total."],
+        "fonte": [("contrato/src/tipos.rs", "pub const MAX_OPCOES: u32 = 16;")],
+    },
+    {
+        "afirma": "4 de 7 fica abaixo do quórum e a apuração é recusada",
+        # Se TAU cair para 3, o painel 9 roda, apura, e a cena inteira — a que
+        # explica por que o contrato prefere não publicar — vira um sucesso
+        # silencioso. Nenhum teste pega isso: a tela é que está errada.
+        "tela": ["ponte.identidades.slice(0, 4)", "Rodar com 4 de 7 e tentar apurar →"],
+        "fonte": [("contrato/src/tipos.rs", "pub const TAU: u32 = 5;")],
+    },
+    {
+        "afirma": "a recusa por quórum é Error(Contract, #19)",
+        "tela": ["Error(Contract, #19)"],
+        "fonte": [("contrato/src/tipos.rs", "AnonimatoInsuficiente = 19,")],
+    },
+    {
+        "afirma": "cada disjuntiva ocupa 320 B",
+        "tela": ["320 B"],
+        "fonte": [("core/src/cds.rs", "pub const TAMANHO: usize = 320;")],
+    },
+    {
+        "afirma": "cada prova de soma ocupa 128 B, e cada compromisso 96 B",
+        "tela": ["128 B", "96 B cada", "96 bytes"],
+        "fonte": [("core/src/soma.rs", "pub const TAMANHO: usize = 96 + 32;")],
+    },
+    {
+        "afirma": "não existe voto aberto, então não há partição a induzir",
+        "tela": ["Sem voto aberto não há partição a induzir"],
+        "fonte": [("contrato/src/lib.rs", "`votar_publico` existia aqui e foi **removido**")],
+        "ausente": [("contrato/src/lib.rs", "pub fn votar_publico")],
+    },
+    {
+        "afirma": "votar não grava nada em disco",
+        "tela": ["`votar` não chama mais recibo::gravar"],
+        "fonte": [("cli/src/recibo.rs", "nenhum_comando_grava_recibo")],
+        "ausente": [("cli/src/comandos.rs", "recibo::gravar")],
+    },
+    {
+        "afirma": "esta página não roda BLS12-381",
+        # A única afirmação da demo sobre ela mesma, e a mais fácil de tornar
+        # falsa sem perceber: basta alguém importar uma biblioteca para
+        # "conferir no cliente".
+        "tela": ["esta página não roda BLS12-381"],
+        "fonte": [],
+        "ausente": [(TELA, "bls12_381"), (TELA, "@noble"), (TELA, "pairing")],
+    },
+]
 
 
-def ler_ancoras(fonte):
-    """Extrai o literal `const ANCORAS = {...};` e o lê como JSON.
+def tem(arquivo, trecho):
+    caminho = RAIZ / arquivo
+    if not caminho.exists():
+        return None
+    return trecho in caminho.read_text(encoding="utf-8")
 
-    O bloco é escrito em JS, mas no subconjunto que também é JSON — strings com
-    aspas duplas e nada de vírgula sobrando. A única diferença é a vírgula final
-    de cada lista, que o JS aceita; ela é removida aqui.
+
+def flags_da_ponte():
+    """Toda `--flag` que a ponte manda tem de existir na CLI.
+
+    É a falha que já aconteceu em cima da hora: a ponte mandou `--abre_em` para
+    um binário que não conhecia o argumento, e a tela só mostrou `unexpected
+    argument` no meio de uma demonstração.
     """
-    m = re.search(r"const ANCORAS = (\{.*?\n\});", fonte, re.S)
-    if not m:
-        sys.exit("não achei o bloco `const ANCORAS` em console/index.html")
-    # O bloco é JS: aceita comentário de linha e vírgula sobrando, e os dois
-    # precisam sair antes de virar JSON. Comentário dentro de string não
-    # acontece aqui — as âncoras são trechos de código, não URLs.
-    bruto = re.sub(r"^\s*//.*$", "", m.group(1), flags=re.M)
-    bruto = re.sub(r",(\s*[\]\}])", r"\1", bruto)
-    try:
-        return json.loads(bruto)
-    except json.JSONDecodeError as e:
-        sys.exit(f"o bloco ANCORAS não é JSON válido: {e}")
-
-
-def arquivos_citados(fonte):
-    """Os arquivos que aparecem no cabeçalho de cada terminal.
-
-    O cabeçalho pode citar mais de um, separado por ` · `, e o segundo costuma
-    vir só com o nome — `core/src/merkle.rs · shamir.rs`. A pasta do primeiro
-    completa os seguintes.
-    """
-    citados = set()
-    for cab in re.findall(r'terminalMecanica\("([^"]*)"', fonte):
-        # Um painel sem arquivo (o vazio que espera a proposta) não declara nada.
-        if "." not in cab:
-            continue
-        partes = [x.strip() for x in cab.split("·")]
-        pasta = str(Path(partes[0]).parent)
-        for parte in partes:
-            citados.add(parte if "/" in parte else f"{pasta}/{parte}")
-    return citados
+    ponte = (RAIZ / PONTE).read_text(encoding="utf-8")
+    cli = (RAIZ / CLI).read_text(encoding="utf-8")
+    faltas = []
+    vistas = sorted(set(re.findall(r'"--([a-z][a-z0-9-]*)"', ponte)))
+    for flag in vistas:
+        campo = flag.replace("-", "_")
+        if not re.search(rf"^\s*{re.escape(campo)}:", cli, re.M):
+            faltas.append(f"a ponte manda --{flag} e {CLI} não tem o campo `{campo}`")
+    return vistas, faltas
 
 
 def main():
-    fonte = PAGINA.read_text(encoding="utf-8")
-    ancoras = ler_ancoras(fonte)
-    citados = arquivos_citados(fonte)
-
     faltas = []
+    conferidos = 0
 
-    # 1. todo arquivo citado está declarado
-    for arq in sorted(citados - set(ancoras)):
-        faltas.append(f"{arq} aparece num terminal mas não está em ANCORAS")
+    for a in ACOPLAMENTOS:
+        quebrou = []
+        for t in a["tela"]:
+            conferidos += 1
+            if not tem(TELA, t):
+                quebrou.append(f"a tela não diz mais «{t}»")
+        for arq, t in a.get("fonte", []):
+            conferidos += 1
+            achou = tem(arq, t)
+            if achou is None:
+                quebrou.append(f"{arq} não existe")
+            elif not achou:
+                quebrou.append(f"{arq} não contém mais «{t}»")
+        for arq, t in a.get("ausente", []):
+            conferidos += 1
+            achou = tem(arq, t)
+            if achou is None:
+                quebrou.append(f"{arq} não existe")
+            elif achou:
+                quebrou.append(f"{arq} voltou a conter «{t}»")
+        if quebrou:
+            faltas.append((a["afirma"], quebrou))
 
-    # 2. toda âncora ainda existe no arquivo
-    conferidas = 0
-    for arq, trechos in ancoras.items():
-        caminho = RAIZ / arq
-        if not caminho.exists():
-            faltas.append(f"{arq} não existe")
-            continue
-        texto = caminho.read_text(encoding="utf-8")
-        for t in trechos:
-            conferidas += 1
-            if t not in texto:
-                faltas.append(f"{arq} não contém mais «{t}»")
+    vistas, faltas_flags = flags_da_ponte()
+    conferidos += len(vistas)
+    if faltas_flags:
+        faltas.append(("a ponte e a CLI falam a mesma língua", faltas_flags))
 
     print()
-    print("  TESSERA · guarda dos recortes")
+    print("  TESSERA · guarda dos acoplamentos")
     print("  " + "─" * 68)
     print()
-    print(f"  Arquivos .... {len(ancoras)}")
-    print(f"  Âncoras ..... {conferidas}")
+    print(f"  Afirmações ... {len(ACOPLAMENTOS)}")
+    print(f"  Conferências . {conferidos}")
+    print(f"  Flags ........ {len(vistas)} da ponte, todas na CLI"
+          if not faltas_flags else f"  Flags ........ {len(vistas)} da ponte")
     print()
 
     if faltas:
-        for f in faltas:
-            print(f"  ✗ {f}")
+        for afirma, motivos in faltas:
+            print(f"  ✗ {afirma}")
+            for m in motivos:
+                print(f"      {m}")
         print()
-        print("  A tela afirma coisas que o código não diz mais.")
-        print("  Conserte o recorte em console/index.html, ou a âncora.")
+        print("  Um lado mudou sem o outro. A tela afirma o que o código não")
+        print("  sustenta mais — conserte a afirmação, ou a âncora.")
         print()
         return 1
 
-    print("  ✓ os recortes da tela ainda batem com o código")
+    print("  ✓ tudo o que a tela afirma, o código ainda sustenta")
     print()
     return 0
 

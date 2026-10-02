@@ -889,69 +889,6 @@ function titulo(s, numero, nome, subtitulo) {
   texto(s,"h1",null,nome);
   if (subtitulo) texto(s,"p","dim",subtitulo);
 }
-/* ---------- As âncoras ----------
-
-   Os recortes de código nos terminais abaixo são cópias. Uma cópia envelhece:
-   se o crate mudar e o recorte não mudar junto, a demo passa a mentir — e
-   mentir com cara de código-fonte é o pior jeito de mentir.
-
-   Esta tabela é o contrato. Para cada arquivo citado por um terminal, ela
-   lista os trechos que têm de continuar existindo lá. `console/guarda.py`
-   confere, e falha se algum sumir.
-
-   Constantes entram com o valor inteiro de propósito: trocar τ de 5 para 3 sem
-   mexer na tela é exatamente o erro que isto existe para pegar.           */
-const ANCORAS = {
-  "contrato/src/tipos.rs": [
-    "pub struct Pergunta",
-    "pub confidencial: bool",
-    "pub const MAX_PERGUNTAS: u32 = 8;",
-    "pub const MAX_OPCOES: u32 = 16;",
-    "pub const TAU: u32 = 5;",
-    "Votou(BytesN<32>, Address)",
-  ],
-  "core/src/merkle.rs": [
-    "pub fn folha",
-    "pub fn no(",
-    "pub fn verificar",
-  ],
-  "core/src/pedersen.rs": [
-    "pub fn comprometer",
-    "((*g * v) + (*h * r)).into()",
-    "pub fn agregar",
-    "pub fn verifica_agregado",
-  ],
-  "core/src/cds.rs": [
-    "pub fn provar",
-    "fabricado de trás para frente",
-    "let e0 = e - e1;",
-    "let z0 = t + e0 * r;",
-    "pub fn desafio",
-  ],
-  "core/src/soma.rs": [
-    "pub fn provar",
-    "pub fn verificar",
-  ],
-  "core/src/shamir.rs": [],
-  "contrato/src/lib.rs": [
-    "Erro::AnonimatoInsuficiente",
-    // O comentário que marca a remoção. Se `votar_publico` voltar, quem o
-    // reintroduzir vai tirar isto daqui — e a guarda acusa.
-    "`votar_publico` existia aqui e foi **removido**",
-  ],
-  "contrato/src/cripto.rs": [
-    "pub fn contexto",
-  ],
-  "cli/src/recibo.rs": [
-    "pub fn queimar",
-    // A âncora que importa: o teste que prova a ausência. Se alguém
-    // reintroduzir a gravação do recibo, ele some e a guarda acusa.
-    "nenhum_comando_grava_recibo",
-  ],
-  "cli/src/comandos.rs": [
-    "pub fn verificar",
-  ],
-};
 
 /* ---------- O diário ----------
 
@@ -1140,7 +1077,7 @@ function linhaMecanica(l) {
   return d;
 }
 
-function terminalMecanica(arquivo, linhas) {
+function terminalMecanica(linhas) {
   if (datilo.quadro) { clearTimeout(datilo.quadro); datilo.quadro = null; }
   const m = el("aside","mecanica");
   /* Em cima o que aconteceu, embaixo o código que fez acontecer. O diário
@@ -1149,11 +1086,6 @@ function terminalMecanica(arquivo, linhas) {
     texto(m,"div","term-topo","o que está acontecendo");
     m.append(rolo());
   }
-  /* O nome do arquivo saiu da tela. Ele continua chegando aqui porque é o que
-     `console/guarda.py` lê para saber quais recortes este card promete — a
-     procedência segue conferida a cada rodada da guarda, só não ocupa mais uma
-     linha de cabeçalho em cada painel. */
-  void arquivo;
   if (ponte.viva) m.append(el("div","term-corte"));
   const t = el("div","term");
   /* Tirar os recortes deixou brancos encostados e brancos nas pontas. Em vez
@@ -1170,7 +1102,7 @@ function terminalMecanica(arquivo, linhas) {
   return m;
 }
 /* Mantido para quem ainda chamar pelo nome antigo. */
-function blocoMecanica(nome) { return terminalMecanica(nome, []); }
+function blocoMecanica() { return terminalMecanica([]); }
 function painelPerguntas(d) {
   const s=el("section");
   /* O número é de quem monta a cédula, não meu. */
@@ -1239,7 +1171,7 @@ function painelPerguntas(d) {
    impõe com mensagem na hora. Sobra o diário, que é o que de fato acontece
    quando o botão é apertado: a abertura saindo para a testnet. */
 function mecanismoPerguntas() {
-  return terminalMecanica("", []);
+  return terminalMecanica([]);
 }
 function painelAbertura(d) {
   const s=el("section"); titulo(s,2,"Abrir a votação");
@@ -1253,7 +1185,7 @@ function painelAbertura(d) {
   return s;
 }
 function mecanismoAbertura(d) {
-  return terminalMecanica("core/src/merkle.rs · shamir.rs", [
+  return terminalMecanica([
     [],
     ["val","aptos",`${d.aptos.length} pessoas`],
     ["val","raiz",curto(d.raiz_aptos,16,8)],
@@ -1286,7 +1218,7 @@ function painelAnalise(d) {
 }
 function mecanismoAnalise(d) {
   const abertas = d.perguntas.filter(p=>!p.confidencial).length;
-  return terminalMecanica("core/src/merkle.rs", [
+  return terminalMecanica([
     [],
     ["ok","você é apta"],
     ["//","conferido no cliente, contra a raiz."],
@@ -1388,7 +1320,7 @@ function urna(d) {
 }
 function mecanismoVotar(d) {
   const v = d.votos.find(x=>!x.publico && x.compromissos?.length);
-  return terminalMecanica("core/src/pedersen.rs", [
+  return terminalMecanica([
     [],
     ["//","uma chamada por opção sigilosa:"],
     ["val","v","1 na opção escolhida, 0 nas outras"],
@@ -1438,7 +1370,7 @@ function painelRecibo(d) {
 }
 
 function mecanismoRecibo() {
-  return terminalMecanica("cli/src/recibo.rs", [
+  return terminalMecanica([
     ["//","`votar` não chama mais recibo::gravar"],
     [],
     ["oculto","r","existiu no processo, e morreu com ele"],
@@ -1458,7 +1390,7 @@ function mecanismoRecibo() {
 }
 
 function mecanismoCedula() {
-  return terminalMecanica("core/src/cds.rs", [
+  return terminalMecanica([
     [],
     ["//","um ramo é provado, o outro é simulado."],
     ["//","os dois saem com a mesma distribuição."],
@@ -1471,7 +1403,7 @@ function mecanismoCedula() {
 }
 function mecanismoGrade(d) {
   const nconf = d.votos.filter(v=>!v.publico).length;
-  return terminalMecanica("core/src/soma.rs", [
+  return terminalMecanica([
     ["//","D = (Σ C_j) − peso·G deve ser múltiplo de H"],
     [],
     ["//","se as opções não somarem o peso, não existe"],
@@ -1543,7 +1475,7 @@ function acoesApuracao(d) {
   return cx;
 }
 function mecanismoApurar(d) {
-  return terminalMecanica("core/src/pedersen.rs · shamir.rs", [
+  return terminalMecanica([
     ["//","ΣC = (Σv)·G + (Σr)·H ← homomórfico"],
     [],
     ["//","a rede soma pontos a cada voto, sem ler nenhum."],
@@ -1655,10 +1587,9 @@ function mecanismoLimite() {
     ["//","nulidade, o remédio é eleição nova, art. 224."],
     ["nota","Sem voto aberto não há partição a induzir: o único caminho até aqui é comparecimento baixo. O remédio é o mesmo — estender o prazo, ou refazer com um eleitorado que caiba no sigilo."],
   ];
-  const arq = "contrato/src/lib.rs";
 
   const e = ponte.viva ? tau.estado : null;
-  if (!e) return terminalMecanica(arq,
+  if (!e) return terminalMecanica(
     ponte.viva ? [...base, ["//","nenhuma rodada montada ainda"], ...fim]
                : [...base, ...fim]);
 
@@ -1685,11 +1616,11 @@ function mecanismoLimite() {
     linhas.push(["//","os dois fecharam. o contrato tinha o"]);
     linhas.push(["//","resultado correto na mão — e não publicou."]);
   }
-  return terminalMecanica(arq, [...linhas, ...fim]);
+  return terminalMecanica( [...linhas, ...fim]);
 }
 function mecanismoVerificador(d) {
   const nconf = d.votos.filter(v=>!v.publico).length;
-  return terminalMecanica("cli/src/comandos.rs", [
+  return terminalMecanica([
     ["//","outro processo. não fala com o contrato."],
     [],
     ["val","disjuntivas",`${nconf*opcoesConf(d)} refeitas`],
@@ -1715,7 +1646,7 @@ function mostrar() {
   /* Dois painéis funcionam sem proposta, porque cada um cria a sua: o 1, que
      abre a votação principal, e o 9, que monta a coligação do limiar. */
   const bastaSozinho = passo === 0 || (passo === 8 && ponte.viva);
-  if (!dados && !bastaSozinho) palco.append(espera(), terminalMecanica("", []));
+  if (!dados && !bastaSozinho) palco.append(espera(), terminalMecanica([]));
   else palco.append(painel(dados),mecanismo(dados));
   $("#app").replaceChildren(palco);
 }
