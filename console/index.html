@@ -62,9 +62,10 @@ button{font:inherit; cursor:pointer}
   padding:0 4px; border-radius:2px}
 .painel-tag{font:10px var(--mono); color:var(--secundario); letter-spacing:.12em; text-transform:uppercase}
 .marca-painel{font:11px var(--mono); color:var(--acento); margin-bottom:22px}
-.diario{font:10.5px/1.65 var(--mono); max-height:330px; overflow-y:auto;
+.diario{font:10.5px/1.65 var(--mono); max-height:460px; overflow-y:auto;
   margin-bottom:22px; padding-right:6px; overflow-wrap:anywhere}
 .d-linha{display:flex; gap:9px; align-items:baseline}
+.d-linha:has(.d-sep){margin-top:4px}
 .d-hora{color:var(--hairline); flex:0 0 auto}
 .d-cmd{color:var(--acento); font-weight:500}
 .d-fn{color:var(--texto)}
@@ -76,11 +77,13 @@ button{font:inherit; cursor:pointer}
 .t-alerta{color:var(--secundario)}
 .d-x::before{content:"✗ "}
 .d-x{color:var(--recusa)}
+.d-sep{color:var(--apagado); letter-spacing:.14em; font-size:9px;
+  border-top:1px solid var(--hairline); padding-top:7px; margin-top:7px; width:100%}
+.d-raw{color:var(--secundario); white-space:pre-wrap}
 .d-com::before{content:"// "}
 .d-com{color:var(--apagado)}
 .d-ocl{color:transparent; white-space:pre;
   background:repeating-linear-gradient(90deg,var(--hairline) 0 4px,transparent 4px 7px)}
-.rolo-cli{font:11px/1.45 var(--mono); white-space:pre-wrap; word-break:break-word; max-height:300px; overflow-y:auto; margin:10px 0 0; color:var(--secundario); background:var(--profundo); padding:12px}
 .selo-vivo,.selo-eco{font:9px var(--mono); letter-spacing:.14em; padding:2px 7px; border-radius:999px; vertical-align:middle; white-space:nowrap}
 .selo-vivo{color:var(--acento); border:1px solid var(--acento)}
 .selo-eco{color:var(--apagado); border:1px solid var(--hairline)}
@@ -683,6 +686,7 @@ async function chamar(verbo, corpo) {
         .find((l) => l.startsWith("✗") || l.startsWith("❌") || l.includes("Error(Contract"));
       reg("x", motivo || j.erro || "a rede recusou");
     }
+    registrarSaida(j.saida);
     /* `ok: false` não é defeito: a recusa do contrato é um resultado da demo,
        e o painel de τ existe para mostrá-la. */
     if (!j.ok && !j.saida) ponte.falha = j.erro || "a ponte recusou";
@@ -700,14 +704,27 @@ async function chamar(verbo, corpo) {
   }
 }
 
-/* O rolo do terminal. É a mecânica deixada de ver: a mesma saída que a CLI
-   imprimiria, dentro da tela, sem tradução. */
-function terminal(pai) {
-  if (!ponte.saida) return;
-  const cx = el("div", "cartao");
-  texto(cx, "p", "olho", "a CLI respondeu");
-  const pre = el("pre", "rolo-cli", ponte.saida);
-  cx.append(pre); pai.append(cx);
+/* A saída da CLI vivia num cartão à parte, "a CLI respondeu", repetido em
+   cinco painéis. Era a mesma história contada duas vezes e em dois lugares.
+   Agora ela entra no diário, logo depois dos passos que a produziram: um
+   fluxo só, do comando à transação. */
+function registrarSaida(bruto) {
+  const linhas = (bruto || "").split("\n")
+    .map((l) => l.replace(/\s+$/, ""))
+    /* As réguas de caixa da CLI servem num terminal de 80 colunas; no diário
+       só empurram o conteúdo para baixo. A legenda delas, quando tem, vira
+       uma separação. */
+    .flatMap((l) => {
+      const t = l.trim();
+      if (!t) return [];
+      if (/^[─—-]{3,}$/.test(t)) return [];
+      const m = t.match(/^(?:──\s*)(.+?)\s*[─—]{3,}$/);
+      return m ? [{ sep: m[1] }] : [t];
+    });
+  if (!linhas.length) return;
+  reg("sep", "saída da CLI");
+  linhas.forEach((l) =>
+    typeof l === "string" ? reg("raw", l) : reg("sep", l.sep));
 }
 
 function aviso(pai, vivo, reencenado) {
@@ -821,7 +838,7 @@ function bater(d) {
     const r = document.querySelector("[data-relogio]");
     if (r) r.textContent = textoRelogio(dados);
     const dv = document.querySelector(".diario");
-    if (dv && dv.childElementCount !== diario.slice(-120).length) dv.replaceWith(rolo());
+    if (dv && dv.childElementCount !== diario.slice(-220).length) dv.replaceWith(rolo());
     pulso = setTimeout(tique, proxima());
   };
   pulso = setTimeout(tique, proxima());
@@ -1031,7 +1048,7 @@ function rolo() {
     cx.append(el("div", "t-com", "// nada aconteceu ainda"));
     return cx;
   }
-  diario.slice(-120).forEach((l, i, todas) => {
+  diario.slice(-220).forEach((l, i, todas) => {
     const d = el("div", "d-linha");
     const abre = l.cls === "cmd" || i === 0;
     d.append(el("span", "d-hora", abre ? hhmmss(l.h) : ""));
@@ -1094,7 +1111,10 @@ function terminalMecanica(arquivo, linhas) {
 /* Mantido para quem ainda chamar pelo nome antigo. */
 function blocoMecanica(nome) { return terminalMecanica(nome, []); }
 function painelPerguntas(d) {
-  const s=el("section"); titulo(s,1,"Uma cédula, três decisões");
+  const s=el("section");
+  /* O número é de quem monta a cédula, não meu. */
+  const q = rascunho.length;
+  titulo(s,1,`Uma cédula, ${q} ${q === 1 ? "decisão" : "decisões"}`);
   const carta=el("div","cartao");
   const secretas=rascunho.filter(p=>p.confidencial).length;
   texto(carta,"div","destaque",secretas===rascunho.length?"Confidencial":secretas===0?"Em aberto":"Semiconfidencial");
@@ -1147,7 +1167,6 @@ function painelPerguntas(d) {
       if (j.ok) { aoVivo.escolhas = []; passo = 1; mostrar(); }
     }));
     s.append(lanca);
-    terminal(s);
   }
   if (ponte.falha) texto(s,"p","recusa-demo",ponte.falha);
   return s;
@@ -1325,7 +1344,6 @@ function urna(d) {
     });
     if (j.ok) { aoVivo.ultimo = quemVota; aoVivo.escolhas = []; aoVivo.publico = false; mostrar(); }
   }));
-  terminal(cx);
   return cx;
 }
 function mecanismoVotar(d) {
@@ -1395,7 +1413,6 @@ function painelRecibo(d) {
     texto(caixa,"p","dim","Seu voto continua na contagem, e você continua podendo conferir que ele está lá.");
   }
   s.append(caixa);
-  if (ponte.viva) terminal(s);
   if (ponte.falha) texto(s,"p","recusa-demo",ponte.falha);
   return s;
 }
@@ -1482,7 +1499,7 @@ function painelApurar(d) {
     if (ponte.viva) {
       const cx=el("div","cartao");
       texto(cx,"h3",null,"Apurar agora");
-      s.append(acoesApuracao(d)); terminal(s);
+      s.append(acoesApuracao(d));
     }
     return s;
   }
@@ -1503,7 +1520,7 @@ function painelApurar(d) {
     const b=el("button","nav-btn",mesaMentindo?"Restaurar total real":"Mesa mentindo →");
     b.type="button";b.addEventListener("click",()=>{mesaMentindo=!mesaMentindo;mostrar();});s.append(b);
   }
-  if (ponte.viva) { s.append(acoesApuracao(d)); terminal(s); }
+  if (ponte.viva) { s.append(acoesApuracao(d)); }
   return s;
 }
 
@@ -1572,9 +1589,6 @@ function painelLimite(d) {
   }
 
   if (tau.fase) texto(s,"p","painel-tag",tau.fase);
-  if (tau.saida) {
-    const pre=el("pre","rolo-cli",tau.saida); s.append(pre);
-  }
 
   const esperando = tau.ledger && ponte.ledger && ponte.ledger < tau.ledger;
   if (esperando) {
@@ -1602,7 +1616,7 @@ async function rodarTau() {
          para a consulta de taxa e ledger. Com 3m a fila morria no quinto voto.
          5m absorve uma parada dessas e ainda sobra. */
       perguntas: [{ texto:"Manter a coligação?", opcoes:["manter","rescindir"], confidencial:true }] }) }).then(r=>r.json());
-  if (!j.ok) { tau.saida = j.saida || j.erro || ""; return dizer("✗ não consegui abrir"); }
+  if (!j.ok) { tau.saida = j.saida || j.erro || ""; registrarSaida(tau.saida); return dizer("✗ não consegui abrir"); }
   tau.ledger = (j.estado && j.estado.prazo_ledger) || 0;
   registrar("abrir", null, j.estado); tau.estado = j.estado;
 
@@ -1641,6 +1655,7 @@ async function rodarTau() {
   registrar("apurar", null, j.estado);
   if (j.estado) tau.estado = j.estado;
   tau.saida = j.saida || j.erro || "";
+  registrarSaida(tau.saida);
   dizer(tau.saida.includes("#19") ? "✗ o contrato recusou · nada foi publicado"
                                   : "✓ terminou — veja a saída");
 }
