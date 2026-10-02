@@ -45,11 +45,21 @@ button{font:inherit; cursor:pointer}
 .acao:hover{filter:brightness(1.08)}
 .palco{display:grid; grid-template-columns:minmax(0,1.35fr) minmax(300px,.75fr); min-height:670px}
 .palco>section{padding:clamp(28px,4vw,58px) clamp(20px,4vw,60px) 50px 0; border:0}
-.mecanica{padding:clamp(28px,4vw,58px) 0 50px clamp(22px,3vw,46px); border-left:1px solid var(--hairline); background:linear-gradient(90deg,rgba(14,16,13,.55),transparent)}
-.mecanica .olho{color:var(--acento)}
-.mecanica p{font-size:13px; color:var(--secundario)}
-.mecanica strong{color:var(--texto); font-weight:500}
-.mecanica .hex{font-size:9px; max-height:130px; overflow:hidden}
+.mecanica{padding:clamp(24px,3vw,40px) 0 50px clamp(20px,2.5vw,36px); border-left:1px solid var(--hairline); background:var(--profundo)}
+.term{font:11px/1.7 var(--mono); overflow-wrap:anywhere}
+.term-topo{color:var(--apagado); letter-spacing:.14em; font-size:9px;
+  padding-bottom:10px; margin-bottom:14px; border-bottom:1px solid var(--hairline)}
+.t-cod{color:var(--texto); white-space:pre-wrap}
+.t-com{color:var(--apagado)}
+.t-chv{color:var(--secundario)}
+.t-val{color:var(--acento)}
+.t-ok{color:var(--acento)}
+.t-x{color:var(--recusa)}
+.t-nota{color:var(--secundario); font:12px/1.6 var(--sans); margin:14px 0 0;
+  padding-top:12px; border-top:1px solid var(--hairline)}
+.t-vazio{height:10px}
+.t-oculto{white-space:pre; color:transparent; background:repeating-linear-gradient(90deg,var(--hairline) 0 4px,transparent 4px 7px);
+  padding:0 4px; border-radius:2px}
 .painel-tag{font:10px var(--mono); color:var(--secundario); letter-spacing:.12em; text-transform:uppercase}
 .marca-painel{font:11px var(--mono); color:var(--acento); margin-bottom:22px}
 .rolo-cli{font:11px/1.45 var(--mono); white-space:pre-wrap; word-break:break-word; max-height:300px; overflow-y:auto; margin:10px 0 0; color:var(--secundario); background:var(--profundo); padding:12px}
@@ -309,7 +319,8 @@ function cabecalho(d) {
    nomeia, a pessoa para de olhar os bytes e começa a ler o rótulo. */
 function momentoCedula(d) {
   const s = el("section");
-  s.append(el("p", "olho", "06 / 10 · III · qualquer pessoa"));
+  const marca06 = el("p", "marca-painel", "06 / 10 · III · QUALQUER PESSOA");
+  selo(marca06); s.append(marca06);
   /* A primeira pergunta sigilosa: é dela que sai o par de compromissos.
      Numa cédula mista as públicas não têm o que mostrar aqui — elas já
      estão em claro no ledger. */
@@ -373,7 +384,8 @@ function momentoCedula(d) {
    este console existir (UX.md §7, Nível 2). */
 function grade(d) {
   const s = el("section");
-  s.append(el("p", "olho", "07 / 10 · III · qualquer pessoa"));
+  const marca07 = el("p", "marca-painel", "07 / 10 · III · QUALQUER PESSOA");
+  selo(marca07); s.append(marca07);
   s.append(el("h2", null, "Todos os compromissos, lado a lado"));
 
   const sigilosos = d.votos.filter((v) => !v.publico);
@@ -741,19 +753,61 @@ const detalhe = (pai, rot, valor) => {
   linha.append(document.createTextNode(valor));
   pai.append(linha);
 };
+/* O selo diz se a ponte está no ar. Precisa estar nos dez painéis: se faltar
+   em um, a plateia não sabe mais o que está vendo. */
+function selo(pai) {
+  const e = el("span", ponte.viva ? "selo-vivo" : "selo-eco",
+               ponte.viva ? "AO VIVO · TESTNET" : "RODADA GRAVADA");
+  pai.append(document.createTextNode("  ")); pai.append(e);
+}
 function titulo(s, numero, nome, subtitulo) {
   const marca = texto(s,"p","marca-painel",`0${numero} / 10 · ${roteiro[numero-1][0].toUpperCase()}`);
-  const selo = el("span", ponte.viva ? "selo-vivo" : "selo-eco", ponte.viva ? "AO VIVO · TESTNET" : "RODADA GRAVADA");
-  marca.append(document.createTextNode("  ")); marca.append(selo);
+  selo(marca);
   texto(s,"h1",null,nome);
   if (subtitulo) texto(s,"p","dim",subtitulo);
 }
-function blocoMecanica(nome) {
+/* ---------- O terminal da mecânica ----------
+
+   A coluna da direita não resume o que acontece: ela mostra o código que faz
+   acontecer, com os valores desta rodada passando por ele. As linhas `cod` são
+   recortes literais de `core/src/*.rs` — se o código mudar e isto não mudar
+   junto, a demo passa a mentir.
+
+   Tipos de linha:
+     ["cod", texto]            fonte, como está no crate
+     ["val", chave, valor]     um valor de verdade desta rodada
+     ["oculto", chave, porque] um valor que a demo se recusa a mostrar
+     ["//", texto]             comentário
+     ["ok", texto] / ["x", t]  veredito
+     ["nota", texto]           a frase em prosa, no fim e só uma
+     []                        linha em branco                                */
+function terminalMecanica(arquivo, linhas) {
   const m = el("aside","mecanica");
-  texto(m,"p","olho","O que acontece");
-  texto(m,"h2",null,nome);
+  texto(m,"div","term-topo", arquivo);
+  const t = el("div","term");
+  linhas.forEach((l) => {
+    if (!l || !l.length) { t.append(el("div","t-vazio")); return; }
+    const [tipo, a, b] = l;
+    if (tipo === "cod")   return t.append(el("div","t-cod", a));
+    if (tipo === "//")    return t.append(el("div","t-com", "// " + a));
+    if (tipo === "ok")    return t.append(el("div","t-ok", "✓ " + a));
+    if (tipo === "x")     return t.append(el("div","t-x", "✗ " + a));
+    if (tipo === "nota")  return t.append(el("p","t-nota", a));
+    if (tipo === "oculto") {
+      const d = el("div"); d.append(el("span","t-chv", a + " = "));
+      d.append(el("span","t-oculto","          "));
+      d.append(el("span","t-com","  " + b)); return t.append(d);
+    }
+    const d = el("div");
+    d.append(el("span","t-chv", a + " = "));
+    d.append(el("span","t-val", b));
+    t.append(d);
+  });
+  m.append(t);
   return m;
 }
+/* Mantido para quem ainda chamar pelo nome antigo. */
+function blocoMecanica(nome) { return terminalMecanica(nome, []); }
 function painelPerguntas(d) {
   const s=el("section"); titulo(s,1,"Uma cédula, três decisões","O organizador define a natureza de cada pergunta antes da abertura.");
   const carta=el("div","cartao");
@@ -819,35 +873,60 @@ function painelPerguntas(d) {
   return s;
 }
 function mecanismoPerguntas(d) {
-  const m=blocoMecanica("A natureza pertence à pergunta");
-  texto(m,"p",null,"Ela é fixada na abertura e vale para todos. Uma escolha individual de sigilo revelaria quem pediu proteção.");
-  detalhe(m,"CONTRATO",`Pergunta { opcoes: u32, confidencial: bool }`);
-  detalhe(m,"LIMITE","8 perguntas · 16 opções sigilosas no total");
-  texto(m,"p","peq","A cédula semiconfidencial é um vetor de perguntas abertas e sigilosas, na mesma transação.");
-  return m;
+  const sig = rascunho.filter(p=>p.confidencial);
+  return terminalMecanica("contrato/src/tipos.rs", [
+    ["cod","pub struct Pergunta {"],
+    ["cod","    pub opcoes: u32,"],
+    ["cod","    pub confidencial: bool,   // ← fixado aqui"],
+    ["cod","}"],
+    [],
+    ["//","nesta cédula:"],
+    ...rascunho.map((p,i)=>["val",`perguntas[${i}]`,`{ opcoes: ${p.opcoes.length}, confidencial: ${p.confidencial} }`]),
+    [],
+    ["cod","pub const MAX_PERGUNTAS: u32 = 8;"],
+    ["cod","pub const MAX_OPCOES:    u32 = 16;  // só as sigilosas"],
+    ["val","em uso",`${rascunho.length}/8 perguntas · ${sig.reduce((n,p)=>n+p.opcoes.length,0)}/16 opções sigilosas`],
+    [],
+    ["//","`confidencial` é da pergunta, não do eleitor."],
+    ["//","se cada um escolhesse, a lista de quem pediu"],
+    ["//","sigilo seria pública — e isso é quase o voto."],
+    ["nota","\"Semiconfidencial\" não existe no contrato. É só um vetor com os dois valores de bool."],
+  ]);
 }
 function painelAbertura(d) {
   const s=el("section"); titulo(s,2,"Abrir a votação","Eleitorado, mesa e prazo foram publicados nesta rodada da testnet.");
-  const carta=el("div","cartao");
-  detalhe(carta,"QUEM VOTA",`${d.aptos.length} pessoas`);
-  detalhe(carta,"PESO","um voto por pessoa");
-  detalhe(carta,"MESA",`${d.mesa.membros} membros · ${d.mesa.limiar} endossos para apurar`);
-  detalhe(carta,"SIGILO MÍNIMO",`${d.sigilo_minimo} cédulas confidenciais`);
-  detalhe(carta,"ENCERRA","ledger "+num(d.prazo_ledger));
-  s.append(carta);
+  texto(s,"div","destaque",`${d.aptos.length} aptos · mesa ${d.mesa.limiar} de ${d.mesa.membros}`);
+  texto(s,"p","dim",`Um voto por pessoa. Encerra no ledger ${num(d.prazo_ledger)}.`);
   const a=el("a","acao","Ver transação de abertura ↗");
   a.href=expert(d,"tx",d.abertura_tx); a.target="_blank"; a.rel="noopener"; s.append(a);
-  texto(s,"p","peq dim",`Raiz de aptos: ${d.raiz_aptos}`);
   return s;
 }
 function mecanismoAbertura(d) {
-  const m=blocoMecanica("Quatro objetos publicados");
-  detalhe(m,"MERKLE",`raiz de 32 bytes · ${curto(d.raiz_aptos,12,8)}`);
-  detalhe(m,"MESA",`${d.mesa.limiar} de ${d.mesa.membros} parcelas de Shamir para reconstruir somente Σr`);
-  detalhe(m,"PRAZO",`fecha_em = ${d.prazo_ledger} · número de ledger`);
-  detalhe(m,"LIMIAR",`τ = ${d.sigilo_minimo} · fixado na abertura`);
-  texto(m,"p","peq","O contrato guarda a raiz, não a lista de eleitores. Cada pessoa apresenta seu caminho de Merkle ao votar.");
-  return m;
+  return terminalMecanica("core/src/merkle.rs", [
+    ["cod","pub fn folha(a: &Apto) -> Hash {"],
+    ["cod","    sha256(0x00 ‖ addr_xdr ‖ peso_be)"],
+    ["cod","}"],
+    ["cod","pub fn no(esq: &Hash, dir: &Hash) -> Hash {"],
+    ["cod","    sha256(0x01 ‖ esq ‖ dir)"],
+    ["cod","}"],
+    [],
+    ["val","aptos",`${d.aptos.length} pessoas`],
+    ["val","raiz",curto(d.raiz_aptos,16,8)],
+    ["val","no contrato","32 bytes"],
+    ["oculto","a lista","nunca é publicada"],
+    [],
+    ["//","o eleitor prova aptidão por caminho."],
+    ["//","provar não é consultar um cadastro."],
+    [],
+    ["cod","// shamir.rs — a mesa recebe as parcelas agora"],
+    ["val","k de n",`${d.mesa.limiar} de ${d.mesa.membros}`],
+    ["val","reconstrói","Σr, e só Σr"],
+    ["oculto","r_i de cada voto","não existe parcela disso"],
+    [],
+    ["val","fecha_em",`ledger ${num(d.prazo_ledger)}`],
+    ["val","τ",String(d.sigilo_minimo)],
+    ["nota","O prazo é número de ledger, não relógio de servidor. Antes dele, apurar recusa com Error(Contract, #7)."],
+  ]);
 }
 function painelAnalise(d) {
   const s=el("section"); titulo(s,3,"Antes de votar","Agora é a vez de uma pessoa apta. Ela vê o que ficará público antes de enviar.");
@@ -861,11 +940,24 @@ function painelAnalise(d) {
   return s;
 }
 function mecanismoAnalise(d) {
-  const m=blocoMecanica("A divulgação vem primeiro");
-  texto(m,"p",null,"O endereço e o fato de votar são públicos. Nas perguntas abertas, a escolha também é pública.");
-  detalhe(m,"APTIDÃO",`caminho de Merkle conferido contra ${curto(d.raiz_aptos,10,6)}`);
-  detalhe(m,"ATOMICIDADE",`${d.perguntas.length} perguntas · uma cédula · uma transação`);
-  return m;
+  const abertas = d.perguntas.filter(p=>!p.confidencial).length;
+  return terminalMecanica("core/src/merkle.rs", [
+    ["cod","pub fn verificar(a, caminho, raiz) -> bool {"],
+    ["cod","    let mut h = folha(a);"],
+    ["cod","    for (irmao, esq) in caminho {"],
+    ["cod","        h = if esq { no(irmao, &h) }"],
+    ["cod","            else    { no(&h, irmao) };"],
+    ["cod","    }"],
+    ["cod","    h == *raiz"],
+    ["cod","}"],
+    [],
+    ["ok","você é apta"],
+    ["//","conferido no cliente, contra a raiz."],
+    [],
+    ["val","em claro",`${abertas} de ${d.perguntas.length} perguntas`],
+    ["val","em sigilo",`${d.perguntas.length-abertas} de ${d.perguntas.length}`],
+    ["nota","A divulgação vem antes do envio. Depois seria aviso, não escolha."],
+  ]);
 }
 function painelVotar(d) {
   const s=el("section"); titulo(s,4,"Um voto publicado na testnet","Esta é uma cédula registrada, com transação e ledger conferíveis. As escolhas sigilosas não constam do estado público.");
@@ -889,12 +981,7 @@ function painelVotar(d) {
     }
     s.append(q);
   });
-  const carta=el("div","cartao");texto(carta,"h3",null,"Dados da cédula real");
-  detalhe(carta,"TRANSAÇÃO",v.tx);
-  detalhe(carta,"LEDGER",num(v.ledger));
-  detalhe(carta,"CÉDULA",`${v.compromissos.length} compromissos · ${v.provas.length} provas disjuntivas · ${v.provas_soma.length} provas de soma`);
-  texto(carta,"p","peq dim","Primeiro compromisso publicado, sem rótulo de escolha:");
-  carta.append(el("div","hex",v.compromissos[0]));s.append(carta);
+  texto(s,"p","peq dim",`${v.compromissos.length} compromissos · ${v.provas.length} disjuntivas · ${v.provas_soma.length} somas · ledger ${num(v.ledger)}`);
   const a=el("a",null,"Conferir esta transação ↗");a.href=expert(d,"tx",v.tx);a.target="_blank";a.rel="noopener";s.append(a);
   if (ponte.viva) s.append(urna(d));
   return s;
@@ -958,13 +1045,30 @@ function urna(d) {
   return cx;
 }
 function mecanismoVotar(d) {
-  const m=blocoMecanica("Um voto inteiro ou nenhum");
-  texto(m,"p",null,"Cada opção sigilosa publica um compromisso C = v·G + r·H de 96 bytes, acompanhado de prova de boa formação.");
-  detalhe(m,"EM ABERTO","um u32 ao lado do endereço, sem compromisso");
-  detalhe(m,"EM SIGILO","compromisso de 96 B por opção");
-  detalhe(m,"VOTOU","uma chave por cédula, não por pergunta");
-  texto(m,"p","peq","O contrato verifica aptidão, formato e provas antes de gravar qualquer parte da cédula.");
-  return m;
+  const v = d.votos.find(x=>!x.publico && x.compromissos?.length);
+  return terminalMecanica("core/src/pedersen.rs", [
+    ["cod","pub fn comprometer(g, h,"],
+    ["cod","                   v: &Fr, r: &Fr) -> G1Affine {"],
+    ["cod","    ((*g * v) + (*h * r)).into()"],
+    ["cod","}"],
+    [],
+    ["//","uma chamada por opção sigilosa:"],
+    ["val","v","1 na opção escolhida, 0 nas outras"],
+    ["oculto","r","sorteado na sua máquina, nunca enviado"],
+    ["val","C", v ? curto(v.compromissos[0],24,8) : "96 bytes"],
+    [],
+    ["//","sem r, esse C é compatível com v=0 e v=1."],
+    ["//","não \"difícil\": compatível. é por isso que"],
+    ["//","nem tempo infinito separa os dois."],
+    [],
+    ["cod","// pergunta em aberto: nada disso acontece"],
+    ["cod","escolhas: Vec<u32>   // um inteiro, e o endereço"],
+    [],
+    ["cod","// contrato/src/tipos.rs"],
+    ["cod","Chave::Votou(proposta, eleitor)   // uma por cédula"],
+    ["ok","tudo verificado antes de gravar qualquer coisa"],
+    ["nota","Não existe votar metade: a chave é da cédula, não da pergunta."],
+  ]);
 }
 function painelRecibo(d) {
   const s=el("section"); titulo(s,5,"O recibo","O aviso mais importante para quem vota.");
@@ -993,30 +1097,84 @@ function painelRecibo(d) {
   return s;
 }
 function mecanismoRecibo() {
-  const m=blocoMecanica("Segredo separado da prova pública");
-  detalhe(m,"RECIBO","escolha e acaso r · dados privados");
-  detalhe(m,"ESTADO","compromissos e provas · dados públicos");
-  texto(m,"p",null,"Queimar o recibo destrói a capacidade de provar o próprio voto. As provas públicas continuam disponíveis para auditoria.");
-  return m;
+  return terminalMecanica("cli/src/recibo.rs", [
+    ["cod","recibos/<identidade>.key"],
+    ["cod","  proposta=…"],
+    ["cod","  escolha0=0  escolha1=1"],
+    ["cod","  r0=…  r1=…          ← o acaso"],
+    [],
+    ["cod","estado/<proposta>.json"],
+    ["cod","  compromissos: [...]  ← público"],
+    ["cod","  provas:       [...]  ← público"],
+    ["oculto","r","não cabe neste arquivo"],
+    [],
+    ["cod","#[test] fn o_json_nao_tem_lugar_para_aleatoriedade()"],
+    ["cod","// console/embutir.py"],
+    ["cod","PROIBIDO = ('\"r\"', 'acaso', 'aleatori',"],
+    ["cod","            'segredo', '\"chave\"')"],
+    [],
+    [reciboQueimado?"ok":"x", reciboQueimado
+      ? "recibo sobrescrito · a prova deixou de existir"
+      : "enquanto a chave existir, você pode ser forçada a mostrá-la"],
+    ["nota","Os segredos estão num arquivo; as provas, no outro. Por isso queimar o recibo não custa nada de auditabilidade — não há o que entregar a quem compra voto."],
+  ]);
 }
 function mecanismoCedula() {
-  const m=blocoMecanica("O objeto que esconde e soma");
-  texto(m,"p",null,"C = v·G + r·H. O acaso r esconde o valor v; os compromissos preservam a soma.");
-  detalhe(m,"CADA BLOCO","96 bytes · ponto de BLS12-381");
-  detalhe(m,"SOMA","ΣC = (Σv)·G + (Σr)·H");
-  texto(m,"p","peq","Os dois blocos à esquerda são da mesma pessoa e transação. Nenhum deles traz um rótulo que revele a escolha.");
-  return m;
+  return terminalMecanica("core/src/cds.rs", [
+    ["cod","pub fn provar(ctx, g, h, c,"],
+    ["cod","              v: u64, r: &Fr) -> Prova {"],
+    ["cod","    let t = fr()?;"],
+    ["cod","    if v == 0 {"],
+    ["cod","        // ramo 0 é o real; o ramo 1 é"],
+    ["cod","        // fabricado de trás para frente"],
+    ["cod","        let a0 = (*h * t).into();"],
+    ["cod","        let e1 = fr()?;"],
+    ["cod","        let z1 = fr()?;"],
+    ["cod","        let a1 = (*h * z1"],
+    ["cod","                  - c_menos_g * e1).into();"],
+    ["cod","        let e  = desafio(ctx, c, &a0, &a1);"],
+    ["cod","        let e0 = e - e1;"],
+    ["cod","        let z0 = t + e0 * r;"],
+    ["cod","    } else { /* espelhado: o real é o 1 */ }"],
+    ["cod","}"],
+    [],
+    ["//","um ramo é provado, o outro é simulado."],
+    ["//","os dois saem com a mesma distribuição."],
+    ["//","nem o verificador sabe qual foi qual."],
+    [],
+    ["val","tamanho","320 B · a0 a1 e0 z0 e1 z1"],
+    ["ok","prova v ∈ {0,1} sem dizer qual"],
+    ["nota","É um sigma-protocolo com Fiat–Shamir, não um SNARK: sem setup confiável, sem circuito, sem cerimônia em que você precise acreditar."],
+  ]);
 }
 function mecanismoGrade(d) {
-  const m=blocoMecanica("Três objetos verificáveis");
-  detalhe(m,"COMPROMISSO","96 B · esconde o voto e preserva a soma");
-  detalhe(m,"DISJUNTIVA","320 B · prova v ∈ {0,1}");
-  detalhe(m,"SOMA","128 B · uma por pergunta sigilosa");
-  texto(m,"p",null,`Na rodada, ${d.votos.filter(v=>!v.publico).length*nPerguntasConf(d)} provas de soma impedem compensar votos entre perguntas.`);
-  return m;
+  const nconf = d.votos.filter(v=>!v.publico).length;
+  return terminalMecanica("core/src/soma.rs", [
+    ["cod","// D = (Σ C_j) − peso·G  deve ser múltiplo de H"],
+    ["cod","pub fn provar(ctx, h, d: &G1Affine, rho: &Fr)"],
+    ["cod","    -> Prova      // Schnorr na base H"],
+    [],
+    ["//","se as opções não somarem o peso, não existe"],
+    ["//","ρ que feche. a prova é impossível de forjar."],
+    [],
+    ["val","por pergunta","1 prova de soma · 128 B"],
+    ["val","nesta rodada",`${nconf} × ${nPerguntasConf(d)} = ${nconf*nPerguntasConf(d)} provas de soma`],
+    ["val","disjuntivas",`${nconf} × ${opcoesConf(d)} = ${nconf*opcoesConf(d)} × 320 B`],
+    [],
+    ["x","uma prova só para a cédula inteira seria furada:"],
+    ["//","2 votos na pergunta 1 e 0 na 2 fechariam"],
+    ["//","a soma total. por isso é uma por pergunta."],
+    [],
+    ["cod","// cripto.rs — o que entra no desafio"],
+    ["cod","proposta ‖ addr_xdr ‖ pergunta ‖ opção"],
+    ["//","sem `pergunta`, a opção 0 da pergunta 1 e a"],
+    ["//","da pergunta 2 teriam o mesmo desafio — e a"],
+    ["//","prova seria copiável de uma para a outra."],
+    ["nota","96 B por compromisso, 320 B por disjuntiva, 128 B por pergunta. Toda a cédula mista: 8.360 B."],
+  ]);
 }
 function painelApurar(d) {
-  const s=el("section"); titulo(s,8,"A mesa afirma. O contrato confere.","Veja a apuração registrada e teste uma afirmação falsa como simulação visual.");
+  const s=el("section"); titulo(s,8,"A mesa afirma. O contrato confere.",ponte.viva ? "Com a ponte no ar, o botão da mesa mentindo manda um total falso à rede — e o contrato recusa de verdade." : "Veja a apuração registrada e teste uma afirmação falsa.");
   if(!d.apuracao){
     texto(s,"p","dim","Esta proposta ainda não tem apuração publicada.");
     if (ponte.viva) {
@@ -1033,20 +1191,18 @@ function painelApurar(d) {
     }
     return s;
   }
-  const v=el("div","cartao");
-  texto(v,"h3",null,"A mesa afirmou");
+  /* A conferência linha a linha vive no terminal à direita. Aqui fica só o
+     que a sala precisa ler de longe: o placar, ou a recusa. */
   const conta=contagem(d,d.apuracao.afirmado||[]);
-  const falsoIndice=conta.findIndex(c=>c.confidencial);
-  const delta=(i)=>!mesaMentindo?0:i===falsoIndice?1:i===falsoIndice+1?-1:0;
-  conta.forEach((c,i)=>detalhe(v,MAIUSC(c.rotulo),`${c.segredo+delta(i)} em segredo + ${c.claro} em claro = ${c.total+delta(i)}`));
-  s.append(v);
-  const contrato=el("div","cartao");texto(contrato,"h3",null,"O contrato conferiu");
-  conta.filter(c=>c.confidencial).forEach((c,i)=>detalhe(contrato,MAIUSC(c.rotulo),mesaMentindo&&i<2?`${c.segredo+(i===0?1:-1)}·G + R·H  ✗ NÃO FECHA`:`${c.segredo}·G + R·H  ✓ fecha`));
-  s.append(contrato);
-  if(mesaMentindo) texto(s,"div","recusa-demo","✗ apuração recusada · nada seria publicado com esse total falso. Simulação visual; a rodada real continua apurada.");
+  if(mesaMentindo) texto(s,"div","recusa-demo","✗ apuração recusada · nada seria publicado com esse total falso.\nO contrato tem o acumulado; a mesa não tem como contorná-lo.");
   else {
-    texto(s,"p","fato",`✓ Resultado publicado no ledger ${num(d.apuracao.ledger)}`);
-    let off=0;d.perguntas.forEach((pg,i)=>{const fatia=conta.slice(off,off+pg.opcoes.length);off+=pg.opcoes.length;texto(s,"p","painel-tag",`${i+1}. ${pg.texto} · ${pg.confidencial?"em sigilo":"em aberto"}`);texto(s,"div","destaque",fatia.map(c=>`${MAIUSC(c.rotulo.split("·").pop())} ${c.total}`).join("  ·  "));});
+    let off=0;
+    d.perguntas.forEach((pg,i)=>{
+      const fatia=conta.slice(off,off+pg.opcoes.length);off+=pg.opcoes.length;
+      texto(s,"p","painel-tag",`${i+1}. ${pg.texto} · ${pg.confidencial?"em sigilo":"em aberto"}`);
+      texto(s,"div","destaque",fatia.map(c=>`${MAIUSC(c.rotulo.split("·").pop())} ${c.total}`).join("  ·  "));
+    });
+    texto(s,"p","fato",`✓ publicado no ledger ${num(d.apuracao.ledger)}`);
   }
   const b=el("button","nav-btn",mesaMentindo?"Restaurar total real":"Mesa mentindo →");b.type="button";b.addEventListener("click",()=>{mesaMentindo=!mesaMentindo;mostrar();});s.append(b);
   if (ponte.viva) {
@@ -1056,21 +1212,38 @@ function painelApurar(d) {
   return s;
 }
 function mecanismoApurar(d) {
-  const m=blocoMecanica("A mesa não escolhe o resultado");
-  texto(m,"p",null,`${d.mesa.limiar} de ${d.mesa.membros} membros somam parcelas de Shamir localmente e reconstroem somente Σr, a abertura agregada.`);
-  detalhe(m,"CONFERÊNCIA","total·G + Σr·H = acumulado na rede");
-  texto(m,"p","peq","Se um total não fecha, o contrato recusa a publicação. A mesa pode deixar de apurar; não consegue publicar um total falso.");
-  return m;
+  return terminalMecanica("core/src/pedersen.rs", [
+    ["cod","pub fn agregar(cs: &[G1Affine]) -> G1Affine {"],
+    ["cod","    cs.iter()"],
+    ["cod","      .fold(identity, |acc, c| acc + c)"],
+    ["cod","}"],
+    ["cod","// ΣC = (Σv)·G + (Σr)·H   ← homomórfico"],
+    [],
+    ["//","a rede soma pontos a cada voto, sem ler nenhum."],
+    [],
+    ["cod","// shamir.rs — cada membro soma localmente"],
+    ["val","endossos",`${d.mesa.limiar} de ${d.mesa.membros}`],
+    ["val","reconstruído","Σr"],
+    ["oculto","qualquer r_i","nem a mesa inteira reunida"],
+    [],
+    ["cod","pub fn verifica_agregado(a, total, soma_r)"],
+    ["cod","    -> bool { a == total·G + soma_r·H }"],
+    [],
+    ...(d.apuracao
+      ? contagem(d,d.apuracao.afirmado||[]).filter(c=>c.confidencial).map((c,i)=>
+          mesaMentindo && i===0
+            ? ["x", `${MAIUSC(c.rotulo)}  ${c.segredo+1}·G + R·H  não fecha`]
+            : ["ok", `${MAIUSC(c.rotulo)}  ${c.segredo}·G + R·H`])
+      : []),
+    [mesaMentindo?"x":"ok", mesaMentindo
+      ? "total afirmado ≠ acumulado · nada é publicado"
+      : "fecha, pergunta por pergunta"],
+    ["nota","A mesa afirma; o contrato confere. Ela pode se recusar a apurar — não pode publicar um total falso. É disponibilidade, não confiança."],
+  ]);
 }
 function painelLimite() {
   const s=el("section"); titulo(s,9,"O resultado correto também pode ser recusado","Outra proposta real na testnet: coligacao-2026, sobre manter o contrato de limpeza.");
-  const c=el("div","cartao");
-  detalhe(c,"ELEITORADO","7 aptos · 7 votaram");
-  detalhe(c,"PARTIÇÃO","4 em segredo · 3 abriram o voto");
-  detalhe(c,"SIGILO MÍNIMO","τ = 5");
-  detalhe(c,"MANTER","4 · acumulado 4·G + R·H  ✓");
-  detalhe(c,"RESCINDIR","0 · acumulado 0·G + R·H  ✓");
-  s.append(c);
+  texto(s,"p","dim","Sete aptos. Quatro votaram em segredo; três abriram o voto de propósito.");
   texto(s,"div","recusa-demo","✗ apuração recusada · nada foi publicado\nError(Contract, #19) = AnonimatoInsuficiente");
   texto(s,"p","peq dim","Os acumuladores fecham antes da recusa. O contrato tinha o total correto e escolheu proteger as quatro pessoas. Nenhum voto foi perdido.");
   const a=el("a",null,"Ver transação de abertura ↗");a.href="https://stellar.expert/explorer/testnet/tx/ed66a8c78b798539ad9796fd8a985325e137d270e152f2b7325970f00ce2f200";a.target="_blank";a.rel="noopener";s.append(a);
@@ -1085,20 +1258,52 @@ function painelLimite() {
   return s;
 }
 function mecanismoLimite() {
-  const m=blocoMecanica("O mínimo protege a célula pequena");
-  texto(m,"p",null,"Quando algumas pessoas abrem o voto, elas particionam o eleitorado. O total das quatro restantes poderia revelar escolhas por subtração.");
-  detalhe(m,"REGRA", "cédulas sigilosas < τ → recusar apuração");
-  detalhe(m,"NESTA RODADA","4 < 5 → Error(Contract, #19)");
-  texto(m,"p","peq","O limiar é global porque a natureza sigilosa é fixada por pergunta para todos.");
-  return m;
+  return terminalMecanica("contrato/src/lib.rs", [
+    ["cod","if confidenciais < TAU {"],
+    ["cod","    return Err(Erro::AnonimatoInsuficiente);"],
+    ["cod","}"],
+    ["cod","pub const TAU: u32 = 5;"],
+    [],
+    ["val","eleitorado","7"],
+    ["val","em segredo","4"],
+    ["val","abriram o voto","3"],
+    ["x","4 < 5 → Error(Contract, #19)"],
+    [],
+    ["ok","acumulado MANTER    4·G + R·H"],
+    ["ok","acumulado RESCINDIR 0·G + R·H"],
+    ["//","os dois fecharam. o contrato tinha o"],
+    ["//","resultado correto na mão — e não publicou."],
+    [],
+    ["//","revelar o próprio voto é um direito. em bloco,"],
+    ["//","particiona o eleitorado; numa célula pequena o"],
+    ["//","agregado para de proteger quem está nela."],
+    ["nota","τ é global, não por pergunta: o sigilo é da pergunta, então quem votou em segredo é o mesmo conjunto em todas. A partição tem só duas células."],
+  ]);
 }
 function mecanismoVerificador(d) {
-  const m=blocoMecanica("Outro processo, em Rust");
-  texto(m,"p",null,"O verificador relê o estado, refaz provas e aritmética e grava o veredito. Esta tela apenas apresenta esse resultado; ela não reverifica BLS12-381 no navegador.");
-  detalhe(m,"LIMITE","compromissos lidos do JSON local");
-  detalhe(m,"VÍNCULO COM A REDE","soma conferida contra o acumulado on-chain");
-  texto(m,"p","peq","A independência da fonte é parcial, e isso faz parte do resultado mostrado.");
-  return m;
+  const nconf = d.votos.filter(v=>!v.publico).length;
+  return terminalMecanica("cli/src/comandos.rs · verificar", [
+    ["cod","// outro processo. não fala com o contrato."],
+    ["cod","for voto in estado.votos {"],
+    ["cod","    cds::verificar(...)?;"],
+    ["cod","    soma::verificar(...)?;"],
+    ["cod","}"],
+    ["cod","pedersen::agregar(&todos)"],
+    ["cod","    == acumulado_on_chain"],
+    [],
+    ["val","disjuntivas",`${nconf*opcoesConf(d)} refeitas`],
+    ["val","somas",`${nconf*nPerguntasConf(d)} refeitas`],
+    ["ok","agregado bate com o acumulado da rede"],
+    [],
+    ["x","esta página não roda BLS12-381"],
+    ["//","não há uma linha disso no console. ele mostra"],
+    ["//","o veredito que o verificador em Rust gravou."],
+    [],
+    ["//","smoke D4: o verificador lê os compromissos do"],
+    ["//","JSON local, não da rede. o que o prende à"],
+    ["//","realidade é a soma, conferida on-chain."],
+    ["nota","Independência parcial, e registrada como tal. Um JSON adulterado não passa, mas a fonte não é a rede."],
+  ]);
 }
 function mostrar() {
   const [ato,nome,painel,mecanismo]=roteiro[passo];
