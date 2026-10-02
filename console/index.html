@@ -190,10 +190,6 @@ input[type=file]{font-family:var(--mono); font-size:11px; color:var(--secundario
 <div class="pag">
   <header class="topo">
     <div class="marca">Tessera · demonstração</div>
-    <p class="aviso-escopo">
-      Votos, compromissos e transações de rodadas reais na testnet. Os controles
-      didáticos não enviam transações; a CLI é quem publica os votos.
-    </p>
     <dl class="meta" id="meta"></dl>
   </header>
 
@@ -347,8 +343,7 @@ function momentoCedula(d) {
 
   const sub = el("p", "dim");
   sub.textContent =
-    `Os dois objetos abaixo estão no ledger agora, publicados pela mesma pessoa, ` +
-    `na mesma transação. Um deles comete um voto e o outro comete a ausência dele.`;
+    "Mesma pessoa, mesma transação. Um comete um voto; o outro, a ausência dele.";
   s.append(sub);
 
   const par = el("div", "par-cedula");
@@ -362,7 +357,7 @@ function momentoCedula(d) {
 
   const p2 = el("p", "peq dim");
   p2.style.marginTop = "14px";
-  p2.textContent = `96 bytes cada. Um é "${pg.opcoes[0]}" e o outro é "${pg.opcoes[1]}".`;
+  p2.textContent = `96 B cada. Um é "${pg.opcoes[0]}", o outro é "${pg.opcoes[1]}".`;
   s.append(p2);
 
   /* Esta frase não pode ser suavizada. É a única vez no produto em que um
@@ -373,7 +368,7 @@ function momentoCedula(d) {
   s.append(dura);
   const p3 = el("p", "peq dim");
   p3.style.marginTop = "12px";
-  p3.textContent = "Nem hoje, nem em cinquenta anos. É o que ela publicou.";
+  p3.textContent = "Nem hoje, nem em cinquenta anos.";
   s.append(p3);
 
   return s;
@@ -434,12 +429,6 @@ function momentoConferencia(d) {
       dlm.append(el("dd", null, pg.confidencial ? "em sigilo" : "em aberto, no ledger"));
     });
     m.append(dlm);
-    const nm = el("p", "peq dim");
-    nm.style.marginTop = "12px";
-    nm.textContent =
-      "A natureza de cada pergunta é da proposta, não de quem vota: toda cédula " +
-      "tem a mesma forma, e não há nada a inferir da forma.";
-    m.append(nm);
     s.append(m);
   }
 
@@ -482,11 +471,8 @@ function momentoConferencia(d) {
   av.append(el("h3", null, "o que o protocolo não garante"));
   av.append(
     el("p", "peq dim",
-      "Quem vota conhece o próprio fator de aleatoriedade e consegue provar o " +
-      "voto a um terceiro. O protocolo remove o registro público permanente; " +
-      "não remove a capacidade de alguém se auto-incriminar. O cliente grava " +
-      "essa chave num arquivo e manda apagá-la — e depois de apagada, nem " +
-      "quem votou consegue provar em que votou.")
+      "O protocolo remove o registro público permanente. Não remove a " +
+      "capacidade de alguém se auto-incriminar — para isso existe queimar o recibo.")
   );
   s.append(av);
   return s;
@@ -597,13 +583,9 @@ function momentoApuracao(d) {
 /* ---------- O verificador. A tela do cético, e do jurado. ---------- */
 function verificador(d) {
   const s = el("section");
-  s.append(el("p", "olho", "10 / 10 · III · qualquer pessoa"));
+  const marca10 = el("p", "marca-painel", "10 / 10 · III · QUALQUER PESSOA");
+  selo(marca10); s.append(marca10);
   s.append(el("h2", null, "O veredito do verificador"));
-  s.append(
-    el("p", "dim",
-      "Um processo separado, em Rust, releu o estado e refez a aritmética. " +
-      "Esta tela apresenta o veredito gravado por ele; não recalcula as provas no navegador.")
-  );
 
   const v = d.verificacao;
   if (!v) {
@@ -868,13 +850,11 @@ function terminalMecanica(arquivo, linhas) {
 /* Mantido para quem ainda chamar pelo nome antigo. */
 function blocoMecanica(nome) { return terminalMecanica(nome, []); }
 function painelPerguntas(d) {
-  const s=el("section"); titulo(s,1,"Uma cédula, três decisões","O organizador define a natureza de cada pergunta antes da abertura.");
+  const s=el("section"); titulo(s,1,"Uma cédula, três decisões");
   const carta=el("div","cartao");
   const secretas=rascunho.filter(p=>p.confidencial).length;
-  texto(carta,"h3",null,"Modo derivado das perguntas");
   texto(carta,"div","destaque",secretas===rascunho.length?"Confidencial":secretas===0?"Em aberto":"Semiconfidencial");
   texto(carta,"p","peq dim",`${rascunho.length-secretas} em aberto · ${secretas} em sigilo · uma transação`);
-  if(secretas===0) texto(carta,"p","peq dim","Com todas as perguntas abertas, a votação é comum e não precisa dos compromissos do Tessera.");
   s.append(carta);
   rascunho.forEach((pg,i)=>{
     const q=el("div","pergunta-demo");
@@ -908,7 +888,6 @@ function painelPerguntas(d) {
   if(erroRascunho) texto(s,"p","recusa-demo",erroRascunho);
   const add=el("button","nav-btn","+ pergunta");add.type="button";add.disabled=rascunho.length>=8;
   add.addEventListener("click",()=>{rascunho.push({texto:"Nova pergunta",opcoes:["sim","não"],confidencial:false});mostrar();});s.append(add);
-  texto(s,"p","peq dim",`${rascunho.length} de 8 perguntas · ${rascunho.reduce((n,p)=>n+(p.confidencial?p.opcoes.length:0),0)} de 16 opções sigilosas`);
   if (ponte.viva) {
     const lanca = el("div","cartao");
     texto(lanca,"h3",null,"Abrir esta cédula na testnet");
@@ -926,9 +905,7 @@ function painelPerguntas(d) {
     s.append(lanca);
     terminal(s);
   }
-  aviso(s,
-    "A ponte está no ar: estas perguntas são as que vão ao ledger. O nome e o prazo acima valem de verdade.",
-    "Prévia de desenho. A proposta da testnet abaixo já foi aberta; mudar esta prévia não altera a rede.");
+  if (ponte.falha) texto(s,"p","recusa-demo",ponte.falha);
   return s;
 }
 function mecanismoPerguntas(d) {
@@ -949,13 +926,11 @@ function mecanismoPerguntas(d) {
     ["//","`confidencial` é da pergunta, não do eleitor."],
     ["//","se cada um escolhesse, a lista de quem pediu"],
     ["//","sigilo seria pública — e isso é quase o voto."],
-    ["nota","\"Semiconfidencial\" não existe no contrato. É só um vetor com os dois valores de bool."],
   ]);
 }
 function painelAbertura(d) {
-  const s=el("section"); titulo(s,2,"Abrir a votação","Eleitorado, mesa e prazo foram publicados nesta rodada da testnet.");
+  const s=el("section"); titulo(s,2,"Abrir a votação");
   texto(s,"div","destaque",`${d.aptos.length} aptos · mesa ${d.mesa.limiar} de ${d.mesa.membros}`);
-  texto(s,"p","dim",`Um voto por pessoa. Encerra no ledger ${num(d.prazo_ledger)}.`);
   const a=el("a","acao","Ver transação de abertura ↗");
   a.href=expert(d,"tx",d.abertura_tx); a.target="_blank"; a.rel="noopener"; s.append(a);
   return s;
@@ -984,11 +959,10 @@ function mecanismoAbertura(d) {
     [],
     ["val","fecha_em",`ledger ${num(d.prazo_ledger)}`],
     ["val","τ",String(d.sigilo_minimo)],
-    ["nota","O prazo é número de ledger, não relógio de servidor. Antes dele, apurar recusa com Error(Contract, #7)."],
   ]);
 }
 function painelAnalise(d) {
-  const s=el("section"); titulo(s,3,"Antes de votar","Agora é a vez de uma pessoa apta. Ela vê o que ficará público antes de enviar.");
+  const s=el("section"); titulo(s,3,"Antes de votar");
   texto(s,"p","fato",`${d.votos.length} de ${d.aptos.length} votaram nesta rodada registrada`);
   d.perguntas.forEach((pg,i)=>{
     const q=el("div","pergunta-demo"); texto(q,"div","painel-tag",`${i+1} · ${pg.confidencial?"em sigilo":"em aberto"}`);
@@ -1015,11 +989,10 @@ function mecanismoAnalise(d) {
     [],
     ["val","em claro",`${abertas} de ${d.perguntas.length} perguntas`],
     ["val","em sigilo",`${d.perguntas.length-abertas} de ${d.perguntas.length}`],
-    ["nota","A divulgação vem antes do envio. Depois seria aviso, não escolha."],
   ]);
 }
 function painelVotar(d) {
-  const s=el("section"); titulo(s,4,"Um voto publicado na testnet","Esta é uma cédula registrada, com transação e ledger conferíveis. As escolhas sigilosas não constam do estado público.");
+  const s=el("section"); titulo(s,4,"Um voto publicado na testnet");
   const v=d.votos.find(x=>!x.publico && x.compromissos?.length);
   /* Numa proposta recém-aberta ainda não existe cédula publicada — e é
      exatamente aí que a urna precisa aparecer. */
@@ -1126,11 +1099,10 @@ function mecanismoVotar(d) {
     ["cod","// contrato/src/tipos.rs"],
     ["cod","Chave::Votou(proposta, eleitor)   // uma por cédula"],
     ["ok","tudo verificado antes de gravar qualquer coisa"],
-    ["nota","Não existe votar metade: a chave é da cédula, não da pergunta."],
   ]);
 }
 function painelRecibo(d) {
-  const s=el("section"); titulo(s,5,"O recibo","O aviso mais importante para quem vota.");
+  const s=el("section"); titulo(s,5,"O recibo");
   const caixa=el("div","cartao");
   if(!reciboQueimado){
     texto(caixa,"h3",null,"⚠ A chave em ./recibos/<identidade>.key prova o seu voto");
@@ -1150,9 +1122,7 @@ function painelRecibo(d) {
   }
   s.append(caixa);
   if (ponte.viva) terminal(s);
-  aviso(s,
-    "Com a ponte no ar, o botão acima sobrescreve o arquivo de verdade. Não há como desfazer — é o que o produto promete.",
-    "Esta tela não acessa arquivos locais. O comando real é tessera queimar --identidade <nome>.");
+  if (ponte.falha) texto(s,"p","recusa-demo",ponte.falha);
   return s;
 }
 function mecanismoRecibo() {
@@ -1175,7 +1145,7 @@ function mecanismoRecibo() {
     [reciboQueimado?"ok":"x", reciboQueimado
       ? "recibo sobrescrito · a prova deixou de existir"
       : "enquanto a chave existir, você pode ser forçada a mostrá-la"],
-    ["nota","Os segredos estão num arquivo; as provas, no outro. Por isso queimar o recibo não custa nada de auditabilidade — não há o que entregar a quem compra voto."],
+    ["nota","Os segredos num arquivo, as provas no outro. Queimar o recibo não custa auditabilidade — e não sobra o que entregar a quem compra voto."],
   ]);
 }
 function mecanismoCedula() {
@@ -1203,7 +1173,7 @@ function mecanismoCedula() {
     [],
     ["val","tamanho","320 B · a0 a1 e0 z0 e1 z1"],
     ["ok","prova v ∈ {0,1} sem dizer qual"],
-    ["nota","É um sigma-protocolo com Fiat–Shamir, não um SNARK: sem setup confiável, sem circuito, sem cerimônia em que você precise acreditar."],
+    ["nota","Sigma-protocolo com Fiat–Shamir, não SNARK: sem setup confiável, sem cerimônia em que você precise acreditar."],
   ]);
 }
 function mecanismoGrade(d) {
@@ -1229,7 +1199,6 @@ function mecanismoGrade(d) {
     ["//","sem `pergunta`, a opção 0 da pergunta 1 e a"],
     ["//","da pergunta 2 teriam o mesmo desafio — e a"],
     ["//","prova seria copiável de uma para a outra."],
-    ["nota","96 B por compromisso, 320 B por disjuntiva, 128 B por pergunta. Toda a cédula mista: 8.360 B."],
   ]);
 }
 function painelApurar(d) {
@@ -1239,7 +1208,6 @@ function painelApurar(d) {
     if (ponte.viva) {
       const cx=el("div","cartao");
       texto(cx,"h3",null,"Apurar agora");
-      texto(cx,"p","peq dim","A mesa só consegue apurar depois do prazo. Antes dele o contrato recusa com Error(Contract, #7) = VotacaoAindaAberta — e essa recusa também é parte da demo.");
       cx.append(botao("A mesa apura →", async () => { await chamar("apurar", { proposta: d.proposta }); }));
       cx.append(botao("A mesa mente →", async () => {
         /* O total falso vai à rede de verdade. O contrato recusa de verdade. */
@@ -1297,19 +1265,15 @@ function mecanismoApurar(d) {
     [mesaMentindo?"x":"ok", mesaMentindo
       ? "total afirmado ≠ acumulado · nada é publicado"
       : "fecha, pergunta por pergunta"],
-    ["nota","A mesa afirma; o contrato confere. Ela pode se recusar a apurar — não pode publicar um total falso. É disponibilidade, não confiança."],
   ]);
 }
 function painelLimite() {
-  const s=el("section"); titulo(s,9,"O resultado correto também pode ser recusado","Outra proposta real na testnet: coligacao-2026, sobre manter o contrato de limpeza.");
-  texto(s,"p","dim","Sete aptos. Quatro votaram em segredo; três abriram o voto de propósito.");
+  const s=el("section"); titulo(s,9,"O resultado correto também pode ser recusado");
   texto(s,"div","recusa-demo","✗ apuração recusada · nada foi publicado\nError(Contract, #19) = AnonimatoInsuficiente");
-  texto(s,"p","peq dim","Os acumuladores fecham antes da recusa. O contrato tinha o total correto e escolheu proteger as quatro pessoas. Nenhum voto foi perdido.");
   const a=el("a",null,"Ver transação de abertura ↗");a.href="https://stellar.expert/explorer/testnet/tx/ed66a8c78b798539ad9796fd8a985325e137d270e152f2b7325970f00ce2f200";a.target="_blank";a.rel="noopener";s.append(a);
   if (ponte.viva) {
     const cx=el("div","cartao");
     texto(cx,"h3",null,"Reproduzir a recusa, agora");
-    texto(cx,"p","peq dim","Abra uma proposta sigilosa, faça três pessoas votarem com --publico, e apure. O conjunto secreto cai abaixo de τ e o contrato recusa — com os acumuladores fechando logo acima.");
     campo(cx,"Proposta a apurar",aoVivo.proposta||"",(v)=>{aoVivo.proposta=v;});
     cx.append(botao("Tentar apurar →", async () => { await chamar("apurar", { proposta: aoVivo.proposta }); }));
     terminal(cx); s.append(cx);
@@ -1337,7 +1301,7 @@ function mecanismoLimite() {
     ["//","revelar o próprio voto é um direito. em bloco,"],
     ["//","particiona o eleitorado; numa célula pequena o"],
     ["//","agregado para de proteger quem está nela."],
-    ["nota","τ é global, não por pergunta: o sigilo é da pergunta, então quem votou em segredo é o mesmo conjunto em todas. A partição tem só duas células."],
+    ["nota","τ é global: o sigilo é da pergunta, então quem votou em segredo é o mesmo conjunto em todas. A partição tem duas células."],
   ]);
 }
 function mecanismoVerificador(d) {
@@ -1362,7 +1326,7 @@ function mecanismoVerificador(d) {
     ["//","smoke D4: o verificador lê os compromissos do"],
     ["//","JSON local, não da rede. o que o prende à"],
     ["//","realidade é a soma, conferida on-chain."],
-    ["nota","Independência parcial, e registrada como tal. Um JSON adulterado não passa, mas a fonte não é a rede."],
+    ["nota","Independência parcial, e registrada como tal: um JSON adulterado não passa, mas a fonte não é a rede."],
   ]);
 }
 function mostrar() {
