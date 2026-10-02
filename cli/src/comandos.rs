@@ -1327,24 +1327,39 @@ pub fn verificar(proposta: &str) -> R {
         }
         agregado &= mesmo && abre;
         let rotulo = if j == 0 { "Agregado refeito" } else { "" };
-        tela::campo_veredito(
-            rotulo,
-            &format!(
+        // Sem apuração não existe total afirmado, e escrever `0·G + R·H` seria
+        // afirmar um que ninguém afirmou — a página inteira passa a ler como
+        // "todos os totais são zero, e fecham". O que de fato foi conferido
+        // aqui é a soma dos compromissos contra o acumulador da cadeia.
+        let valor = match &apuracao {
+            Some(a) => format!(
                 "{:<9} {}·G + R·H",
                 rotulos_conf[j].to_uppercase(),
-                apuracao.as_ref().map(|a| a.afirmado[j]).unwrap_or(0)
+                a.afirmado[j]
             ),
-            mesmo && abre,
-        );
+            None => format!(
+                "{:<9} soma confere · sem total afirmado",
+                rotulos_conf[j].to_uppercase()
+            ),
+        };
+        tela::campo_veredito(rotulo, &valor, mesmo && abre);
     }
 
     tela::branco();
     tela::regua();
-    let tudo = aptidao && repetidos == 0 && boa && claro_ok && tau && agregado;
-    if tudo && apuracao.is_some() {
+    // Integridade e quórum são perguntas diferentes, e misturá-las fazia o
+    // verificador dizer "alguma coisa não fecha" numa rodada em que tudo
+    // fechava e só faltava gente. Quórum baixo não é defeito de prova.
+    let integro = aptidao && repetidos == 0 && boa && claro_ok && agregado;
+    if integro && tau && apuracao.is_some() {
         tela::confere("o resultado publicado é o resultado correto");
-    } else if tudo {
+    } else if integro && tau {
         tela::confere("tudo o que já existe confere · ainda não apurada");
+    } else if integro {
+        tela::confere(&format!(
+            "as provas conferem · quórum de sigilo em {} de {}",
+            conf, e.sigilo_minimo
+        ));
     } else {
         tela::recusa("alguma coisa não fecha · veja as linhas acima");
     }
