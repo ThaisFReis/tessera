@@ -1,0 +1,22 @@
+[package]
+name = "tessera-cliente"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "A matemática do Tessera no navegador: a cédula nasce e o `r` morre na aba de quem vota."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# `navegador` liga a Web Crypto como fonte de entropia do `getrandom`. Sem ele
+# o crate nem compila para wasm32 — e é bom que não compile: um `r` sorteado de
+# uma fonte fraca é um voto que dá para adivinhar.
+tessera-core = { path = "../core", features = ["navegador"] }
+wasm-bindgen = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+
+[profile.release]
+opt-level = "s"
+lto = true

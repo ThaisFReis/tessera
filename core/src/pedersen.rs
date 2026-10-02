@@ -265,6 +265,15 @@ pub fn fr_para_bytes_be(f: &Fr) -> [u8; 32] {
     b
 }
 
+/// A volta: 32 bytes big-endian → escalar.
+///
+/// Existe para o cliente no navegador, que recebe de volta em hex o que ele
+/// mesmo guardou — a chave de anel de quem comparece. Reduz módulo `r`, que é
+/// seguro aqui porque a ida produz bytes já canônicos.
+pub fn fr_de_bytes_be(b: &[u8]) -> Fr {
+    Fr::from_be_bytes_mod_order(b)
+}
+
 /// Descobre `T` tal que `A = T·G + soma_r·H`, por busca em `0..=max`.
 ///
 /// **Isto roda fora da cadeia, e é a outra metade da sonda 5.** Lá, procurar o

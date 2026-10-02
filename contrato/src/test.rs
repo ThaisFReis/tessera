@@ -1587,3 +1587,151 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
     std::println!("cedulas ............. {}  (nenhuma com endereco de membro)", conf);
     std::println!("anel ................ {} ramos, {} bytes", COMPARECERAM, anel::tamanho(COMPARECERAM));
 }
+
+/// **O portão 2 do PLANO: a cédula que o navegador monta é aceita pelo contrato.**
+///
+/// Chama `tessera_cliente::montar` e `mensagem` — as mesmas funções que
+/// `wasm-pack` compila para a aba, não uma reescrita delas — e manda o resultado
+/// para `votar_anonimo`. O que fica de fora é só a travessia `JsValue`, que é
+/// trabalho do `wasm-bindgen`.
+///
+/// Se os bytes do contexto ou da mensagem divergirem entre cliente e contrato,
+/// este teste quebra o build. Era o jeito mais caro possível de descobrir isso
+/// pela primeira vez numa demonstração ao vivo.
+#[test]
+fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
+    use tessera_cliente::{mensagem as msg_cliente, montar, PerguntaJs};
+    use tessera_core::anel;
+
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(10);
+    let id = env.register(Tessera, ());
+    let cliente = TesseraClient::new(&env, &id);
+
+    let aptos: Vetor<Address> = (0..3).map(|_| Address::generate(&env)).collect();
+    let folhas: Vetor<merkle::Apto> = aptos
+        .iter()
+        .map(|a| merkle::Apto { endereco: bytes_de(&a.clone().to_xdr(&env)), peso: 1 })
+        .collect();
+    let arvore = merkle::Arvore::montar(&folhas).unwrap();
+    let mut mesa_sdk = Vec::new(&env);
+    for _ in 0..5 {
+        mesa_sdk.push_back(Address::generate(&env));
+    }
+    // Cédula mista: uma sigilosa de 3 opções e uma pública de 2. A mistura é o
+    // caso em que os deslocamentos entre compromissos e escolhas podem
+    // divergir, e é por isso que o teste usa ela.
+    let mut perg = Vec::new(&env);
+    perg.push_back(Pergunta { opcoes: 3, confidencial: true });
+    perg.push_back(Pergunta { opcoes: 2, confidencial: false });
+
+    let proposta: BytesN<32> = BytesN::from_array(&env, &[0x5au8; 32]);
+    cliente.abrir(
+        &Address::generate(&env), &proposta, &perg,
+        &BytesN::from_array(&env, &arvore.raiz()), &mesa_sdk,
+        &3u32, &50u32, &1000u32, &true,
+    );
+
+    let g = pedersen::gerador();
+    let h_hex = ponto::para_hex(&ponto::desserializar(&cliente.gerador_h().to_array()).unwrap());
+    let hp = ponto::desserializar(&cripto::calcular_hp(&env, &proposta).to_array()).unwrap();
+
+    // ---- comparecimento, com as chaves que o cliente sortearia ----
+    let xs: Vetor<ArkFr> = (0..3).map(|_| pedersen::acaso_fr().unwrap()).collect();
+    let anel_ark: Vetor<ArkG1> = xs.iter().map(|x| anel::chave_publica(&g, x)).collect();
+    for (i, pk) in anel_ark.iter().enumerate() {
+        let c = arvore.caminho(i).unwrap();
+        let mut irmaos = Vec::new(&env);
+        for s in &c.irmaos {
+            irmaos.push_back(BytesN::from_array(&env, s));
+        }
+        cliente.comparecer(&proposta, &aptos[i], &g1(&env, pk), &irmaos, &c.indice);
+    }
+    env.ledger().set_sequence_number(60);
+
+    // ---- a cédula, montada pelo cliente do navegador ----
+    const EU: usize = 1;
+    let imagem = anel::imagem(&hp, &xs[EU]);
+    let ident = ponto::serializar(&imagem).to_vec();
+    let perguntas_js = [
+        PerguntaJs { opcoes: 3, confidencial: true },
+        PerguntaJs { opcoes: 2, confidencial: false },
+    ];
+    let escolhas_feitas = [2u32, 0u32];
+    let c = montar(
+        &proposta.to_array(), &ident, &h_hex, &perguntas_js, &escolhas_feitas, 0, 0,
+    )
+    .expect("o cliente nao montou a cedula");
+    assert!(c.parcelas.is_empty(), "sem mesa, nao pode sair parcela de Shamir");
+
+    let anel_hex: Vetor<std::string::String> =
+        anel_ark.iter().map(ponto::para_hex).collect();
+    let msg = msg_cliente(&proposta.to_array(), &c.compromissos, &c.escolhas).unwrap();
+    let s = anel::assinar(&msg, &g, &hp, &anel_ark, EU, &xs[EU]).unwrap();
+
+    // A mensagem do cliente e a do contrato têm de ser os mesmos bytes.
+    let mut compr_sdk: Vec<Bls12381G1Affine> = Vec::new(&env);
+    for x in &c.compromissos {
+        compr_sdk.push_back(g1(&env, &ponto::de_hex(x).unwrap()));
+    }
+    let mut esc_sdk: Vec<u32> = Vec::new(&env);
+    for e in &c.escolhas {
+        esc_sdk.push_back(*e);
+    }
+    assert_eq!(
+        msg,
+        bytes_de(&cripto::mensagem_cedula(&env, &proposta, &compr_sdk, &esc_sdk)),
+        "a mensagem do cliente divergiu da do contrato"
+    );
+    let _ = anel_hex;
+
+    let mut provas_sdk: Vec<ProvaCds> = Vec::new(&env);
+    for p in &c.provas {
+        provas_sdk.push_back(ProvaCds {
+            a0: g1(&env, &ponto::de_hex(&p.a0).unwrap()),
+            a1: g1(&env, &ponto::de_hex(&p.a1).unwrap()),
+            e0: escalar(&env, &pedersen::fr_de_bytes_be(&hex_bytes(&p.e0))),
+            z0: escalar(&env, &pedersen::fr_de_bytes_be(&hex_bytes(&p.z0))),
+            e1: escalar(&env, &pedersen::fr_de_bytes_be(&hex_bytes(&p.e1))),
+            z1: escalar(&env, &pedersen::fr_de_bytes_be(&hex_bytes(&p.z1))),
+        });
+    }
+    let mut soma_sdk: Vec<ProvaSoma> = Vec::new(&env);
+    for p in &c.provas_soma {
+        soma_sdk.push_back(ProvaSoma {
+            a: g1(&env, &ponto::de_hex(&p.a).unwrap()),
+            z: escalar(&env, &pedersen::fr_de_bytes_be(&hex_bytes(&p.z))),
+        });
+    }
+    let mut anel_sdk: Vec<Bls12381G1Affine> = Vec::new(&env);
+    for p in &anel_ark {
+        anel_sdk.push_back(g1(&env, p));
+    }
+    let mut z_sdk: Vec<Bls12381Fr> = Vec::new(&env);
+    for zi in &s.z {
+        z_sdk.push_back(escalar(&env, zi));
+    }
+
+    cliente.votar_anonimo(
+        &proposta, &anel_sdk, &g1(&env, &s.imagem), &escalar(&env, &s.c0), &z_sdk,
+        &compr_sdk, &provas_sdk, &soma_sdk, &esc_sdk,
+    );
+
+    // A pergunta pública conta em claro; a sigilosa só soma no acumulador.
+    let publico: u32 = env.as_contract(&id, || {
+        env.storage().persistent().get(&Chave::TotalPublico(proposta.clone(), 1, 0)).unwrap()
+    });
+    assert_eq!(publico, 1, "a escolha publica do cliente nao chegou");
+
+    std::println!("\n== PORTAO 2: A CEDULA DO NAVEGADOR ==");
+    std::println!("compromissos ........ {}", c.compromissos.len());
+    std::println!("escolhas em claro ... {}", c.escolhas.len());
+    std::println!("parcelas ............ {} (sem mesa)", c.parcelas.len());
+    std::println!("anel ................ {} ramos", anel_ark.len());
+    std::println!("aceita pelo contrato  SIM");
+}
+
+fn hex_bytes(s: &str) -> Vetor<u8> {
+    (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
+}
