@@ -1,1 +1,1 @@
-{"root":["./src/App.tsx","./src/carteira.ts","./src/main.tsx","./src/rede.ts"],"version":"5.9.3"}
+{"root":["./src/App.tsx","./src/carteira.ts","./src/lista.ts","./src/main.tsx","./src/rede.ts","./src/wasm.ts","./src/paginas/Abrir.tsx","./src/paginas/Apurar.tsx","./src/paginas/Comparecer.tsx","./src/paginas/Votacao.tsx","./src/paginas/Votacoes.tsx","./src/paginas/Votar.tsx","./src/paginas/comum.tsx"],"version":"5.9.3"}

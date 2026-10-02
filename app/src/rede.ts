@@ -144,7 +144,41 @@ const JANELA = 2_000;
  * isto responde "o que está aberto agora" — não "tudo o que já existiu", que
  * exigiria um indexador. Para o dapp é exatamente a pergunta certa.
  */
-export async function assembleiasAbertas(desde?: number) {
+export type Fase = "agendada" | "comparecimento" | "votacao" | "encerrada";
+
+export type Assembleia = {
+  proposta: string;
+  perguntas: number;
+  opcoes: number;
+  abre_em: number;
+  fecha_em: number;
+  limiar: number;
+  anel: boolean;
+  ledger: number;
+  fase: Fase;
+};
+
+/**
+ * Em que ponto da vida a assembleia está.
+ *
+ * A mesma janela significa coisas diferentes nos dois modos. Com o caderno
+ * separado da urna, o tempo antes de `abre_em` **é** o comparecimento — não é
+ * espera. Sem anel, é só agendamento.
+ */
+export function fase(a: { abre_em: number; fecha_em: number; anel: boolean }, ledger: number): Fase {
+  if (ledger >= a.fecha_em) return "encerrada";
+  if (ledger < a.abre_em) return a.anel ? "comparecimento" : "agendada";
+  return "votacao";
+}
+
+/**
+ * Todas as assembleias da janela, em qualquer fase.
+ *
+ * **Sem índice e sem backend.** O contrato já publica o evento de `abrir`, e
+ * isto responde "o que existe agora" — não "tudo o que já existiu", que
+ * exigiria um indexador.
+ */
+export async function assembleias(desde?: number): Promise<Assembleia[]> {
   const atual = await ledgerAtual();
   const inicio = desde ?? Math.max(1, atual - JANELA);
   const r = await servidor.getEvents({
@@ -155,7 +189,7 @@ export async function assembleiasAbertas(desde?: number) {
     .filter((e) => scValToNative(e.topic[0]) === "abrir")
     .map((e) => {
       const v = scValToNative(e.value) as [number, number, number, number, number, boolean];
-      return {
+      const base = {
         proposta: bytesParaHex(scValToNative(e.topic[1]) as Uint8Array),
         perguntas: v[0],
         opcoes: v[1],
@@ -165,8 +199,9 @@ export async function assembleiasAbertas(desde?: number) {
         anel: v[5],
         ledger: e.ledger,
       };
+      return { ...base, fase: fase(base, atual) };
     })
-    .filter((a) => a.fecha_em > atual);
+    .reverse();
 }
 
 // ---------- escrita ----------
