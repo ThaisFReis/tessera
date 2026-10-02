@@ -254,3 +254,105 @@ pub fn verificar_aptidao(
     // outro caminho para a mesma raiz.
     i == 0 && atual == *raiz
 }
+
+// ===================== o anel =====================================
+
+pub const DST_ANEL: &[u8] = b"TESSERA-V1-ANEL";
+
+/// `Hp` da proposta, por hash-to-curve do host.
+///
+/// Mesmo padrão do `H`: o contrato calcula, e o cliente **lê** em vez de
+/// recalcular. É o que evita exigir que o provador reimplemente o hash-to-curve
+/// do host byte a byte — divergir ali faria toda assinatura falhar sem dizer
+/// por quê, que é o bug mais caro possível neste projeto (smoke B3).
+///
+/// Por proposta, não do sistema: se `Hp` fosse fixo, a imagem `I = x·Hp` seria a
+/// mesma em toda votação da pessoa, e daria para dizer "quem votou em A também
+/// votou em B".
+pub fn calcular_hp(env: &Env, proposta: &BytesN<32>) -> Bls12381G1Affine {
+    let bls = env.crypto().bls12_381();
+    let mut msg = Bytes::from_slice(env, DST_ANEL);
+    msg.extend_from_array(&proposta.to_array());
+    bls.hash_to_g1(&msg, &Bytes::from_slice(env, DST_ANEL))
+}
+
+/// O preâmbulo: a mensagem e o anel inteiro, hasheados **uma vez**.
+///
+/// Hashear os `n` pontos dentro de cada um dos `n` elos seria quadrático. Num
+/// anel de 20 isso é a diferença entre 2 KB e 38 KB passando pelo SHA-256.
+///
+/// É também o que a `Proposta` guarda: conferir que a lista apresentada é a que
+/// foi fixada na abertura custa um hash, não guardar `n` pontos no estado.
+pub fn preambulo_anel(env: &Env, msg: &Bytes, anel: &Vec<Bls12381G1Affine>) -> BytesN<32> {
+    let mut buf = Bytes::from_slice(env, DST_ANEL);
+    buf.extend_from_array(&(msg.len() as u32).to_be_bytes());
+    buf.append(msg);
+    buf.extend_from_array(&(anel.len() as u32).to_be_bytes());
+    for p in anel.iter() {
+        buf.extend_from_array(&p.to_array());
+    }
+    env.crypto().sha256(&buf).into()
+}
+
+fn elo_anel(
+    env: &Env,
+    pre: &BytesN<32>,
+    imagem: &Bls12381G1Affine,
+    a: &Bls12381G1Affine,
+    b: &Bls12381G1Affine,
+) -> Bls12381Fr {
+    let mut buf = Bytes::from_array(env, &pre.to_array());
+    buf.extend_from_array(&imagem.to_array());
+    buf.extend_from_array(&a.to_array());
+    buf.extend_from_array(&b.to_array());
+    para_desafio(env, &buf)
+}
+
+/// Dá a volta no anel e confere se cai de volta em `c0`.
+///
+/// Prova que quem assinou conhece a chave de **um** dos membros, sem dizer qual,
+/// e que a mesma pessoa não assinou duas vezes — a imagem `I = x·Hp` colide, e
+/// é o chamador que guarda as imagens usadas.
+///
+/// Dois MSM de dois termos por ramo, pelo mesmo motivo do `verificar_cds`: o
+/// MSM de 2 custa bem menos que dois muls somados.
+pub fn verificar_anel(
+    env: &Env,
+    pre: &BytesN<32>,
+    g: &Bls12381G1Affine,
+    hp: &Bls12381G1Affine,
+    anel: &Vec<Bls12381G1Affine>,
+    imagem: &Bls12381G1Affine,
+    c0: &Bls12381Fr,
+    z: &Vec<Bls12381Fr>,
+) -> bool {
+    let n = anel.len();
+    if n == 0 || z.len() != n {
+        return false;
+    }
+    let bls = env.crypto().bls12_381();
+    let mut c = c0.clone();
+    for i in 0..n {
+        let zi = z.get(i).unwrap();
+        let pi = anel.get(i).unwrap();
+
+        let mut ps = Vec::new(env);
+        let mut ss = Vec::new(env);
+        ps.push_back(g.clone());
+        ps.push_back(pi);
+        ss.push_back(zi.clone());
+        ss.push_back(c.clone());
+        let a = bls.g1_msm(ps, ss);
+
+        let mut ps = Vec::new(env);
+        let mut ss = Vec::new(env);
+        ps.push_back(hp.clone());
+        ps.push_back(imagem.clone());
+        ss.push_back(zi);
+        ss.push_back(c.clone());
+        let b = bls.g1_msm(ps, ss);
+
+        c = elo_anel(env, pre, imagem, &a, &b);
+    }
+    c == *c0
+}

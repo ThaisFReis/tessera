@@ -1289,3 +1289,107 @@ fn orcamento_da_cedula_mista() {
     );
     assert!(tres < 400_000_000 / 2, "e tem de caber com folga");
 }
+
+// ===================== o portão do anel =============================
+
+/// **O portão do PLANO: o anel cabe numa transação?**
+///
+/// Mede `verificar_anel` para 5, 10 e 20 membros, com a assinatura gerada pelo
+/// `tessera-core` em Rust nativo e conferida aqui pelo host do Soroban — o mesmo
+/// cruzamento provador↔verificador do resto do arquivo.
+///
+/// O `Hp` vem do **contrato** e vai para o provador, que é como será em
+/// produção: o cliente lê, não recalcula. Se este teste passa, o hash-to-curve
+/// do host e o provador estão falando a mesma língua.
+#[test]
+fn orcamento_do_anel() {
+    use tessera_core::anel;
+
+    let env = Env::default();
+    env.mock_all_auths();
+    let g_sdk = cripto::gerador_g(&env);
+    let g = ponto::desserializar(&g_sdk.to_array()).unwrap();
+    let proposta = BytesN::from_array(&env, &[7u8; 32]);
+    let hp_sdk = cripto::calcular_hp(&env, &proposta);
+    let hp = ponto::desserializar(&hp_sdk.to_array()).unwrap();
+
+    std::println!("\n== ORCAMENTO DO ANEL ==");
+    std::println!("{:>7}  {:>12}  {:>8}  {:>9}", "membros", "instrucoes", "% de 400M", "bytes");
+
+    let mut custo_10 = 0u64;
+    for n in [5usize, 10, 20] {
+        let xs: Vetor<ArkFr> = (0..n).map(|_| pedersen::acaso_fr().unwrap()).collect();
+        let anel_ark: Vetor<ArkG1> = xs.iter().map(|x| anel::chave_publica(&g, x)).collect();
+        // Quem assina é o último: o custo não depende do índice, mas medir no
+        // pior caso de laço evita uma surpresa se algum dia depender.
+        let s = anel::assinar(b"cedula", &g, &hp, &anel_ark, n - 1, &xs[n - 1]).unwrap();
+
+        let mut anel_sdk: Vec<Bls12381G1Affine> = Vec::new(&env);
+        for p in &anel_ark {
+            anel_sdk.push_back(g1(&env, p));
+        }
+        let mut z_sdk: Vec<Bls12381Fr> = Vec::new(&env);
+        for zi in &s.z {
+            z_sdk.push_back(escalar(&env, zi));
+        }
+        let imagem = g1(&env, &s.imagem);
+        let c0 = escalar(&env, &s.c0);
+        let msg = Bytes::from_slice(&env, b"cedula");
+        let pre = cripto::preambulo_anel(&env, &msg, &anel_sdk);
+
+        let mut ok = false;
+        let custo = cpu(&env, || {
+            ok = cripto::verificar_anel(&env, &pre, &g_sdk, &hp_sdk, &anel_sdk, &imagem, &c0, &z_sdk);
+        });
+        assert!(ok, "o anel de {} nao fechou no host", n);
+        if n == 10 {
+            custo_10 = custo;
+        }
+
+        std::println!(
+            "{:>7}  {:>12}  {:>7.1}%  {:>9}",
+            n,
+            custo,
+            100.0 * custo as f64 / TETO as f64,
+            anel::tamanho(n)
+        );
+    }
+
+    // E o que o host tem de recusar.
+    let xs: Vetor<ArkFr> = (0..5).map(|_| pedersen::acaso_fr().unwrap()).collect();
+    let anel_ark: Vetor<ArkG1> = xs.iter().map(|x| anel::chave_publica(&g, x)).collect();
+    let s = anel::assinar(b"cedula", &g, &hp, &anel_ark, 2, &xs[2]).unwrap();
+    let mut anel_sdk: Vec<Bls12381G1Affine> = Vec::new(&env);
+    for p in &anel_ark {
+        anel_sdk.push_back(g1(&env, p));
+    }
+    let mut z_sdk: Vec<Bls12381Fr> = Vec::new(&env);
+    for zi in &s.z {
+        z_sdk.push_back(escalar(&env, zi));
+    }
+    let imagem = g1(&env, &s.imagem);
+    let c0 = escalar(&env, &s.c0);
+
+    // outra mensagem: a cédula foi trocada depois de assinada
+    let outra = cripto::preambulo_anel(&env, &Bytes::from_slice(&env, b"outra"), &anel_sdk);
+    assert!(
+        !cripto::verificar_anel(&env, &outra, &g_sdk, &hp_sdk, &anel_sdk, &imagem, &c0, &z_sdk),
+        "o host aceitou uma cedula trocada depois da assinatura"
+    );
+
+    // outro Hp: a assinatura veio de outra proposta
+    let hp_outro = cripto::calcular_hp(&env, &BytesN::from_array(&env, &[9u8; 32]));
+    let certo = cripto::preambulo_anel(&env, &Bytes::from_slice(&env, b"cedula"), &anel_sdk);
+    assert!(
+        !cripto::verificar_anel(&env, &certo, &g_sdk, &hp_outro, &anel_sdk, &imagem, &c0, &z_sdk),
+        "o host aceitou uma assinatura de outra proposta"
+    );
+
+    // Portão: um anel de 10 mais a cédula medida (10.980.243 por disjuntiva)
+    // tem de caber com folga nos 400M.
+    assert!(
+        custo_10 <= 150_000_000,
+        "anel de 10 custa {}, e nao sobra espaco para a cedula",
+        custo_10
+    );
+}

@@ -5,6 +5,7 @@
 //! neste projeto (smoke B3).
 
 pub mod acaso;
+pub mod anel;
 pub mod cds;
 pub mod merkle;
 pub mod pedersen;
