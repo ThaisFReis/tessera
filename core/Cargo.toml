@@ -14,3 +14,8 @@ ark-bls12-381 = { version = "0.5", default-features = false, features = ["curve"
 ark-ec = { version = "0.5", default-features = false }
 ark-ff = { version = "0.5", default-features = false }
 ark-serialize = { version = "0.5", default-features = false }
+
+[features]
+# A mesma matemática rodando no navegador: `getrandom` precisa da fonte de
+# entropia da Web Crypto para existir em wasm32-unknown-unknown.
+navegador = ["getrandom/js"]
