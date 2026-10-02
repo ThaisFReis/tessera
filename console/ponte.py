@@ -76,7 +76,22 @@ def rodar(args):
         timeout=180,
         env=amb,
     )
-    return p.returncode, (p.stdout or "") + (p.stderr or "")
+    saida = (p.stdout or "") + (p.stderr or "")
+
+    # A CLI fala com o contrato pelos nomes dos parâmetros. Quando o contrato
+    # na rede é mais velho que a CLI, a `stellar` devolve um "unexpected
+    # argument" que não diz nada a quem está olhando a demo. Dizer aqui custa
+    # cinco linhas e evita a caça ao fantasma — aconteceu comigo.
+    if "unexpected argument" in saida:
+        faltante = re.search(r"unexpected argument '(--[\w-]+)'", saida)
+        saida += (
+            f"\n\n  O contrato em {CONTRATO[:8]}… não conhece "
+            f"{faltante.group(1) if faltante else 'esse argumento'}.\n"
+            "  A CLI foi recompilada e o contrato na rede ficou para trás:\n"
+            "  publique de novo, ou aponte TESSERA_CONTRATO para a versão nova\n"
+            "  e reinicie a ponte.\n"
+        )
+    return p.returncode, saida
 
 
 def estado(proposta):
