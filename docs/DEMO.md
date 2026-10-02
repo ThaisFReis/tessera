@@ -36,7 +36,7 @@ Dez painéis, três atos. Todos construídos, e todos ligados à ponte.
 | **I** | 2 · eleitorado, mesa e prazo | mostra a abertura recém-publicada |
 | **II** | 3 · analisar a cédula | — |
 | **II** | 4 · votar | **envia o voto**, um eleitor por vez |
-| **II** | 5 · o recibo | **sobrescreve o recibo de verdade** |
+| **II** | 5 · pronto | confirmação; não há recibo a queimar |
 | **III** | 6 · a cédula indecifrável | — |
 | **III** | 7 · a grade | — |
 | **III** | 8 · apurar | **apura**, e **faz a mesa mentir de verdade** |
@@ -71,7 +71,7 @@ que a torna legível para quem nunca viu o projeto.
 | Ato | Ator | O que ele faz | Painéis |
 |---|---|---|---|
 | I | **Organizador** | abre a proposta: perguntas, natureza, prazo, mesa | 1–2 |
-| II | **Votante** | analisa a cédula, vota, recebe o recibo, queima | 3–5 |
+| II | **Votante** | analisa a cédula, vota, e vê o sigilo protegido | 3–5 |
 | III | **Qualquer um** | apura, e confere | 6–9 |
 
 E, atrás de tudo, a coluna da mecânica.
@@ -138,7 +138,7 @@ Os dez traços:
 | 2 | `core/src/merkle.rs` | `folha`, `no`, e a lista que nunca é publicada |
 | 3 | `core/src/merkle.rs` | `verificar` — provar aptidão sem consultar cadastro |
 | 4 | `core/src/pedersen.rs` | `comprometer` — `v`, `r` tarjado, `C` |
-| 5 | `cli/src/recibo.rs` | os dois arquivos, e o teste que separa um do outro |
+| 5 | `cli/src/recibo.rs` | o teste que prova que nada é gravado |
 | 6 | `core/src/cds.rs` | `provar` — o ramo real e o fabricado |
 | 7 | `core/src/soma.rs` | a prova por pergunta, e o desafio com `pergunta` |
 | 8 | `core/src/pedersen.rs` | `agregar` e `verifica_agregado`, linha a linha |
@@ -316,55 +316,48 @@ ser indecifrável. **A saída é a ordem:** aqui aparece só o compromisso da
 escolha, nunca o par. Os dois juntos só no painel 6, onde "qual era qual?" já
 não tem resposta na tela.
 
-E o `abrir o voto inteiro` da urna é o `--publico`: revelação voluntária,
-legítima — e, em bloco, o ataque do painel 9.
+**Não há botão de abrir o voto.** Houve, e foi removido junto com
+`votar_publico` no contrato: um voto aberto no ledger é coação verificável em
+escala, e em bloco derrubava a apuração por τ.
 
 > Uma transação, três perguntas, uma taxa. `Votou(proposta, eleitor)` é **uma
 > chave por cédula**, não por pergunta: **não existe votar metade**. E o
 > contrato verifica tudo — provas, aptidão, formato — **antes de escrever
 > qualquer coisa**.
 
-## Painel 5 — o recibo 
+## Painel 5 — pronto
 
-**Esquerda.** O que a CLI já diz, e a tela precisa dizer com o mesmo peso:
-
-```
-  ⚠  A CHAVE EM ./recibos/ana.key PROVA O SEU VOTO
-
-     Enquanto ela existir, você consegue provar a qualquer pessoa em que
-     votou — e quem te obrigar a mostrar consegue conferir.
-
-     A rede nunca vai saber. Mas você pode ser forçada a contar.
-
-                                              [ queimar o recibo ]
-```
-
-Clicou, e a tela muda para:
+**Esquerda.** O voto entrou, e a tela vai direto para cá — não há botão a
+apertar.
 
 ```
-  ✓ Agora nem você consegue provar em que votou.
-    Seu voto continua na contagem, e você continua podendo conferir
-    que ele está lá.
+  Pronto
+  MARTA · LEDGER 4.986.200
+
+  Seu voto está na contagem.
+  Seu sigilo está protegido.
+
+  Nenhum arquivo nesta máquina prova em que você votou.
 ```
 
-**Direita — as duas frases que fazem este painel ser o mais importante do Ato
-II:**
+**Direita:**
 
-> O recibo guarda **só os segredos**: o acaso `r` e a escolha. As provas e os
-> compromissos vivem no arquivo de estado, que é público.
+> `votar` **não grava recibo**. Houve uma versão que gravava `r` em
+> `./recibos/<identidade>.key` e pedia que a pessoa apagasse depois. Dois
+> defeitos: quem coage manda não apagar, e nenhum comando lia o arquivo — nem
+> para conferir voto, nem para apurar. Era passivo puro.
 >
-> Logo, queimar o recibo destrói a capacidade de provar o próprio voto e **não
-> custa um grama de auditabilidade**. É o que torna a compra de voto sem objeto:
-> **não existe o que entregar**.
+> Gravar e apagar em seguida deixa uma janela. Não gravar não deixa janela
+> nenhuma: o `r` vive no processo e morre com ele.
 >
-> E o estado nunca contém `r`. Não é promessa: é o teste
-> `o_json_nao_tem_lugar_para_aleatoriedade` e a trava do `console/embutir.py`,
-> que recusa embutir um estado onde apareça `"r"`, `acaso`, `aleatori`,
-> `segredo` ou `"chave"`.
+> A auditoria não perdeu nada, porque nunca dependeu do segredo — compromissos e
+> provas continuam no estado público. Um teste lê `comandos.rs` e falha se
+> `recibo::gravar` voltar; é a única forma de provar uma ausência.
 
----
+**Narração:**
 
-# ATO III — A APURAÇÃO, E QUEM DUVIDA
+> Não existe prova do seu voto em lugar nenhum. É isso que torna a compra de
+> voto sem objeto: não há o que entregar.
 
 ## Painel 6 — a cédula indecifrável  (`momentoCedula`)
 
@@ -439,12 +432,10 @@ deixa a conta não fechar, na tela.
 > Não é que alguém auditou depois e descobriu. É que a apuração errada **não é
 > representável** — não existe o estado em que ela foi publicada.
 
-## Painel 9 — sigilo abaixo do mínimo 
+## Painel 9 — quórum de sigilo
 
-Segundo instantâneo, proposta separada: 7 aptos, **4 em segredo e 3 que abriram
-o voto de propósito**.
-
-**A ordem na tela é o efeito inteiro — não inverta:**
+Um clique monta a rodada: proposta nova, **4 das 7 pessoas votam**, o prazo
+fecha, e a mesa tenta apurar.
 
 ```
   MANTER ............. 4
@@ -455,23 +446,31 @@ o voto de propósito**.
   Error(Contract, #19) = AnonimatoInsuficiente
 ```
 
-Os dois `✓` vêm **antes** da recusa. A mesa reconstruiu a abertura, achou os
-totais, os acumuladores fecharam — o contrato tinha o resultado correto na mão e
-escolheu não publicar.
+Os dois `✓` vêm **antes** da recusa, e a ordem é o efeito inteiro: a mesa
+reconstruiu a abertura, achou os totais, os acumuladores fecharam — e o contrato
+não publicou.
 
-**Direita — o teorema da partição, SPEC §6.6:**
+**Direita — e esta cena mudou de significado:**
 
-> Revelar o próprio voto é um direito. Mas um bloco revelando em conjunto
-> **particiona** o eleitorado, e numa célula pequena o agregado deixa de
-> proteger o indivíduo — no limite, uma célula de um é o voto daquela pessoa.
+> Com poucas cédulas o total entrega quem votou. No limite, uma cédula só *é* o
+> voto daquela pessoa.
 >
-> Tessera recusa apurar qualquer célula com menos de **τ = 5** cédulas
-> sigilosas. Converte uma quebra de sigilo numa falha de **disponibilidade**: a
-> votação não sai, e ninguém é exposto.
+> **Isto é quórum, não recusa.** Antes era um ataque: bastavam três pessoas
+> abrindo o voto por `votar_publico` para encolher o conjunto sigiloso de fora e
+> vetar a assembleia inteira — negação de serviço contra a própria eleição.
+> Removida aquela função, o único caminho até aqui é comparecimento baixo.
 >
-> **τ é global, não por pergunta** — porque o sigilo é da pergunta, fixado na
-> abertura. Quem votou em segredo é o mesmo conjunto em todas as sigilosas,
-> então a partição tem só duas células.
+> Nenhum sistema eleitoral sério recusa contar. O Brasil protege a célula
+> pequena **antes**, agregando seções com menos de 50 eleitores (TSE,
+> Res. 23.669/2021); quando há nulidade, o remédio é eleição nova (CE art. 224),
+> não ausência de resultado. O remédio aqui é o mesmo: estender o prazo, ou
+> refazer com um eleitorado que caiba no sigilo.
+
+**Narração:**
+
+> Quatro pessoas votaram num eleitorado de sete. O contrato tinha o resultado
+> correto na mão e não publicou — porque publicar entregaria as quatro. Isso é
+> quórum, declarado na abertura, e o remédio é repetir com mais gente.
 
 ## Painel 10 — o verificador  (`verificador`)
 
@@ -505,7 +504,7 @@ cd cli && cargo build --release && cd ..
 ```
 
 ```bash
-export TESSERA_CONTRATO=CAXI5NPJNWGN7MNVAKASDAYOZLOXXRYA2YGZHXVQQQDRPLDP4AYHGK46
+export TESSERA_CONTRATO=CBAHLZMTSP52CVPJGN6ATDVP4XACCX2PVMGBVIVYMR363JQRSOL7OOTG
 python3 console/ponte.py
 ```
 
@@ -538,7 +537,7 @@ for c in core contrato cli bls-smoke; do (cd $c && cargo test); done
 python3 console/guarda.py
 ```
 
-115 testes e 25 âncoras.
+112 testes e 27 âncoras.
 
 ### 11.2 O problema do prazo — leia antes de começar
 
@@ -560,9 +559,9 @@ tessera abrir --proposta coligacao-demo \
   --aptos aptos.txt --mesa mesa.txt -k 3 --prazo 15m
 ```
 
-Vote: 5 cédulas mistas e 2 com `--publico` na primeira; na segunda, 4 em
-segredo e **3 com `--publico`** — é o que encolhe o conjunto sigiloso abaixo
-de τ.
+Vote nas duas. Na segunda, **só 4 das 7 pessoas** — é o que deixa o
+comparecimento abaixo de τ e faz a apuração parar por falta de quórum de
+sigilo.
 
 ```bash
 tessera votar --proposta assembleia-demo \
@@ -604,7 +603,7 @@ Pages renderiza certo. **Se for gravar o console, grave do Pages.**
 | I | 2 · mesa, prazo, raiz de Merkle | 0:25 | — |
 | II | 3 · analisar a cédula | 0:20 | — |
 | II | 4 · votar | 0:30 | ✓ |
-| II | 5 · o recibo, e queimá-lo | 0:30 | ✓ |
+| II | 5 · pronto · o sigilo protegido | 0:25 | ✓ |
 | III | 6 · a cédula indecifrável | 0:40 | ✓ **o coração** |
 | III | 7 · a grade | 0:20 | ✓ |
 | III | 8 · apurar + mesa mentindo | 0:40 | ✓ |
@@ -627,7 +626,7 @@ sempre a mesma pessoa, e o desenho inteiro fica incompreensível.
 
 ### O fechamento
 
-> Contrato de 23,8 KB, 115 testes, rodando na testnet. Compromisso de Pedersen,
+> Contrato de 22,1 KB, 112 testes, rodando na testnet. Compromisso de Pedersen,
 > prova disjuntiva, Shamir para a mesa. Sem setup confiável, sem cerimônia.
 >
 > E a cédula mista: a mesma assembleia decide o que é público e o que é secreto,
@@ -647,9 +646,9 @@ Nada fora desta tabela deve ser afirmado em quadro.
 
 | | |
 |---|---|
-| Contrato (testnet) | `CAXI5NPJNWGN7MNVAKASDAYOZLOXXRYA2YGZHXVQQQDRPLDP4AYHGK46` |
-| Wasm otimizado | 24.344 B = **23,8 KB** |
-| Testes | **115** · bls-smoke 13, core 49, contrato 29, cli 24 |
+| Contrato (testnet) | `CBAHLZMTSP52CVPJGN6ATDVP4XACCX2PVMGBVIVYMR363JQRSOL7OOTG` |
+| Wasm otimizado | 22.584 B = **22,1 KB** |
+| Testes | **112** · bls-smoke 13, core 49, contrato 25, cli 25 |
 | `votar`, custo | **9.805.000 + 13.501.500 por opção sigilosa** |
 | 1 pergunta sigilosa, 2 opções | 36.804.670 — **9,2%** do teto |
 | mista: 1 pública + 2 sigilosas | 73.547.797 — **18,4%** |

@@ -3,7 +3,7 @@
 ```bash
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
-export TESSERA_CONTRATO=CAXI5NPJNWGN7MNVAKASDAYOZLOXXRYA2YGZHXVQQQDRPLDP4AYHGK46
+export TESSERA_CONTRATO=CBAHLZMTSP52CVPJGN6ATDVP4XACCX2PVMGBVIVYMR363JQRSOL7OOTG
 ```
 
 Requer a `stellar` CLI com identidades criadas e financiadas. Quem vota paga a
@@ -24,15 +24,25 @@ tessera abrir   --proposta contas \
 
 tessera cedula  --proposta contas --identidade marta          # mostra, não vota
 tessera votar   --proposta contas --opcao rejeitar --identidade marta
-tessera votar   --proposta contas --opcao aprovar --identidade pedro --publico
-tessera queimar --identidade marta
+tessera votar   --proposta contas --opcao aprovar --identidade pedro
 tessera status  --proposta contas
 tessera apurar  --proposta contas
 tessera verificar --proposta contas
 ```
 
 `--aptos` e `--mesa` aceitam lista por vírgula ou um arquivo com um nome por
-linha. `--prazo` aceita `8m`, `2h` ou um número de ledgers.
+linha. `--inicio` diz quando a votação abre (padrão `0`, imediato) e `--prazo`
+quanto ela dura depois disso; os dois aceitam `8m`, `2h`, `45s` ou um número de
+ledgers.
+
+**Não existe votar em público, e não existe recibo.** Um voto aberto no ledger
+é a forma mais forte de coação que há — quem coage confere sozinho, sem a
+pessoa na frente — e um recibo guardado é o que a compra de voto precisa para
+saber se foi entregue. `votar` não grava nada em disco: o acaso que esconde o
+seu voto vive no processo e morre com ele.
+
+Perguntas públicas são outra coisa, e continuam existindo: valem para todos e
+são decididas pelo estatuto na abertura.
 
 ## A cédula mista
 
@@ -45,9 +55,6 @@ tessera abrir   --proposta assembleia                 --pergunta "Aprovar as con
 
 # uma --opcao por pergunta, na ordem da cédula
 tessera votar   --proposta assembleia --opcao aprovar --opcao sim --opcao ana                 --identidade marta
-
-# --publico abre a cédula INTEIRA, inclusive as perguntas sigilosas
-tessera votar   --proposta assembleia --opcao aprovar --opcao nao --opcao bruno                 --identidade pedro --publico
 ```
 
 Uma cédula **confidencial** é aquela em que todas as perguntas são sigilosas;

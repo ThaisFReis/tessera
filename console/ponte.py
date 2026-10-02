@@ -166,8 +166,8 @@ def votar(c):
             raise Recusa("opção vazia")
         args += ["--opcao", o.strip()]
     args += ["--identidade", identidade]
-    if c.get("publico"):
-        args.append("--publico")
+    # `--publico` não existe mais. Um voto aberto on-chain é coação verificável
+    # em escala, e era também o que permitia derrubar a apuração por τ.
     return rodar(args), proposta
 
 

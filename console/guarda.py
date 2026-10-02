@@ -39,7 +39,11 @@ def ler_ancoras(fonte):
     m = re.search(r"const ANCORAS = (\{.*?\n\});", fonte, re.S)
     if not m:
         sys.exit("não achei o bloco `const ANCORAS` em console/index.html")
-    bruto = re.sub(r",(\s*[\]\}])", r"\1", m.group(1))
+    # O bloco é JS: aceita comentário de linha e vírgula sobrando, e os dois
+    # precisam sair antes de virar JSON. Comentário dentro de string não
+    # acontece aqui — as âncoras são trechos de código, não URLs.
+    bruto = re.sub(r"^\s*//.*$", "", m.group(1), flags=re.M)
+    bruto = re.sub(r",(\s*[\]\}])", r"\1", bruto)
     try:
         return json.loads(bruto)
     except json.JSONDecodeError as e:

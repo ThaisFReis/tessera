@@ -55,7 +55,6 @@ Teto de CPU por transação, achado por bissecção na testnet: **400.000.000**.
 | **caminho de Merkle (profundidade 8)** | **127.863** | **5.235 stroops** |
 | **`votar()` completo, m=2** | **36.781.170** | |
 | **`apurar()`, m=2** | **11.150.582** | |
-| **`votar_publico()`, m=2** | **350.372** | |
 | apuração ElGamal (desenho anterior) | 6.712.183 | 11.852 stroops |
 | verificação Groth16 (4 entradas públicas) | 47.371.348 | |
 
@@ -125,7 +124,6 @@ Custo real por voto, medido:
 |---|---|
 | `abrir` | 1,83 XLM |
 | `votar` confidencial | **157.267 stroops ≈ 0,0157 XLM** |
-| `votar --publico` | 118.448 stroops |
 | manter o contrato vivo 180 dias | 181,70 XLM, uma vez |
 
 O `cedula` é o comando que não vota: mostra os dois compromissos possíveis
@@ -214,7 +212,7 @@ Contratos na testnet:
 
 | | |
 |---|---|
-| **Tessera (cédula mista)** | `CAXI5NPJNWGN7MNVAKASDAYOZLOXXRYA2YGZHXVQQQDRPLDP4AYHGK46` |
+| **Tessera (cédula mista)** | `CBAHLZMTSP52CVPJGN6ATDVP4XACCX2PVMGBVIVYMR363JQRSOL7OOTG` |
 | Tessera v1, cédula de uma pergunta | `CBLUSE2LCPPELS7GIQ5MRYKSW7KTILMWY7VBRFRSWAVG3L7TSRQYHP7H` |
 | sondas 1–13 (cripto, CDS e Merkle) | `CCL4CPAJ4ZVP25FP2PO7T3AMYGIVQZLYJZYZS53UAM5IFA5NFYGLUISR` |
 | sonda 9 (TTL) | `CCCZ4HPW3ESHO6BMNFGXX6DJRSWPWA7FBQH2MS6QGHC3U67DIZ434KFC` |

@@ -770,7 +770,7 @@ async function sondarPonte() {
 }
 
 /* O que o organizador está montando, e com que nome vai ao ar. */
-const aoVivo = { proposta: "", inicio: "0", prazo: "3m", identidade: "", escolhas: [], publico: false, ultimo: "", recibo: "" };
+const aoVivo = { proposta: "", inicio: "0", prazo: "3m", identidade: "", escolhas: [], ultimo: "", recibo: "" };
 
 /* O rascunho com que a tela abre quando a ponte está no ar. Não há proposta
    ainda: ela vai existir quando alguém clicar em abrir. */
@@ -934,13 +934,18 @@ const ANCORAS = {
   "core/src/shamir.rs": [],
   "contrato/src/lib.rs": [
     "Erro::AnonimatoInsuficiente",
+    // O comentário que marca a remoção. Se `votar_publico` voltar, quem o
+    // reintroduzir vai tirar isto daqui — e a guarda acusa.
+    "`votar_publico` existia aqui e foi **removido**",
   ],
   "contrato/src/cripto.rs": [
     "pub fn contexto",
   ],
   "cli/src/recibo.rs": [
-    "escolha{}={}",
-    "r{}={}",
+    "pub fn queimar",
+    // A âncora que importa: o teste que prova a ausência. Se alguém
+    // reintroduzir a gravação do recibo, ele some e a guarda acusa.
+    "nenhum_comando_grava_recibo",
   ],
   "cli/src/comandos.rs": [
     "pub fn verificar",
@@ -1344,11 +1349,6 @@ function urna(d) {
     q.append(g); cx.append(q);
   });
 
-  const abre = el("button","nav-btn", aoVivo.publico ? "✓ abrindo o voto inteiro" : "abrir o voto inteiro (revelação voluntária)");
-  abre.type="button"; abre.setAttribute("aria-pressed",String(aoVivo.publico));
-  abre.addEventListener("click",()=>{aoVivo.publico=!aoVivo.publico;mostrar();});
-  cx.append(abre);
-
   const faltam = d.perguntas.length - aoVivo.escolhas.filter(Boolean).length;
   /* Sem ninguém para votar não há botão. Ele continuava na tela depois do
      sétimo voto, com a identidade já vazia, e cada clique virava um
@@ -1359,9 +1359,12 @@ function urna(d) {
     const quemVota = aoVivo.identidade;
     const j = await chamar("votar", {
       proposta: d.proposta, identidade: quemVota,
-      opcoes: aoVivo.escolhas, publico: aoVivo.publico,
+      opcoes: aoVivo.escolhas,
     });
-    if (j.ok) { aoVivo.ultimo = quemVota; aoVivo.escolhas = []; aoVivo.publico = false; mostrar(); }
+    /* Depois de votar, a tela vai direto para a confirmação: o voto entrou e
+       nada nesta máquina prova em que foi. Não há botão a apertar, porque não
+       há recibo a queimar. */
+    if (j.ok) { aoVivo.ultimo = quemVota; aoVivo.escolhas = []; passo = 4; mostrar(); }
   }));
   return cx;
 }
@@ -1390,74 +1393,62 @@ function mecanismoVotar(d) {
     ["ok","tudo verificado antes de gravar qualquer coisa"],
   ]);
 }
+/* O painel 5 era "o recibo", com um botão para queimá-lo. O recibo não existe
+   mais: `votar` não grava nada. Então ele deixou de ser uma tarefa e virou o
+   que deveria ter sido desde o começo — a confirmação de que acabou bem. */
 function painelRecibo(d) {
-  const s=el("section"); titulo(s,5,"O recibo");
-  const caixa=el("div","cartao");
-  if(!reciboQueimado){
-    texto(caixa,"h3",null,"⚠ A chave em ./recibos/<identidade>.key prova o seu voto");
-    texto(caixa,"p",null,"Enquanto ela existir, você consegue provar a qualquer pessoa em que votou — e quem te obrigar a mostrar consegue conferir.");
-    texto(caixa,"p","dim","A rede nunca vai saber. Mas você pode ser forçada a contar.");
-    if (ponte.viva) {
-      /* Numa rodada de sete, "o recibo de quem?" é pergunta de verdade. Antes
-         a tela chutava, e quando o chute saía vazio a ponte devolvia
-         "identidade inválido" — erro sem informação nenhuma para quem assiste. */
-      const quem = (d?.votos || []).map((v) => v.identidade);
-      const lista = quem.length ? quem : ponte.identidades;
-      if (!aoVivo.recibo || !lista.includes(aoVivo.recibo))
-        aoVivo.recibo = aoVivo.ultimo && lista.includes(aoVivo.ultimo)
-          ? aoVivo.ultimo : lista[lista.length - 1] || "";
-      if (!lista.length) {
-        texto(caixa,"p","recusa-demo","Ninguém votou ainda — não há recibo para queimar.");
-      } else {
-        texto(caixa,"label","campo-rot","De quem é o recibo");
-        const sel = el("select","campo-demo");
-        lista.forEach((nm) => { const o = el("option", null, nm); o.value = nm; sel.append(o); });
-        sel.value = aoVivo.recibo;
-        sel.addEventListener("change", () => { aoVivo.recibo = sel.value; });
-        caixa.append(sel);
-        caixa.append(botao(`Queimar o recibo de ${aoVivo.recibo}`, async () => {
-          const j = await chamar("queimar", { identidade: aoVivo.recibo });
-          if (j.ok) { reciboQueimado = true; mostrar(); }
-        }));
-      }
-    } else {
-      const b=el("button","acao","Simular a queima do recibo");b.type="button";
-      b.addEventListener("click",()=>{reciboQueimado=true;mostrar();});caixa.append(b);
-    }
-  } else {
-    texto(caixa,"p","fato", ponte.viva
-      ? `✓ recibos/${aoVivo.recibo}.key foi sobrescrito`
-      : "✓ Recibo removido na reencenação");
-    texto(caixa,"div","destaque","Agora nem você consegue provar em que votou.");
-    texto(caixa,"p","dim","Seu voto continua na contagem, e você continua podendo conferir que ele está lá.");
+  const s = el("section");
+  titulo(s, 5, "Pronto");
+
+  const ultimo = (d?.votos || []).slice(-1)[0];
+  if (ultimo) {
+    texto(s, "p", "painel-tag", `${ultimo.identidade} · ledger ${num(ultimo.ledger)}`);
   }
-  s.append(caixa);
-  if (ponte.falha) texto(s,"p","recusa-demo",ponte.falha);
+  texto(s, "div", "destaque", "Seu voto está na contagem.");
+  texto(s, "div", "destaque", "Seu sigilo está protegido.");
+
+  const cx = el("div", "cartao");
+  texto(cx, "p", null, "Nenhum arquivo nesta máquina prova em que você votou.");
+  texto(cx, "p", "dim",
+    "O acaso que escondeu o seu voto existiu só durante o envio e morreu com ele. " +
+    "Nem você consegue mais demonstrar a sua escolha — e é por isso que não há " +
+    "o que entregar a quem compra voto.");
+  texto(cx, "p", "dim",
+    "O voto continua na contagem, e continua conferível por qualquer pessoa.");
+  s.append(cx);
+
+  if (ultimo && d.contrato) {
+    const a = el("a", null, "Ver esta transação ↗");
+    a.href = expert(d, "tx", ultimo.tx); a.target = "_blank"; a.rel = "noopener";
+    s.append(a);
+  }
   return s;
 }
+
 function mecanismoRecibo() {
   return terminalMecanica("cli/src/recibo.rs", [
-    ["cod","recibos/<identidade>.key"],
-    ["cod","  proposta=…"],
-    ["cod","  escolha0=0  escolha1=1"],
-    ["cod","  r0=…  r1=…          ← o acaso"],
+    ["cod","// `votar` não chama mais recibo::gravar."],
+    ["cod","#[test] fn nenhum_comando_grava_recibo() {"],
+    ["cod","    let fonte = include_str!(\"comandos.rs\");"],
+    ["cod","    assert!(!fonte.contains(\"recibo::gravar\"));"],
+    ["cod","}"],
+    [],
+    ["ocl","r","existiu no processo, e morreu com ele"],
+    ["val","no disco","nada"],
+    [],
+    ["//","a v1 gravava o recibo e pedia para apagar."],
+    ["//","quem coage manda não apagar — e nenhum"],
+    ["//","comando lia o arquivo, nem para conferir voto"],
+    ["//","nem para apurar. era passivo puro."],
     [],
     ["cod","estado/<proposta>.json"],
-    ["cod","  compromissos: [...]  ← público"],
-    ["cod","  provas:       [...]  ← público"],
-    ["oculto","r","não cabe neste arquivo"],
-    [],
-    ["cod","#[test] fn o_json_nao_tem_lugar_para_aleatoriedade()"],
-    ["cod","// console/embutir.py"],
-    ["cod","PROIBIDO = ('\"r\"', 'acaso', 'aleatori',"],
-    ["cod","            'segredo', '\"chave\"')"],
-    [],
-    [reciboQueimado?"ok":"!", reciboQueimado
-      ? "recibo sobrescrito · a prova deixou de existir"
-      : "enquanto a chave existir, você pode ser forçada a mostrá-la"],
-    ["nota","Os segredos num arquivo, as provas no outro. Queimar o recibo não custa auditabilidade — e não sobra o que entregar a quem compra voto."],
+    ["cod","  compromissos: [...]   ← público"],
+    ["cod","  provas:       [...]   ← público"],
+    ["ok","tudo que o verificador precisa continua lá"],
+    ["nota","Não existe prova do seu voto em lugar nenhum — e a auditoria não perdeu nada, porque ela nunca dependeu do segredo."],
   ]);
 }
+
 function mecanismoCedula() {
   return terminalMecanica("core/src/cds.rs", [
     ["cod","pub fn provar(ctx, g, h, c,"],
@@ -1590,78 +1581,61 @@ function mecanismoApurar(d) {
       : "fecha, pergunta por pergunta"],
   ]);
 }
-/* O painel de τ precisa de um eleitorado diferente do da votação principal:
-   um bloco que abre o voto e encolhe o conjunto secreto abaixo do mínimo. Com
-   a ponte no ar ele monta essa rodada sozinho — abrir, quatro em segredo, três
-   com --publico — e tenta apurar. A recusa que aparece é a do contrato. */
+/* O painel de τ contava um ataque: um bloco abrindo o voto para encolher o
+   conjunto sigiloso e derrubar a apuração. Com `votar_publico` fora do
+   contrato esse ataque não existe mais — e era a coisa certa a fazer, porque
+   recusar o resultado correto é negação de serviço contra a eleição.
+
+   O que sobra é quórum: se pouca gente vota, publicar o total entrega quem
+   votou. A tela agora monta essa rodada — quatro cédulas num eleitorado de
+   sete — e tenta apurar. */
 const tau = { proposta: "", fase: "", saida: "", ledger: 0, estado: null };
 
 function painelLimite(d) {
-  const s=el("section"); titulo(s,9,"O resultado correto também pode ser recusado");
+  const s=el("section"); titulo(s,9,"Quórum de sigilo");
+  texto(s,"p","dim","Com poucas cédulas, publicar o total entrega quem votou. O contrato prefere não publicar.");
 
   if (!ponte.viva) {
     texto(s,"div","recusa-demo","✗ apuração recusada · nada foi publicado\nError(Contract, #19) = AnonimatoInsuficiente");
-    const a=el("a",null,"Ver transação ↗");
-    a.href="https://stellar.expert/explorer/testnet/tx/ed66a8c78b798539ad9796fd8a985325e137d270e152f2b7325970f00ce2f200";
-    a.target="_blank";a.rel="noopener";s.append(a);
     return s;
   }
-
   if (tau.fase) texto(s,"p","painel-tag",tau.fase);
-
-  const esperando = tau.ledger && ponte.ledger && ponte.ledger < tau.ledger;
-  if (esperando) {
+  if (tau.ledger && ponte.ledger && ponte.ledger < tau.ledger)
     texto(s,"p","painel-tag",`faltam ~${(tau.ledger-ponte.ledger)*5}s para o prazo fechar`);
-  }
 
-  if (!tau.fase || tau.fase.startsWith("✗") || tau.fase.startsWith("✓")) {
-    s.append(botao("Montar a coligação e tentar apurar →", rodarTau));
-  }
+  if (!tau.fase || tau.fase.startsWith("✗") || tau.fase.startsWith("✓"))
+    s.append(botao("Rodar com 4 de 7 e tentar apurar →", rodarTau));
   return s;
 }
 
-/* Sete aptos: quatro votam em segredo, três abrem o voto. 4 < τ = 5. */
+/* Quatro votam, três não aparecem. 4 < τ = 5. */
 async function rodarTau() {
-  const nome = "coligacao-" + Date.now().toString(36).slice(-5);
+  const nome = "quorum-" + Date.now().toString(36).slice(-5);
   const dizer = (f) => { tau.fase = f; mostrar(); };
 
-  tau.proposta = nome; tau.saida = ""; tau.ledger = 0;
+  tau.proposta = nome; tau.saida = ""; tau.ledger = 0; tau.estado = null;
   dizer("abrindo a proposta…");
   let j = await fetch("/api/abrir", { method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ proposta: nome, prazo: "5m", limiar: 3,
-      /* O prazo precisa aguentar a pior volta, não a média.
-         Medido numa rodada real: três votos em 10 s e 5 s, e então uma parada
-         de 140 s antes do quarto — provavelmente o Horizon respondendo devagar
-         para a consulta de taxa e ledger. Com 3m a fila morria no quinto voto.
-         5m absorve uma parada dessas e ainda sobra. */
+    body: JSON.stringify({ proposta: nome, prazo: "4m", limiar: 3,
       perguntas: [{ texto:"Manter a coligação?", opcoes:["manter","rescindir"], confidencial:true }] }) }).then(r=>r.json());
   if (!j.ok) { tau.saida = j.saida || j.erro || ""; registrarSaida(tau.saida); return dizer("✗ não consegui abrir"); }
-  tau.ledger = (j.estado && j.estado.prazo_ledger) || 0;
   registrar("abrir", null, j.estado); tau.estado = j.estado;
+  tau.ledger = (j.estado && j.estado.prazo_ledger) || 0;
 
-  const quem = ponte.identidades.slice(0,7);
+  const quem = ponte.identidades.slice(0, 4);
   for (let i = 0; i < quem.length; i++) {
-    const aberto = i >= 4;            // os três últimos revelam o voto
-    /* Se o prazo está por fechar, parar aqui é melhor que gastar um voto que
-       vai ser recusado — e deixa claro que foi o relógio, não o protocolo. */
     await lerLedger();
-    if (ponte.ledger && tau.ledger && (tau.ledger - ponte.ledger) * 5 < 20) {
+    if (ponte.ledger && tau.ledger && (tau.ledger - ponte.ledger) * 5 < 20)
       return dizer(`✗ o prazo fecha em instantes · pararam ${i} de ${quem.length} votos`);
-    }
-    dizer(`${quem[i]} votando ${aberto ? "com o voto aberto" : "em segredo"} · ${i+1} de ${quem.length} · ${relogio({prazo_ledger: tau.ledger})}`);
+    dizer(`${quem[i]} votando · ${i+1} de ${quem.length}`);
     j = await fetch("/api/votar", { method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ proposta: nome, identidade: quem[i], opcoes:["manter"], publico: aberto }) }).then(r=>r.json());
-    if (j.ok) { registrar("votar", { votos: (j.estado?.votos || []).slice(0, i) }, j.estado); tau.estado = j.estado; }
-    if (!j.ok) {
-      tau.saida = j.saida || j.erro || "";
-      const tarde = ponte.ledger && tau.ledger && ponte.ledger >= tau.ledger;
-      return dizer(tarde
-        ? `✗ o prazo fechou antes de ${quem[i]} votar — abra de novo com prazo maior`
-        : `✗ ${quem[i]} não conseguiu votar`);
-    }
+      body: JSON.stringify({ proposta: nome, identidade: quem[i], opcoes:["manter"] }) }).then(r=>r.json());
+    if (!j.ok) { tau.saida = j.saida || j.erro || ""; registrarSaida(tau.saida); return dizer(`✗ ${quem[i]} não conseguiu votar`); }
+    registrar("votar", { votos: (j.estado?.votos || []).slice(0, i) }, j.estado);
+    tau.estado = j.estado;
   }
 
-  dizer("4 em segredo, 3 abriram o voto · esperando o prazo");
+  dizer("4 de 7 compareceram · esperando o prazo");
   while (true) {
     await lerLedger(); mostrar();
     if (ponte.ledger >= tau.ledger) break;
@@ -1675,16 +1649,10 @@ async function rodarTau() {
   if (j.estado) tau.estado = j.estado;
   tau.saida = j.saida || j.erro || "";
   registrarSaida(tau.saida);
-  dizer(tau.saida.includes("#19") ? "✗ o contrato recusou · nada foi publicado"
-                                  : "✓ terminou — veja a saída");
+  dizer(tau.saida.includes("#19") ? "✗ sem quórum de sigilo · nada foi publicado"
+                                  : "✓ terminou — veja o diário");
 }
-/* Esta coluna lia números que eu havia digitado: 7 aptos, 4 em segredo, 3
-   abertos, e os dois acumuladores da rodada de setembro. Enquanto o painel era
-   reencenação isso passava; depois que ele passou a rodar de verdade, virou
-   uma mentira com cara de saída de programa.
 
-   Agora ela lê da rodada que está na tela. Sem rodada, mostra só o código —
-   que é o que dá para afirmar sem ter executado nada. */
 function mecanismoLimite() {
   const base = [
     ["cod","if confidenciais < TAU {"],
@@ -1696,10 +1664,17 @@ function mecanismoLimite() {
   ];
   const fim = [
     [],
-    ["//","revelar o próprio voto é um direito. em bloco,"],
-    ["//","particiona o eleitorado; numa célula pequena o"],
-    ["//","agregado para de proteger quem está nela."],
-    ["nota","τ é global: o sigilo é da pergunta, então quem votou em segredo é o mesmo conjunto em todas. A partição tem duas células."],
+    ["//","isto é quórum, declarado na abertura — não"],
+    ["//","uma recusa surpresa. enquanto existia o voto"],
+    ["//","aberto, três pessoas encolhiam o conjunto de"],
+    ["//","fora e vetavam a assembleia: negação de"],
+    ["//","serviço contra a própria eleição."],
+    [],
+    ["//","o Brasil protege a célula pequena antes —"],
+    ["//","agrega seções com menos de 50 eleitores — e"],
+    ["//","nunca recusa contar depois. quando há"],
+    ["//","nulidade, o remédio é eleição nova, art. 224."],
+    ["nota","Sem voto aberto não há partição a induzir: o único caminho até aqui é comparecimento baixo. O remédio é o mesmo — estender o prazo, ou refazer com um eleitorado que caiba no sigilo."],
   ];
   const arq = "contrato/src/lib.rs · contrato/src/tipos.rs";
 
@@ -1709,13 +1684,11 @@ function mecanismoLimite() {
                : [...base, ...fim]);
 
   const segredo = e.votos.filter((v) => !v.publico).length;
-  const abertos = e.votos.filter((v) => v.publico).length;
   const linhas = [
     ...base,
     ["val","eleitorado", String(e.aptos.length)],
     ["val","votaram", String(e.votos.length)],
     ["val","em segredo", String(segredo)],
-    ["val","abriram o voto", String(abertos)],
   ];
 
   /* Os acumuladores só entram se a apuração foi tentada e a CLI os imprimiu.

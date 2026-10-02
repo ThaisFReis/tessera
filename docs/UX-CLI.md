@@ -253,49 +253,59 @@ isso é v1.1; até lá, deixar de responder não pode ser um acidente de digita�
 
 ### 3.1 Decisões
 
-**A escolha aparece em caixa alta uma vez, no topo, e nunca mais.** Depois disso a tela fala de compromisso, posição e recibo. A escolha não se repete porque repetir a escolha na tela é ensaiar o hábito de deixá-la visível.
+**A escolha aparece em caixa alta uma vez, no topo, e nunca mais.** Depois disso a tela fala de compromisso e posição. A escolha não se repete porque repetir a escolha na tela é ensaiar o hábito de deixá-la visível.
 
 **Cada linha diz `[em claro]` ou `[em segredo]`, e isso não é decoração.** Numa cédula mista a pessoa precisa saber o que vai para o ledger ao lado do endereço dela **antes** de enviar, não descobrir depois num explorador de blocos. A `cedula` já tinha avisado; `votar` repete na hora de confirmar, porque é a última tela antes do irreversível.
 
-**`--publico` abre a cédula inteira, inclusive as perguntas sigilosas.** Não há meio-termo por pergunta: a natureza das perguntas é da proposta, e o que o eleitor escolhe é abrir tudo ou nada (SPEC §6.5). A linha `Sigilo` diz exatamente isso, em vez de só "PÚBLICO".
+**Não existe `--publico`, e a ausência é o recurso.** Houve uma versão em que o eleitor podia abrir a própria cédula inteira no ledger. Parecia um direito e era uma alavanca: quem coage confere sozinho, lendo o ledger, sem a pessoa na frente — coação verificável em escala. Uma escolha que o coator pode exigir não é liberdade.
+
+Perguntas públicas continuam existindo e são outra coisa: valem para todos e são decididas pelo estatuto em `abrir` (SPEC §6.5).
 
 **`Posição 27 de 43 em segredo` é a verificabilidade individual virando uma frase que Dona Marta entende.** Não é "seu commitment está no acumulador". É "você é a 27ª de 43".
 
-**O aviso de coação é o último bloco e o maior.** Última coisa na tela é a que fica na memória e a que sobra no scroll. Esse posicionamento é a decisão de design mais importante do comando — ver UX.md §5.2.
+**O último bloco é a garantia, não uma tarefa.** A última coisa na tela é a que fica na memória, e por isso ela era o aviso de coação com o comando para apagar o recibo. Agora `votar` não grava recibo nenhum, então o lugar é da garantia:
+
+```
+  ✓ seu sigilo está protegido
+
+     Nenhum arquivo nesta máquina prova em que você votou.
+     O acaso que escondeu o seu voto morreu com este comando —
+     nem você consegue mais demonstrar a sua escolha.
+```
+
+Pedir uma faxina depois do voto era transferir para a pessoa um risco que o
+desenho podia simplesmente não criar.
 
 **O aviso não é vermelho.** Vermelho é reservado para a apuração recusada (UX.md §8). Aqui é `⚠` em texto normal com indentação, porque não é erro: é a verdade sobre o estado do mundo.
 
 ---
 
-## 4. `tessera queimar`
+## 4. `tessera queimar` — vestigial, de propósito
 
 ```
 $ tessera queimar --identidade marta
 ```
 
+**Este comando quase não tem mais o que fazer.** Ele existia porque `votar`
+gravava `./recibos/<identidade>.key` com o acaso `r`, e queimar era a faxina que
+a pessoa precisava lembrar de fazer.
+
+Isso tinha dois defeitos. Quem coage simplesmente manda não queimar — e o
+arquivo não servia para mais nada: nenhum comando o lia, nem para conferir voto,
+nem para apurar. Era passivo puro.
+
+Agora `votar` não grava. `queimar` fica para os arquivos que rodadas antigas
+deixaram, e a tela diz isso:
+
 ```
   TESSERA · queimando o recibo
-  ────────────────────────────────────────────────────────────────────
+  ──────────────────────────────────────────────────────────────────
 
-  ./recibos/marta.key                                    sobrescrito
-  ./recibos/marta.json                                   sobrescrito
-
-  ✓ pronto
-
-  Agora nem você consegue provar em que votou.
-
-  Seu voto continua na contagem, e você continua podendo conferir
-  que ele está lá:
-    tessera conferir --proposta contas-2025 --identidade marta
+  Não há recibo em ./recibos/marta.key — nada a queimar.
 ```
 
-**Esta é a tela mais curta e a de maior carga emocional do produto.** "Agora nem você consegue provar em que votou" é a frase que o Tessera inteiro existe para poder dizer. Não acrescente nada em volta dela.
-
-E a última linha é indispensável: a pessoa precisa saber que queimar o recibo **não** destruiu o voto. Sem isso, a ação assusta e ninguém a executa.
-
-`sobrescrito`, não `apagado` — e o código tem que sobrescrever de verdade antes de remover.
-
----
+Quando há arquivo, ele é **sobrescrito** antes de removido: apagar o inode não
+basta se o conteúdo continua no disco.
 
 ## 5. `tessera status` — dois números grandes
 
@@ -559,7 +569,7 @@ Todo comando escreve `./estado/<proposta>.json`:
     { "texto": "Eleger a cadeira 3",
       "opcoes": ["ana", "bruno", "carla"], "confidencial": true }
   ],
-  "contrato": "CAXI5NPJNWGN7MNVAKASDAYOZLOXXRYA2YGZHXVQQQDRPLDP4AYHGK46",
+  "contrato": "CBAHLZMTSP52CVPJGN6ATDVP4XACCX2PVMGBVIVYMR363JQRSOL7OOTG",
   "raiz_aptos": "7c3a...b219",
   "aptos": ["GB4V...", "GAO2..."],
   "sigilo_minimo": 5,
@@ -601,13 +611,14 @@ silêncio:**
 | `aberturas`, `apuracao.afirmado` | só as opções **sigilosas** | pergunta, depois opção |
 | `votos[].escolhas` | depende de `publico` | ver abaixo |
 
-`escolhas` é o único campo com duas leituras, e **não é um descuido**: numa
-cédula sigilosa ele cobre só as perguntas **públicas**; numa cédula aberta por
-`--publico`, cobre a **cédula inteira**. Quem lê precisa olhar `publico` antes
-de indexar. O console tem essa conta isolada numa função só (`contagem`), com o
-motivo escrito ao lado.
+`escolhas` cobre as perguntas **públicas** da cédula, na ordem. Ele teve duas
+leituras enquanto `--publico` existia — numa cédula aberta cobria a cédula
+inteira — e quem lia precisava olhar `publico` antes de indexar. Removida
+aquela função, a leitura é uma só. O campo `publico` continua no JSON para que
+estados de rodadas antigas ainda abram.
 
-Nada de `r` neste arquivo, nunca. A chave vive só em `./recibos/<identidade>.key`, que é o arquivo que `queimar` sobrescreve.
+**Nada de `r` neste arquivo, e em nenhum outro.** Não existe mais o recibo onde
+ele morava: `votar` não escreve em disco.
 
 **E o contrário também vale, e só ficou claro na implementação: as provas são públicas e por isso moram no estado, não no recibo.** Na primeira versão elas estavam no `.key`, e `queimar` apagava junto a capacidade de qualquer pessoa reverificar a boa formação daquela cédula — proteger quem vota passava a custar auditabilidade. Não custa. O recibo guarda **só o segredo**; o que já está no ledger fica no estado.
 

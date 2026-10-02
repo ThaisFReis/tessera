@@ -382,17 +382,11 @@ fn votar(
     peso: u32,                               // w, conferido contra a folha
 ) -> Result<(), Erro>;
 
-/// Revelação voluntária: abre a cédula INTEIRA em claro, inclusive as
-/// perguntas sigilosas. É o τ de §6.6 que protege quem ficou no residual.
-fn votar_publico(
-    env: Env,
-    proposta: BytesN<32>,
-    votante: Address,                        // require_auth
-    escolhas: Vec<u32>,                      // todas as perguntas, achatadas
-    caminho: Vec<BytesN<32>>,
-    indice: u32,
-    peso: u32,
-) -> Result<(), Erro>;
+// `votar_publico` existiu e foi REMOVIDO. Ele abria a cédula inteira em claro,
+// inclusive as perguntas sigilosas. Era revelação voluntária, e é a forma mais
+// forte de coação que existe: quem coage confere sozinho, lendo o ledger, sem
+// a pessoa na frente. Em bloco, derrubava a apuração por τ — três pessoas
+// vetavam a assembleia. Ver §6.6.
 
 /// Apura. UM ENDOSSO POR MEMBRO, uma transação por pessoa.
 /// `totais` e `aberturas` cobrem só as opções SIGILOSAS; as públicas já
@@ -429,9 +423,10 @@ fn gerador_h(env: Env) -> Bls12381G1Affine;
 | `Endosso(id, digest, addr)` | `bool` | persistent | um membro endossou estes números |
 | `GeradorH` | `Bls12381G1Affine` | instance | calculado uma vez no deploy |
 
-`TotalPublico` existe para **toda** pergunta, inclusive as sigilosas, porque
-quem usa `votar_publico()` abre a cédula inteira e a resposta dele a uma
-pergunta sigilosa entra em claro.
+`TotalPublico` existe apenas para as perguntas **públicas**. Existia para todas
+enquanto `votar_publico()` existia, porque a resposta de quem abria o voto
+entrava em claro mesmo numa pergunta sigilosa; removida aquela função, uma
+pergunta sigilosa nunca tem total em claro.
 
 `Votou(id, addr)` ser **uma por cédula** é o que torna a cédula mista atômica:
 ou a pessoa respondeu a cédula inteira, ou não votou. Não existe meia cédula.
@@ -648,9 +643,10 @@ e "quem pediu sigilo na pergunta 2" é, numa assembleia pequena, uma lista curta
 o bastante para ser uma acusação. Fixando na proposta, toda cédula tem a mesma
 forma e não há nada a inferir da forma.
 
-O eleitor mantém uma escolha, mas ela é da **cédula inteira**: votar em sigilo
-(`votar`) ou abrir o voto todo (`votar_publico`). É a publicidade opcional por
-votante, e é o τ de §6.6 que protege quem fica no grupo residual.
+**O eleitor não escolhe nada sobre sigilo, e isso é deliberado.** Houve uma
+versão em que ele podia abrir o voto inteiro, e foi removida: uma escolha que o
+coator pode exigir não é liberdade, é alavanca. Toda cédula é sigilosa nas
+perguntas que o estatuto marcou como sigilosas, e ponto.
 
 #### Casos de governança que isso destrava
 
@@ -701,12 +697,11 @@ Esta é uma correção a uma leitura intuitiva mas errada que apareceu durante a
 implementação: *"com várias perguntas, τ passa a valer por pergunta."* Não
 passa, e o motivo importa.
 
-A confidencialidade é **da pergunta**, não do eleitor (§6.5). Quem vota por
-`votar()` compromete **todas** as perguntas sigilosas; quem vota por
-`votar_publico()` abre **todas**. Logo o conjunto confidencial é exatamente o
-mesmo em toda pergunta sigilosa, e a partição induzida tem duas células — em
-sigilo e aberta — independentemente de quantas perguntas a cédula tenha. Uma
-checagem cobre a cédula inteira:
+A confidencialidade é **da pergunta**, não do eleitor (§6.5). Quem vota
+compromete **todas** as perguntas sigilosas — não há outro caminho. Logo o
+conjunto confidencial é exatamente o mesmo em toda pergunta sigilosa, e não há
+partição a induzir: todas as cédulas caem na mesma célula. Uma checagem cobre a
+cédula inteira:
 
 ```rust
 if conf > 0 && conf < TAU { return Err(Erro::AnonimatoInsuficiente); }
@@ -737,6 +732,44 @@ só no contrato.
 > com sigilo por pergunta e publicidade opcional por votante, com a regra de `τ`
 > junto, não depois — sem ela o recurso é uma armadilha. O que fica para a v1.1
 > é a **abstenção** por pergunta, que precisa de uma disjuntiva a mais.
+
+#### Por que isto é quórum, e não recusa
+
+Esta seção defendia a troca como *"converte uma quebra de privacidade numa
+falha de liveness"*. A frase era verdadeira e a conclusão estava incompleta,
+porque enquanto `votar_publico()` existia a falha de liveness era **induzível
+de fora**: três pessoas abrindo o voto encolhiam o conjunto sigiloso abaixo de
+τ e vetavam a assembleia inteira. Recusar o resultado correto deixa de ser
+prudência e vira negação de serviço contra a própria eleição.
+
+Nenhum sistema eleitoral sério aceita isso. Vale olhar o brasileiro, que é
+grande e muito contestado:
+
+| Quando alguém contesta | O que o sistema faz |
+|---|---|
+| Boletim de Urna | cada urna publica seus totais; qualquer pessoa soma todas e compara com o oficial |
+| RDV | registro digital embaralhado, permite recontagem a qualquer tempo |
+| Votação paralela | urnas sorteadas votam em público no dia, e se confere se contaram o que foi digitado |
+| Nulidade provada | eleição **nova** (CE art. 224) |
+
+Em nenhum desses caminhos o sistema devolve "não vou contar". E o problema da
+célula pequena ele resolve **antes**: seção com menos de 50 eleitores é agregada
+a outra (TSE, Res. 23.669/2021). Protege-se mudando o tamanho da urna, nunca
+recusando a contagem depois.
+
+Removido `votar_publico()`, toda cédula é sigilosa e não há partição a induzir.
+O único caminho até abaixo de τ passa a ser **comparecimento baixo** — que não é
+ataque, é quórum. E quórum se declara na abertura, junto com o prazo e a mesa;
+não aparece como surpresa na apuração.
+
+O remédio é o mesmo do Brasil: estender o prazo, ou refazer com um eleitorado
+que caiba no sigilo. O que não existe mais é um terceiro provocar a recusa.
+
+> **Onde Tessera é melhor que a urna**, e vale dizer: um total falso não é
+> apenas auditável depois — ele **não é representável**. A mesa não consegue
+> publicar números que não fechem contra o acumulador. A contestação brasileira
+> precisa de auditoria porque o sistema *poderia* ter contado errado; aqui o
+> contrato recusa antes de publicar.
 
 ## 7. Orçamento de custo
 
@@ -1083,8 +1116,8 @@ contrato recusa.
 | Recusa por `τ` demonstrada na rede (D3) | ✅ feito |
 | Vídeo de demonstração ponta a ponta | **pendente** |
 
-Contrato na testnet: `CAXI5NPJNWGN7MNVAKASDAYOZLOXXRYA2YGZHXVQQQDRPLDP4AYHGK46`.
-115 testes passando em quatro pacotes, Wasm de 23,8 KB otimizado.
+Contrato na testnet: `CBAHLZMTSP52CVPJGN6ATDVP4XACCX2PVMGBVIVYMR363JQRSOL7OOTG`.
+112 testes passando em quatro pacotes, Wasm de 22,1 KB otimizado.
 
 **Congelamento de código: 2026-10-04, 12:00.** Submissão fecha 2026-10-05 19:00.
 Uma interface gráfica não entra na v1; o critério de "user experience" fica

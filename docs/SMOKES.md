@@ -87,7 +87,7 @@ Se a janela for curta, o verificador funciona no dia da votação e para de func
 
 **Decisão que destrava.** Se não couber: menos opções por transação, ou pontos comprimidos (48 B em vez de 96 — mas só se o host desserializar comprimido, que é um smoke por si), ou caminho de Merkle mais curto.
 
-**Tempo.** 45 min · **✅ MEDIDO NA TESTNET 2026-10-01**, na maior transação que o projeto já mandou — a cédula mista da proposta `assembleia-2026` (contrato `CAXI5NPJ…GK46`).
+**Tempo.** 45 min · **✅ MEDIDO NA TESTNET 2026-10-01**, na maior transação que o projeto já mandou — a cédula mista da proposta `assembleia-2026` (contrato `CBAHLZMT…OOTG`).
 
 | cédula | envelope | tx |
 |---|---:|---|
@@ -282,7 +282,7 @@ O roteiro do vídeo é o smoke. Cinco votantes, um divergente, apuração 3-de-5
 
 **Decisão que destrava.** É o teorema da partição (§6.6) executando. Quinze segundos de vídeo, e o estado que mais impressiona quem entende de votação.
 
-**Tempo.** 30 min · **✅ RESOLVIDO NA TESTNET 2026-10-01.** Proposta `coligacao-2026` no contrato `CAXI5NPJ…GK46`: 7 aptos, **4 votaram em segredo e 3 abriram o voto** — a coligação de §6.6 encolhendo o conjunto secreto de propósito. Depois do prazo, `apurar` foi recusada com `HostError: Error(Contract, #19)` = `AnonimatoInsuficiente`.
+**Tempo.** 30 min · **✅ RESOLVIDO NA TESTNET 2026-10-01.** Proposta `coligacao-2026` no contrato `CBAHLZMT…OOTG`: 7 aptos, **4 votaram em segredo e 3 abriram o voto** — a coligação de §6.6 encolhendo o conjunto secreto de propósito. Depois do prazo, `apurar` foi recusada com `HostError: Error(Contract, #19)` = `AnonimatoInsuficiente`.
 
 O que faz a cena funcionar é que **os números conferiam**: a mesa reconstruiu a abertura, achou `MANTER 4 · RESCINDIR 0`, e os dois acumuladores fecharam com `✓`. O contrato tinha o resultado correto em mãos e **recusou publicá-lo**. Não é falha de cálculo; é a troca de §6.6 — uma quebra de privacidade virando falha de liveness, ao vivo.
 
