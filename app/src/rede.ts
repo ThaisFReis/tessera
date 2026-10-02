@@ -35,9 +35,18 @@ export const hexParaBytes = (h: string): Uint8Array =>
 export const bytesParaHex = (b: Uint8Array): string =>
   Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
 
-const bytesN = (h: string) => xdr.ScVal.scvBytes(Buffer.from(hexParaBytes(h)));
+const bytesN = (h: string) => xdr.ScVal.scvBytes(hexParaBytes(h));
 const ponto = (h: string) => bytesN(h);
-const escalar = (h: string) => bytesN(h);
+
+/**
+ * `Bls12381Fr` é `U256` no contrato, **não** `BytesN<32>`.
+ *
+ * Mandar bytes faz o wrapper do `#[contractimpl]` falhar ao desserializar — e
+ * ele não devolve erro, ele **trapa**, com `UnreachableCodeReached`, antes de
+ * uma linha do contrato rodar. O erro não diz qual argumento está errado nem
+ * que o problema é de tipo.
+ */
+const escalar = (h: string) => nativeToScVal(BigInt("0x" + h), { type: "u256" });
 const u32 = (n: number) => xdr.ScVal.scvU32(n);
 const vetor = (v: xdr.ScVal[]) => xdr.ScVal.scvVec(v);
 const endereco = (g: string) => new Address(g).toScVal();
@@ -111,16 +120,33 @@ export async function ledgerAtual(): Promise<number> {
 }
 
 /**
+ * Quantos ledgers para trás a busca de eventos olha.
+ *
+ * **Não é um número escolhido por conforto.** Pedir uma janela maior que o
+ * limite do RPC não dá erro: devolve zero eventos, em silêncio. Medido na
+ * testnet com o contrato tendo quatro aberturas recentes:
+ *
+ *     últimos    100 ledgers →  0
+ *     últimos    500 ledgers →  1
+ *     últimos  2.000 ledgers →  1
+ *     últimos 17.000 ledgers →  0   ← pediu demais, veio vazio
+ *
+ * Uma lista vazia e uma consulta larga demais são indistinguíveis daqui, e a
+ * segunda faria o dapp parecer quebrado para quem chega. 2.000 ledgers são umas
+ * 3 horas, que cobre com folga a vida inteira de uma rodada.
+ */
+const JANELA = 2_000;
+
+/**
  * As assembleias abertas agora, lidas dos eventos de `abrir`.
  *
- * **Sem índice e sem backend.** O contrato já publica o evento desde a v1; o
- * RPC guarda uma janela de ledgers, então isto responde "o que está aberto
- * agora", não "tudo o que já existiu". Para o dapp é exatamente a pergunta
- * certa.
+ * **Sem índice e sem backend.** O contrato já publica o evento desde a v1, e
+ * isto responde "o que está aberto agora" — não "tudo o que já existiu", que
+ * exigiria um indexador. Para o dapp é exatamente a pergunta certa.
  */
 export async function assembleiasAbertas(desde?: number) {
   const atual = await ledgerAtual();
-  const inicio = desde ?? Math.max(1, atual - 17_000);
+  const inicio = desde ?? Math.max(1, atual - JANELA);
   const r = await servidor.getEvents({
     startLedger: inicio,
     filters: [{ type: "contract", contractIds: [REDE.contrato] }],
@@ -174,10 +200,7 @@ async function enviar(
     throw new Error(sim.error);
   }
   const pronta = rpc.assembleTransaction(bruta, sim).build();
-  diario?.({
-    tipo: "val",
-    txt: `instruções = ${sim.cost?.cpuInsns ?? "?"} · taxa = ${pronta.fee} stroops`,
-  });
+  diario?.({ tipo: "val", txt: `taxa = ${pronta.fee} stroops` });
 
   const assinada = TransactionBuilder.fromXDR(
     await carteira.assinar(pronta.toXDR()),
@@ -297,21 +320,21 @@ export function votarAnonimo(
         provas.map((p) =>
           nativeToScVal(
             {
-              a0: Buffer.from(hexParaBytes(p.a0)),
-              a1: Buffer.from(hexParaBytes(p.a1)),
-              e0: Buffer.from(hexParaBytes(p.e0)),
-              z0: Buffer.from(hexParaBytes(p.z0)),
-              e1: Buffer.from(hexParaBytes(p.e1)),
-              z1: Buffer.from(hexParaBytes(p.z1)),
+              a0: hexParaBytes(p.a0),
+              a1: hexParaBytes(p.a1),
+              e0: BigInt("0x" + p.e0),
+              z0: BigInt("0x" + p.z0),
+              e1: BigInt("0x" + p.e1),
+              z1: BigInt("0x" + p.z1),
             },
             {
               type: {
                 a0: ["symbol", null],
                 a1: ["symbol", null],
-                e0: ["symbol", null],
-                z0: ["symbol", null],
-                e1: ["symbol", null],
-                z1: ["symbol", null],
+                e0: ["symbol", "u256"],
+                z0: ["symbol", "u256"],
+                e1: ["symbol", "u256"],
+                z1: ["symbol", "u256"],
               },
             },
           ),
@@ -320,8 +343,8 @@ export function votarAnonimo(
       vetor(
         provasSoma.map((p) =>
           nativeToScVal(
-            { a: Buffer.from(hexParaBytes(p.a)), z: Buffer.from(hexParaBytes(p.z)) },
-            { type: { a: ["symbol", null], z: ["symbol", null] } },
+            { a: hexParaBytes(p.a), z: BigInt("0x" + p.z) },
+            { type: { a: ["symbol", null], z: ["symbol", "u256"] } },
           ),
         ),
       ),

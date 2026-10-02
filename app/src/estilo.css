@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+/* O console nasceu com estas cores e elas são do projeto, não do Tailwind:
+   verde marca o que foi VERIFICADO, nunca o que foi escolhido. */
+@theme {
+  --color-fundo: #0d0f0c;
+  --color-profundo: #0a0b0a;
+  --color-texto: #ecefe6;
+  --color-secundario: #9aa093;
+  --color-apagado: #6b7065;
+  --color-acento: #c8f24f;
+  --color-recusa: #ff6b4a;
+  --color-hairline: #23261f;
+  --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
+}
+
+html, body, #raiz { height: 100%; }
+body {
+  background: var(--color-fundo);
+  color: var(--color-texto);
+  font-family: var(--font-mono);
+  -webkit-font-smoothing: antialiased;
+}

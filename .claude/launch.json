@@ -2,10 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "console",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8777", "--directory", "console"],
-      "port": 8777
+      "name": "tessera-app",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "app", "dev", "--port", "5273", "--strictPort"],
+      "port": 5273
     }
   ]
 }
