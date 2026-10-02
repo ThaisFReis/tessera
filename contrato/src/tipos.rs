@@ -72,6 +72,8 @@ pub enum Erro {
     /// Nenhuma pergunta, perguntas demais, ou opções confidenciais somadas
     /// acima de `MAX_OPCOES`.
     PerguntasForaDaFaixa = 25,
+    /// A janela ainda não começou: `ledger < abre_em`.
+    VotacaoAindaNaoComecou = 26,
 }
 
 #[contracttype]
@@ -138,6 +140,11 @@ pub struct Proposta {
     pub raiz_aptos: BytesN<32>,
     pub mesa: Vec<Address>,
     pub limiar: u32,
+    /// Sequência de ledger a partir da qual se pode votar.
+    ///
+    /// Abertura imediata é `abre_em <= ledger atual` — não é outro caminho de
+    /// código, é o mesmo portão com a janela já começada.
+    pub abre_em: u32,
     /// Sequência de ledger a partir da qual não se vota mais.
     pub fecha_em: u32,
 }

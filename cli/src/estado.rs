@@ -90,6 +90,10 @@ pub struct Estado {
     pub identidades: Vec<String>,
     pub sigilo_minimo: u32,
     pub mesa: Mesa,
+    /// Ledger em que a votação abre. Igual ou anterior ao atual significa que
+    /// ela já está aberta — é o caso comum.
+    #[serde(default)]
+    pub inicio_ledger: u64,
     pub prazo_ledger: u64,
     pub abertura_tx: String,
     pub votos: Vec<Voto>,

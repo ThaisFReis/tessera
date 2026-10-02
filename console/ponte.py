@@ -121,8 +121,10 @@ def abrir(c):
         raise Recusa(f"{sigilosas} opções sigilosas — o máximo é 16")
 
     prazo = c.get("prazo") or "15m"
-    if not re.match(r"^\d{1,5}(h|m|)$", str(prazo)):
-        raise Recusa("prazo inválido")
+    inicio = str(c.get("inicio") or "0")
+    for v, nome_ in ((prazo, "prazo"), (inicio, "início")):
+        if not re.match(r"^\d{1,5}(h|m|s|)$", str(v)):
+            raise Recusa(f"{nome_} inválido")
     limiar = c.get("limiar", 3)
     if not isinstance(limiar, int) or not 1 <= limiar <= 5:
         raise Recusa("limiar fora da faixa")
@@ -131,6 +133,7 @@ def abrir(c):
         "--aptos", "aptos.txt",
         "--mesa", "mesa.txt",
         "-k", str(limiar),
+        "--inicio", inicio,
         "--prazo", str(prazo),
     ]
     return rodar(args), proposta

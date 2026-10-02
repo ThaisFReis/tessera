@@ -74,6 +74,17 @@ fn montar(n_aptos: usize) -> Cenario {
 }
 
 fn montar_cedula(n_aptos: usize, perguntas: &[(u32, bool)]) -> Cenario {
+    montar_janela(n_aptos, perguntas, 0, FECHA_EM)
+}
+
+/// O mesmo cenário, com a janela escolhida. `abre_em = 0` é abertura imediata,
+/// que é o que todas as outras baterias usam.
+fn montar_janela(
+    n_aptos: usize,
+    perguntas: &[(u32, bool)],
+    abre_em: u32,
+    fecha_em: u32,
+) -> Cenario {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().set_sequence_number(10);
@@ -110,7 +121,8 @@ fn montar_cedula(n_aptos: usize, perguntas: &[(u32, bool)]) -> Cenario {
         &BytesN::from_array(&env, &arvore.raiz()),
         &mesa_sdk,
         &3u32,
-        &FECHA_EM,
+        &abre_em,
+        &fecha_em,
     );
 
     let h = ponto::de_hex(&{
@@ -710,6 +722,61 @@ fn nao_se_apura_antes_do_prazo() {
     );
 }
 
+/// A janela tem dois lados. Antes de `abre_em` o voto é recusado; dentro dela
+/// passa. "Ainda não" e "não mais" têm erros diferentes, porque são situações
+/// diferentes para quem está na frente da urna.
+#[test]
+fn a_votacao_so_aceita_voto_dentro_da_janela() {
+    // Abre no ledger 100, fecha no 200; o cenário começa no 10.
+    let c = montar_janela(16, &[(OPCOES, true)], 100, 200);
+
+    let tentar = || {
+        let (compromissos, provas, provas_soma, publicas, _) = c.cedula_mista(0, &[0]);
+        let (irmaos, indice) = c.caminho(0);
+        c.cliente.try_votar(
+            &c.proposta, &c.aptos[0], &compromissos, &provas, &provas_soma,
+            &publicas, &irmaos, &indice, &1u32,
+        )
+    };
+
+    assert_eq!(tentar(), Err(Ok(Erro::VotacaoAindaNaoComecou)));
+
+    c.env.ledger().set_sequence_number(150);
+    assert!(tentar().is_ok(), "dentro da janela o voto entra");
+
+    c.env.ledger().set_sequence_number(250);
+    let (compromissos, provas, provas_soma, publicas, _) = c.cedula_mista(1, &[0]);
+    let (irmaos, indice) = c.caminho(1);
+    assert_eq!(
+        c.cliente.try_votar(
+            &c.proposta, &c.aptos[1], &compromissos, &provas, &provas_soma,
+            &publicas, &irmaos, &indice, &1u32,
+        ),
+        Err(Ok(Erro::VotacaoEncerrada))
+    );
+}
+
+/// Uma janela de duração zero não é votação.
+#[test]
+fn a_janela_precisa_ter_duracao() {
+    let c = montar(4);
+    let mut perg = Vec::new(&c.env);
+    perg.push_back(Pergunta { opcoes: OPCOES, confidencial: true });
+    let mut mesa_sdk = Vec::new(&c.env);
+    for m in &c.mesa {
+        mesa_sdk.push_back(m.clone());
+    }
+    let outra: BytesN<32> = BytesN::from_array(&c.env, &[43u8; 32]);
+    assert_eq!(
+        c.cliente.try_abrir(
+            &Address::generate(&c.env), &outra, &perg,
+            &BytesN::from_array(&c.env, &c.arvore.raiz()), &mesa_sdk,
+            &3u32, &300u32, &300u32,
+        ),
+        Err(Ok(Erro::PrazoNoPassado))
+    );
+}
+
 // ===================== semi-confidencial e o teorema da partição =====
 
 /// A cédula pública entra, soma no resultado, e o sigilo de quem escolheu
@@ -856,28 +923,28 @@ fn abrir_recusa_configuracao_invalida() {
     let ok = cedula(&[(2, true)]);
 
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&[(1, true)]), &raiz, &mesa, &2u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &cedula(&[(1, true)]), &raiz, &mesa, &2u32, &0u32, &1000u32),
         Err(Ok(Erro::OpcoesForaDaFaixa))
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&[(17, true)]), &raiz, &mesa, &2u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &cedula(&[(17, true)]), &raiz, &mesa, &2u32, &0u32, &1000u32),
         Err(Ok(Erro::OpcoesForaDaFaixa))
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&[]), &raiz, &mesa, &2u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &cedula(&[]), &raiz, &mesa, &2u32, &0u32, &1000u32),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
     // Nove perguntas passam de MAX_PERGUNTAS.
     let nove: Vetor<(u32, bool)> = (0..9).map(|_| (2u32, false)).collect();
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&nove), &raiz, &mesa, &2u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &cedula(&nove), &raiz, &mesa, &2u32, &0u32, &1000u32),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
     // Cada pergunta cabe, mas o total confidencial passa de MAX_OPCOES — e é
     // o total que o orçamento de CPU limita.
     let gordas: Vetor<(u32, bool)> = (0..3).map(|_| (16u32, true)).collect();
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&gordas), &raiz, &mesa, &2u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &cedula(&gordas), &raiz, &mesa, &2u32, &0u32, &1000u32),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
     // As mesmas 48 opções, mas públicas, não custam disjuntiva nenhuma.
@@ -890,20 +957,21 @@ fn abrir_recusa_configuracao_invalida() {
             &raiz,
             &mesa,
             &2u32,
+            &0u32,
             &1000u32
         )
         .is_ok());
 
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &4u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &4u32, &0u32, &1000u32),
         Err(Ok(Erro::LimiarInvalido))
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &0u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &0u32, &0u32, &1000u32),
         Err(Ok(Erro::LimiarInvalido))
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &5u32),
+        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &5u32),
         Err(Ok(Erro::PrazoNoPassado))
     );
 
@@ -912,13 +980,13 @@ fn abrir_recusa_configuracao_invalida() {
     repetida.push_back(m.clone());
     repetida.push_back(m);
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &repetida, &2u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &ok, &raiz, &repetida, &2u32, &0u32, &1000u32),
         Err(Ok(Erro::MembroRepetido))
     );
 
-    cliente.abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &1000u32);
+    cliente.abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32);
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32),
         Err(Ok(Erro::PropostaJaExiste))
     );
 }

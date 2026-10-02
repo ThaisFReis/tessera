@@ -102,6 +102,45 @@ escreve a cédula, nunca um esquecimento.
 
 ---
 
+### 1.1 A janela: `--inicio` e `--prazo`
+
+```
+tessera abrir --proposta assembleia --pergunta "..." \
+    --aptos aptos.csv --mesa mesa.csv -k 3 --inicio 1h --prazo 2h
+```
+
+`--inicio` diz **quando a votação abre**, contado a partir de agora, e
+`--prazo` **quanto ela dura depois disso**. Os dois aceitam `2h`, `30m`, `45s`
+ou um número de ledgers.
+
+O padrão de `--inicio` é `0`: abre no instante em que a transação entra no
+ledger. Era o único comportamento até a v1.0; agendar é a adição, não o caso
+comum.
+
+A tela de abertura mostra os dois lados:
+
+```
+  Abre ............... em 1min  (ledger 4984758)
+  Encerra ............ em 6min  (ledger 4984818)
+```
+
+E `tessera cedula` troca a frase conforme o lado da janela em que se está —
+`Abre em 15s · você é apta` antes, `Encerra em 4min · você é apta` depois.
+Sem isso a pessoa tenta votar cedo e leva uma recusa que parece defeito.
+
+**As duas recusas são distintas de propósito:**
+
+| | |
+|---|---|
+| `Error(Contract, #26)` | `VotacaoAindaNaoComecou` — chegou cedo |
+| `VotacaoEncerrada` | chegou tarde |
+
+Um erro só para os dois lados economizaria um discriminante e custaria a única
+informação que importa para quem está na frente da urna.
+
+Abertura e fechamento são **ledgers, não relógio de parede**. Um ledger da
+testnet leva ~5 s, e é o que o contrato consegue verificar sozinho.
+
 ## 2. `tessera cedula` — onde o sigilo fica visível
 
 **Este é o comando que ganha a demo.** Ele não vota. Ele mostra.
@@ -520,7 +559,7 @@ Todo comando escreve `./estado/<proposta>.json`:
     { "texto": "Eleger a cadeira 3",
       "opcoes": ["ana", "bruno", "carla"], "confidencial": true }
   ],
-  "contrato": "CDWAY3PETO4JUATLLUM5INMJKMOQ45FTGG5FQCMAUJVTLCW5FJMP7JUH",
+  "contrato": "CAXI5NPJNWGN7MNVAKASDAYOZLOXXRYA2YGZHXVQQQDRPLDP4AYHGK46",
   "raiz_aptos": "7c3a...b219",
   "aptos": ["GB4V...", "GAO2..."],
   "sigilo_minimo": 5,

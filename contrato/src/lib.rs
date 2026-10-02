@@ -66,6 +66,7 @@ impl Tessera {
         raiz_aptos: BytesN<32>,
         mesa: Vec<Address>,
         limiar: u32,
+        abre_em: u32,
         fecha_em: u32,
     ) -> Result<(), Erro> {
         governanca.require_auth();
@@ -96,6 +97,12 @@ impl Tessera {
         if fecha_em <= env.ledger().sequence() {
             return Err(Erro::PrazoNoPassado);
         }
+        // A janela precisa existir. `abre_em` no passado é abertura imediata e
+        // é legítimo — o que não pode é abrir depois de fechar, ou no mesmo
+        // ledger, que daria uma votação de duração zero.
+        if abre_em >= fecha_em {
+            return Err(Erro::PrazoNoPassado);
+        }
         // Membros repetidos reduziriam o limiar efetivo sem que aparecesse.
         for (i, m) in mesa.iter().enumerate() {
             if mesa.iter().take(i).any(|o| o == m) {
@@ -118,7 +125,7 @@ impl Tessera {
         }
 
         let n_perguntas = perguntas.len();
-        let p = Proposta { perguntas, raiz_aptos, mesa, limiar, fecha_em };
+        let p = Proposta { perguntas, raiz_aptos, mesa, limiar, abre_em, fecha_em };
         env.storage().persistent().set(&Chave::Proposta(proposta.clone()), &p);
         guardar_longo(&env, &Chave::Proposta(proposta.clone()));
 
@@ -146,7 +153,7 @@ impl Tessera {
 
         env.events().publish(
             (symbol_short!("abrir"), proposta),
-            (n_perguntas, conf_opcoes, fecha_em, limiar),
+            (n_perguntas, conf_opcoes, abre_em, fecha_em, limiar),
         );
         Ok(())
     }
@@ -191,6 +198,9 @@ impl Tessera {
         votante.require_auth();
         let p = abrir_proposta(&env, &proposta)?;
 
+        if env.ledger().sequence() < p.abre_em {
+            return Err(Erro::VotacaoAindaNaoComecou);
+        }
         if env.ledger().sequence() >= p.fecha_em {
             return Err(Erro::VotacaoEncerrada);
         }
@@ -323,6 +333,9 @@ impl Tessera {
         votante.require_auth();
         let p = abrir_proposta(&env, &proposta)?;
 
+        if env.ledger().sequence() < p.abre_em {
+            return Err(Erro::VotacaoAindaNaoComecou);
+        }
         if env.ledger().sequence() >= p.fecha_em {
             return Err(Erro::VotacaoEncerrada);
         }

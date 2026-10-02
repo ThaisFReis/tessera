@@ -770,7 +770,7 @@ async function sondarPonte() {
 }
 
 /* O que o organizador está montando, e com que nome vai ao ar. */
-const aoVivo = { proposta: "", prazo: "3m", identidade: "", escolhas: [], publico: false, ultimo: "", recibo: "" };
+const aoVivo = { proposta: "", inicio: "0", prazo: "3m", identidade: "", escolhas: [], publico: false, ultimo: "", recibo: "" };
 
 /* O rascunho com que a tela abre quando a ponte está no ar. Não há proposta
    ainda: ela vai existir quando alguém clicar em abrir. */
@@ -796,6 +796,11 @@ function faltam(d) {
   if (!d || !ponte.ledger || !d.prazo_ledger) return null;
   return d.prazo_ledger - ponte.ledger;
 }
+/* Quantos ledgers faltam para a votação abrir. Zero ou negativo é aberta. */
+function ateAbrir(d) {
+  if (!d || !ponte.ledger || !d.inicio_ledger) return 0;
+  return d.inicio_ledger - ponte.ledger;
+}
 function relogio(d) {
   const f = faltam(d);
   if (f === null) return "";
@@ -806,6 +811,12 @@ function relogio(d) {
 function textoRelogio(d) {
   const f = faltam(d);
   if (f === null) return "";
+  const a = ateAbrir(d);
+  if (a > 0) {
+    const seg = a * 5;
+    return `ainda não abriu · faltam ~${seg < 60 ? seg + "s" : Math.ceil(seg/60) + "min"}`
+         + ` · ledger ${num(ponte.ledger)} de ${num(d.inicio_ledger)}`;
+  }
   return f <= 0 ? "✓ prazo encerrado · pode apurar"
                 : `${relogio(d)} · ledger ${num(ponte.ledger)} de ${num(d.prazo_ledger)}`;
 }
@@ -965,6 +976,7 @@ function registrarAbertura(d) {
   reg("com", "as parcelas reconstroem Σr, nunca um voto");
   d.perguntas.forEach((pg, i) =>
     reg("val", `perguntas[${i}] = { opcoes: ${pg.opcoes.length}, confidencial: ${pg.confidencial} }`));
+  reg("val", `abre_em  = ${d.inicio_ledger ? "ledger " + d.inicio_ledger : "imediato"}`);
   reg("val", `fecha_em = ledger ${d.prazo_ledger}`);
   if (d.abertura_tx) reg("tx", `tx ${d.abertura_tx}`);
   reg("ok",  "votação aberta");
@@ -1157,11 +1169,12 @@ function painelPerguntas(d) {
     texto(lanca,"h3",null,"Abrir esta cédula na testnet");
     if (!aoVivo.proposta) aoVivo.proposta = "ao-vivo-" + Date.now().toString(36).slice(-5);
     campo(lanca,"Nome da proposta",aoVivo.proposta,(v)=>{aoVivo.proposta=v;});
-    campo(lanca,"Prazo",aoVivo.prazo,(v)=>{aoVivo.prazo=v;});
+    campo(lanca,"Abre em (0 = agora)",aoVivo.inicio,(v)=>{aoVivo.inicio=v;});
+    campo(lanca,"Fica aberta por",aoVivo.prazo,(v)=>{aoVivo.prazo=v;});
     lanca.append(botao("Abrir votação na testnet →", async () => {
       if (erroRascunho) return;
       const j = await chamar("abrir", {
-        proposta: aoVivo.proposta, prazo: aoVivo.prazo, limiar: 3,
+        proposta: aoVivo.proposta, inicio: aoVivo.inicio, prazo: aoVivo.prazo, limiar: 3,
         perguntas: rascunho.map((p)=>({texto:p.texto,opcoes:p.opcoes,confidencial:p.confidencial})),
       });
       if (j.ok) { aoVivo.escolhas = []; passo = 1; mostrar(); }
@@ -1224,6 +1237,7 @@ function mecanismoAbertura(d) {
     ["val","reconstrói","Σr, e só Σr"],
     ["oculto","r_i de cada voto","não existe parcela disso"],
     [],
+    ["val","abre_em", d.inicio_ledger ? `ledger ${num(d.inicio_ledger)}` : "imediato"],
     ["val","fecha_em",`ledger ${num(d.prazo_ledger)}`],
     ["val","τ",String(d.sigilo_minimo)],
   ]);
@@ -1293,6 +1307,11 @@ function painelVotar(d) {
    dois aparecessem aqui, a demo revelaria o mapa que ela jura ser indecifrável. */
 function urna(d) {
   const cx = el("div","cartao");
+  if (ateAbrir(d) > 0) {
+    texto(cx,"h3",null,"A votação ainda não abriu");
+    texto(cx,"p","painel-tag",textoRelogio(d));
+    return cx;
+  }
   texto(cx,"h3",null,"Votar agora, nesta proposta");
   const votaram = new Set((d.votos||[]).map((v)=>v.identidade));
   const faltantes = ponte.identidades.filter((n)=>!votaram.has(n));

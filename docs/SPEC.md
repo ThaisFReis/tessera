@@ -347,8 +347,22 @@ fn abrir(
     raiz_aptos: BytesN<32>,      // raiz de Merkle da lista na data de corte
     mesa: Vec<Address>,          // N membros
     limiar: u32,                 // k
+    abre_em: u32,                // ledger sequence de abertura
     fecha_em: u32,               // ledger sequence de fechamento
 ) -> Result<(), Erro>;
+
+// A janela é `[abre_em, fecha_em)`. `abre_em` igual ou anterior ao ledger
+// corrente é abertura imediata — não é outro caminho de código, é a janela já
+// começada. `abre_em >= fecha_em` é recusado: votação de duração zero não é
+// votação.
+//
+// Os dois lados têm erros diferentes, e isso é de propósito: quem chega cedo
+// precisa saber que é cedo, e quem chega tarde que é tarde.
+//
+//   ledger < abre_em   → Erro::VotacaoAindaNaoComecou  (26)
+//   ledger >= fecha_em → Erro::VotacaoEncerrada
+//
+// `apurar` continua exigindo `ledger >= fecha_em` (VotacaoAindaAberta).
 
 /// Registra um voto em sigilo. Chamada pelo votante, que paga a taxa.
 ///
@@ -1069,8 +1083,8 @@ contrato recusa.
 | Recusa por `τ` demonstrada na rede (D3) | ✅ feito |
 | Vídeo de demonstração ponta a ponta | **pendente** |
 
-Contrato na testnet: `CDWAY3PETO4JUATLLUM5INMJKMOQ45FTGG5FQCMAUJVTLCW5FJMP7JUH`.
-113 testes passando em quatro pacotes, Wasm de 23,4 KB otimizado.
+Contrato na testnet: `CAXI5NPJNWGN7MNVAKASDAYOZLOXXRYA2YGZHXVQQQDRPLDP4AYHGK46`.
+115 testes passando em quatro pacotes, Wasm de 23,8 KB otimizado.
 
 **Congelamento de código: 2026-10-04, 12:00.** Submissão fecha 2026-10-05 19:00.
 Uma interface gráfica não entra na v1; o critério de "user experience" fica

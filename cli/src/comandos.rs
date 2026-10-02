@@ -65,12 +65,27 @@ fn prazo_em_ledgers(s: &str) -> Result<u64, String> {
     Ok(v * mult)
 }
 
+/// "Ainda não abriu" e "encerra em tanto" são estados diferentes, e a tela de
+/// quem vai votar precisa dizer qual dos dois é — senão a pessoa tenta votar e
+/// leva uma recusa que parece defeito.
+fn janela(inicio: u64, fim: u64, agora: u64) -> String {
+    if agora < inicio {
+        format!("Abre {}", relogio(inicio as i64 - agora as i64))
+    } else {
+        format!("Encerra {}", relogio(fim as i64 - agora as i64))
+    }
+}
+
 fn relogio(ledgers: i64) -> String {
     if ledgers <= 0 {
         return "encerrada".into();
     }
     let s = ledgers * 5;
-    if s < 3600 {
+    // Abaixo de um minuto, "em 0min" soa como "já era" — e numa janela curta é
+    // justamente o trecho em que alguém está olhando o relógio.
+    if s < 60 {
+        format!("em {}s", s)
+    } else if s < 3600 {
         format!("em {}min", s / 60)
     } else {
         format!("em {}h{:02}", s / 3600, (s % 3600) / 60)
@@ -183,6 +198,7 @@ pub fn abrir(
     aptos: &str,
     mesa: &str,
     limiar: u32,
+    inicio: &str,
     prazo: &str,
     contrato: &str,
     rede: &str,
@@ -260,7 +276,12 @@ pub fn abrir(
     let raiz = arvore.raiz();
 
     let agora = Cadeia::ledger_atual(rede).ok_or("não consegui ler o ledger atual")?;
-    let fecha_em = agora + prazo_em_ledgers(prazo)?;
+    // A janela é contada a partir de agora: `--inicio` diz quando ela começa e
+    // `--prazo` quanto ela dura depois disso. `--inicio 0` é abertura imediata,
+    // que é o padrão.
+    let espera = prazo_em_ledgers(inicio)?;
+    let abre_em = agora + espera;
+    let fecha_em = abre_em + prazo_em_ledgers(prazo)?;
     let pid = id32(proposta);
 
     tela::titulo("abrindo votação");
@@ -284,8 +305,16 @@ pub fn abrir(
     );
     tela::campo("Sigilo mínimo", "5 votos confidenciais");
     tela::campo(
+        "Abre",
+        &if espera == 0 {
+            "agora".to_string()
+        } else {
+            format!("{}  (ledger {})", relogio(espera as i64), abre_em)
+        },
+    );
+    tela::campo(
         "Encerra",
-        &format!("{}  (ledger {})", relogio(prazo_em_ledgers(prazo)? as i64), fecha_em),
+        &format!("{}  (ledger {})", relogio((fecha_em - agora) as i64), fecha_em),
     );
 
     let r = c
@@ -311,6 +340,7 @@ pub fn abrir(
                 ("raiz_aptos", hex(&raiz)),
                 ("mesa", cedula::enderecos_json(&enderecos_mesa)),
                 ("limiar", limiar.to_string()),
+                ("abre_em", abre_em.to_string()),
                 ("fecha_em", fecha_em.to_string()),
             ],
         )
@@ -345,6 +375,7 @@ pub fn abrir(
         identidades: nomes_aptos,
         sigilo_minimo: 5,
         mesa: Mesa { membros: enderecos_mesa.len(), limiar, enderecos: enderecos_mesa, identidades: nomes_mesa },
+        inicio_ledger: abre_em,
         prazo_ledger: fecha_em,
         abertura_tx: tx,
         votos: vec![],
@@ -393,8 +424,8 @@ pub fn mostrar_cedula(proposta: &str, identidade: &str) -> R {
     }
     tela::branco();
     tela::linha(&format!(
-        "Encerra {} · você {} · {}",
-        relogio(e.prazo_ledger as i64 - agora as i64),
+        "{} · você {} · {}",
+        janela(e.inicio_ledger, e.prazo_ledger, agora),
         if apta { "é apta" } else { "NÃO está na lista" },
         if votou { "já votou" } else { "ainda não votou" }
     ));
@@ -890,7 +921,7 @@ pub fn status(proposta: &str) -> R {
     let agora = Cadeia::ledger_atual(&e.rede).unwrap_or(0);
     let (conf, publ) = (e.confidenciais(), e.publicos());
 
-    tela::titulo_com(proposta, &format!("encerra {}", relogio(e.prazo_ledger as i64 - agora as i64)));
+    tela::titulo_com(proposta, &janela(e.inicio_ledger, e.prazo_ledger, agora).to_lowercase());
     tela::branco();
     let esq = format!("{} de {} votaram", e.votos.len(), e.aptos.len());
     tela::centrado(&format!("{}            {} em segredo", esq, conf));

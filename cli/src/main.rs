@@ -48,7 +48,12 @@ enum Comando {
         /// Quantas assinaturas da mesa apuram.
         #[arg(short = 'k', long, default_value = "3")]
         limiar: u32,
-        /// `2h`, `30m` ou um número de ledgers.
+        /// Quando a votação abre, contado a partir de agora. `0` é imediato,
+        /// que é o padrão; `1h` agenda para daqui a uma hora.
+        #[arg(long, default_value = "0")]
+        inicio: String,
+        /// Quanto a votação dura **depois de abrir**. `2h`, `30m` ou um número
+        /// de ledgers.
         #[arg(long, default_value = "2h")]
         prazo: String,
         #[arg(long, env = "TESSERA_CONTRATO")]
@@ -108,8 +113,8 @@ enum Comando {
 fn main() {
     let cli = Cli::parse();
     let r = match &cli.comando {
-        Comando::Abrir { proposta, pergunta, opcoes, aptos, mesa, limiar, prazo, contrato, rede, governanca } =>
-            comandos::abrir(proposta, pergunta, opcoes.as_deref(), aptos, mesa, *limiar, prazo, contrato, rede, governanca),
+        Comando::Abrir { proposta, pergunta, opcoes, aptos, mesa, limiar, inicio, prazo, contrato, rede, governanca } =>
+            comandos::abrir(proposta, pergunta, opcoes.as_deref(), aptos, mesa, *limiar, inicio, prazo, contrato, rede, governanca),
         Comando::Cedula { proposta, identidade } => comandos::mostrar_cedula(proposta, identidade),
         Comando::Votar { proposta, opcao, identidade, publico } => comandos::votar(proposta, opcao, identidade, *publico),
         Comando::Queimar { identidade } => comandos::queimar(identidade),
