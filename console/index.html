@@ -1094,34 +1094,68 @@ function rolo() {
      ["!", texto]              ressalva ou hipótese — não é falha
      ["nota", texto]           a frase em prosa, no fim e só uma
      []                        linha em branco                                */
+/* Um terminal não desenha a tela inteira de uma vez, e ler o recorte de código
+   aparecendo linha por linha é o que faz a coluna parecer o que ela é. Anima
+   uma vez por painel: voltar a um painel já visto desenha na hora, e um
+   redesenho no meio da animação não a reinicia — `vistos` é marcado na entrada,
+   então a animação interrompida simplesmente morre com o nó antigo. */
+const datilo = { vistos: new Set(), quadro: null };
+const semMovimento = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const MS_POR_LINHA = 20;
+
+function datilografar(caixa, nos) {
+  let i = 0;
+  const t0 = performance.now();
+  /* O alvo vem do relógio, não de um contador de ticks: se o navegador
+     estrangular o temporizador — aba em segundo plano, gravação em curso — o
+     tick seguinte emenda todas as linhas atrasadas de uma vez, em vez de
+     deixar o terminal pela metade. */
+  const bater = () => {
+    const alvo = Math.min(nos.length, Math.max(1, Math.ceil((performance.now() - t0) / MS_POR_LINHA)));
+    const f = document.createDocumentFragment();   // um layout por tick, não um por linha
+    while (i < alvo) f.append(nos[i++]);
+    caixa.append(f);
+    datilo.quadro = i < nos.length ? setTimeout(bater, MS_POR_LINHA) : null;
+  };
+  bater();
+}
+
+function linhaMecanica(l) {
+  if (!l || !l.length) return el("div","t-vazio");
+  const [tipo, a, b] = l;
+  if (tipo === "cod")   return el("div","t-cod", a);
+  if (tipo === "//")    return el("div","t-com", "// " + a);
+  if (tipo === "ok")    return el("div","t-ok", "✓ " + a);
+  if (tipo === "x")     return el("div","t-x", "✗ " + a);
+  if (tipo === "!")     return el("div","t-alerta", "⚠ " + a);
+  if (tipo === "nota")  return el("p","t-nota", a);
+  if (tipo === "oculto") {
+    const d = el("div"); d.append(el("span","t-chv", a + " = "));
+    d.append(el("span","t-oculto","          "));
+    d.append(el("span","t-com","  " + b)); return d;
+  }
+  const d = el("div");
+  d.append(el("span","t-chv", a + " = "));
+  d.append(el("span","t-val", b));
+  return d;
+}
+
 function terminalMecanica(arquivo, linhas) {
+  if (datilo.quadro) { clearTimeout(datilo.quadro); datilo.quadro = null; }
   const m = el("aside","mecanica");
-  /* Em cima o que aconteceu, embaixo o código que fez acontecer. */
+  /* Em cima o que aconteceu, embaixo o código que fez acontecer. O diário
+     entra inteiro: é saída de verdade, e já chega aos poucos. */
   if (ponte.viva) {
     texto(m,"div","term-topo","o que está acontecendo");
     m.append(rolo());
   }
   texto(m,"div","term-topo", arquivo || "");
   const t = el("div","term");
-  linhas.forEach((l) => {
-    if (!l || !l.length) { t.append(el("div","t-vazio")); return; }
-    const [tipo, a, b] = l;
-    if (tipo === "cod")   return t.append(el("div","t-cod", a));
-    if (tipo === "//")    return t.append(el("div","t-com", "// " + a));
-    if (tipo === "ok")    return t.append(el("div","t-ok", "✓ " + a));
-    if (tipo === "x")     return t.append(el("div","t-x", "✗ " + a));
-    if (tipo === "!")     return t.append(el("div","t-alerta", "⚠ " + a));
-    if (tipo === "nota")  return t.append(el("p","t-nota", a));
-    if (tipo === "oculto") {
-      const d = el("div"); d.append(el("span","t-chv", a + " = "));
-      d.append(el("span","t-oculto","          "));
-      d.append(el("span","t-com","  " + b)); return t.append(d);
-    }
-    const d = el("div");
-    d.append(el("span","t-chv", a + " = "));
-    d.append(el("span","t-val", b));
-    t.append(d);
-  });
+  const nos = linhas.map(linhaMecanica);
+  const jaVisto = datilo.vistos.has(passo);
+  datilo.vistos.add(passo);
+  if (jaVisto || semMovimento || nos.length < 3) t.append(...nos);
+  else datilografar(t, nos);
   m.append(t);
   return m;
 }
@@ -1189,25 +1223,13 @@ function painelPerguntas(d) {
   if (ponte.falha) texto(s,"p","recusa-demo",ponte.falha);
   return s;
 }
-function mecanismoPerguntas(d) {
-  const sig = rascunho.filter(p=>p.confidencial);
-  return terminalMecanica("contrato/src/tipos.rs", [
-    ["cod","pub struct Pergunta {"],
-    ["cod","    pub opcoes: u32,"],
-    ["cod","    pub confidencial: bool,   // ← fixado aqui"],
-    ["cod","}"],
-    [],
-    ["//","nesta cédula:"],
-    ...rascunho.map((p,i)=>["val",`perguntas[${i}]`,`{ opcoes: ${p.opcoes.length}, confidencial: ${p.confidencial} }`]),
-    [],
-    ["cod","pub const MAX_PERGUNTAS: u32 = 8;"],
-    ["cod","pub const MAX_OPCOES:    u32 = 16;  // só as sigilosas"],
-    ["val","em uso",`${rascunho.length}/8 perguntas · ${sig.reduce((n,p)=>n+p.opcoes.length,0)}/16 opções sigilosas`],
-    [],
-    ["//","`confidencial` é da pergunta, não do eleitor."],
-    ["//","se cada um escolhesse, a lista de quem pediu"],
-    ["//","sigilo seria pública — e isso é quase o voto."],
-  ]);
+/* O painel 1 é rascunho: nada foi para a rede ainda, e o que havia aqui era
+   declaração de tipo — `struct Pergunta`, as constantes — não acontecimento. Os
+   limites que importavam, 8 perguntas e 16 opções sigilosas, o formulário já
+   impõe com mensagem na hora. Sobra o diário, que é o que de fato acontece
+   quando o botão é apertado: a abertura saindo para a testnet. */
+function mecanismoPerguntas() {
+  return terminalMecanica("", []);
 }
 function painelAbertura(d) {
   const s=el("section"); titulo(s,2,"Abrir a votação");
@@ -1755,6 +1777,7 @@ function espera() {
 }
 function desenhar(d) {
   dados=d; passo=0; reciboQueimado=false; mesaMentindo=false;
+  datilo.vistos.clear();
   rascunho=d.perguntas.map(p=>({texto:p.texto,opcoes:[...p.opcoes],confidencial:p.confidencial}));erroRascunho="";
   cabecalho(d); bater(d); mostrar();
   document.title = `Tessera Demo · ${d.proposta}`;

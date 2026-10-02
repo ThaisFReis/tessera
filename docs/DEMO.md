@@ -130,11 +130,17 @@ Com a mecânica carregando os dados, a esquerda pôde emagrecer. A regra passou 
 ser: **se o terminal já diz, a esquerda não repete.** A apuração perdeu dois
 cartões de dez linhas e ficou só com o placar, legível do fundo da sala.
 
+O terminal da mecânica **datilografa**: aparece linha por linha, ~20 ms cada,
+uma vez por painel. Voltar a um painel já visto desenha na hora, e um redesenho
+no meio da animação não a reinicia. O alvo vem do relógio, não de um contador de
+ticks — se o navegador estrangular o temporizador durante a gravação, o tick
+seguinte emenda as linhas atrasadas em vez de deixar o terminal pela metade.
+
 Os dez traços:
 
 | Painel | Arquivo | O que mostra |
 |---|---|---|
-| 1 | `contrato/src/tipos.rs` | `Pergunta { opcoes, confidencial }` e os limites |
+| 1 | — | nada: a cédula ainda é rascunho, e só o diário tem o que dizer |
 | 2 | `core/src/merkle.rs` | `folha`, `no`, e a lista que nunca é publicada |
 | 3 | `core/src/merkle.rs` | `verificar` — provar aptidão sem consultar cadastro |
 | 4 | `core/src/pedersen.rs` | `comprometer` — `v`, `r` tarjado, `C` |
