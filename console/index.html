@@ -766,6 +766,65 @@ function titulo(s, numero, nome, subtitulo) {
   texto(s,"h1",null,nome);
   if (subtitulo) texto(s,"p","dim",subtitulo);
 }
+/* ---------- As âncoras ----------
+
+   Os recortes de código nos terminais abaixo são cópias. Uma cópia envelhece:
+   se o crate mudar e o recorte não mudar junto, a demo passa a mentir — e
+   mentir com cara de código-fonte é o pior jeito de mentir.
+
+   Esta tabela é o contrato. Para cada arquivo citado por um terminal, ela
+   lista os trechos que têm de continuar existindo lá. `console/guarda.py`
+   confere, e falha se algum sumir.
+
+   Constantes entram com o valor inteiro de propósito: trocar τ de 5 para 3 sem
+   mexer na tela é exatamente o erro que isto existe para pegar.           */
+const ANCORAS = {
+  "contrato/src/tipos.rs": [
+    "pub struct Pergunta",
+    "pub confidencial: bool",
+    "pub const MAX_PERGUNTAS: u32 = 8;",
+    "pub const MAX_OPCOES: u32 = 16;",
+    "pub const TAU: u32 = 5;",
+    "Votou(BytesN<32>, Address)",
+  ],
+  "core/src/merkle.rs": [
+    "pub fn folha",
+    "pub fn no(",
+    "pub fn verificar",
+  ],
+  "core/src/pedersen.rs": [
+    "pub fn comprometer",
+    "((*g * v) + (*h * r)).into()",
+    "pub fn agregar",
+    "pub fn verifica_agregado",
+  ],
+  "core/src/cds.rs": [
+    "pub fn provar",
+    "fabricado de trás para frente",
+    "let e0 = e - e1;",
+    "let z0 = t + e0 * r;",
+    "pub fn desafio",
+  ],
+  "core/src/soma.rs": [
+    "pub fn provar",
+    "pub fn verificar",
+  ],
+  "core/src/shamir.rs": [],
+  "contrato/src/lib.rs": [
+    "Erro::AnonimatoInsuficiente",
+  ],
+  "contrato/src/cripto.rs": [
+    "pub fn contexto",
+  ],
+  "cli/src/recibo.rs": [
+    "escolha{}={}",
+    "r{}={}",
+  ],
+  "cli/src/comandos.rs": [
+    "pub fn verificar",
+  ],
+};
+
 /* ---------- O terminal da mecânica ----------
 
    A coluna da direita não resume o que acontece: ela mostra o código que faz
@@ -902,7 +961,7 @@ function painelAbertura(d) {
   return s;
 }
 function mecanismoAbertura(d) {
-  return terminalMecanica("core/src/merkle.rs", [
+  return terminalMecanica("core/src/merkle.rs · shamir.rs", [
     ["cod","pub fn folha(a: &Apto) -> Hash {"],
     ["cod","    sha256(0x00 ‖ addr_xdr ‖ peso_be)"],
     ["cod","}"],
@@ -1046,7 +1105,7 @@ function urna(d) {
 }
 function mecanismoVotar(d) {
   const v = d.votos.find(x=>!x.publico && x.compromissos?.length);
-  return terminalMecanica("core/src/pedersen.rs", [
+  return terminalMecanica("core/src/pedersen.rs · contrato/src/tipos.rs", [
     ["cod","pub fn comprometer(g, h,"],
     ["cod","                   v: &Fr, r: &Fr) -> G1Affine {"],
     ["cod","    ((*g * v) + (*h * r)).into()"],
@@ -1149,7 +1208,7 @@ function mecanismoCedula() {
 }
 function mecanismoGrade(d) {
   const nconf = d.votos.filter(v=>!v.publico).length;
-  return terminalMecanica("core/src/soma.rs", [
+  return terminalMecanica("core/src/soma.rs · contrato/src/cripto.rs", [
     ["cod","// D = (Σ C_j) − peso·G  deve ser múltiplo de H"],
     ["cod","pub fn provar(ctx, h, d: &G1Affine, rho: &Fr)"],
     ["cod","    -> Prova      // Schnorr na base H"],
@@ -1212,7 +1271,7 @@ function painelApurar(d) {
   return s;
 }
 function mecanismoApurar(d) {
-  return terminalMecanica("core/src/pedersen.rs", [
+  return terminalMecanica("core/src/pedersen.rs · shamir.rs", [
     ["cod","pub fn agregar(cs: &[G1Affine]) -> G1Affine {"],
     ["cod","    cs.iter()"],
     ["cod","      .fold(identity, |acc, c| acc + c)"],
@@ -1258,10 +1317,11 @@ function painelLimite() {
   return s;
 }
 function mecanismoLimite() {
-  return terminalMecanica("contrato/src/lib.rs", [
+  return terminalMecanica("contrato/src/lib.rs · tipos.rs", [
     ["cod","if confidenciais < TAU {"],
     ["cod","    return Err(Erro::AnonimatoInsuficiente);"],
     ["cod","}"],
+    ["cod","// tipos.rs"],
     ["cod","pub const TAU: u32 = 5;"],
     [],
     ["val","eleitorado","7"],
@@ -1282,7 +1342,7 @@ function mecanismoLimite() {
 }
 function mecanismoVerificador(d) {
   const nconf = d.votos.filter(v=>!v.publico).length;
-  return terminalMecanica("cli/src/comandos.rs · verificar", [
+  return terminalMecanica("cli/src/comandos.rs", [
     ["cod","// outro processo. não fala com o contrato."],
     ["cod","for voto in estado.votos {"],
     ["cod","    cds::verificar(...)?;"],

@@ -110,9 +110,21 @@ parágrafo escrito em volta dele.
 ao lado — `r` não está no estado, e não existe parcela de Shamir de um voto
 individual. A ausência é parte da explicação, não uma lacuna.
 
-**Isso cria uma dívida, e ela é real:** se o código mudar e estes recortes não
-mudarem junto, a demo passa a mentir. Eles vivem em `console/index.html`, nas
-dez funções `mecanismo*`.
+**Esses recortes são cópias, e cópia envelhece** — se o crate mudar e o recorte
+não mudar junto, a demo passa a mentir com cara de código-fonte. Por isso existe
+uma guarda:
+
+```bash
+python3 console/guarda.py
+```
+
+O bloco `const ANCORAS` no topo do script da página declara, para cada arquivo
+citado, os trechos que têm de continuar existindo lá. A guarda confere os dois
+sentidos: nenhum terminal cita arquivo não declarado, e nenhuma âncora sumiu.
+
+**Constantes entram com o valor inteiro de propósito.** Trocar `τ` de 5 para 3
+sem mexer na tela é exatamente o erro que isto pega — testei trocando, e a
+guarda acusou.
 
 Com a mecânica carregando os dados, a esquerda pôde emagrecer. A regra passou a
 ser: **se o terminal já diz, a esquerda não repete.** A apuração perdeu dois
@@ -523,7 +535,10 @@ Os testes rodam por crate:
 
 ```bash
 for c in core contrato cli bls-smoke; do (cd $c && cargo test); done
+python3 console/guarda.py
 ```
+
+113 testes e 25 âncoras.
 
 ### 11.2 O problema do prazo — leia antes de começar
 
