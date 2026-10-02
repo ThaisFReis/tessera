@@ -287,6 +287,7 @@ function contagem(d, afirmado) {
 
 /* Cabeçalho: de onde vem cada número que a página mostra. */
 function cabecalho(d) {
+  if (!d) { $("#meta").replaceChildren(); return; }
   const m = $("#meta");
   m.replaceChildren();
   const par = (k, v, href) => {
@@ -709,12 +710,66 @@ async function sondarPonte() {
     if (!j.ok) return;
     ponte.viva = true;
     ponte.identidades = j.identidades.filter((x) => x.tem_chave).map((x) => x.nome);
+    await lerLedger();
+    /* A ponte no ar significa que esta demo vota. Então ela não abre numa
+       rodada gravada: abre sem proposta nenhuma, e a primeira coisa que
+       acontece na tela é alguém criar uma. */
+    const pedida = new URLSearchParams(location.search).get("p");
+    if (!pedida) {
+      dados = null; rascunho = RASCUNHO_PADRAO(); erroRascunho = "";
+      passo = 0; cabecalho(null);
+      document.title = "Tessera · ao vivo";
+    }
     mostrar();
   } catch (_) { /* sem ponte: a reencenação continua valendo */ }
 }
 
 /* O que o organizador está montando, e com que nome vai ao ar. */
-const aoVivo = { proposta: "", prazo: "15m", identidade: "", escolhas: [], publico: false };
+const aoVivo = { proposta: "", prazo: "3m", identidade: "", escolhas: [], publico: false };
+
+/* O rascunho com que a tela abre quando a ponte está no ar. Não há proposta
+   ainda: ela vai existir quando alguém clicar em abrir. */
+const RASCUNHO_PADRAO = () => [
+  { texto: "Aprovar as contas de 2025?", opcoes: ["aprovar","rejeitar"], confidencial: false },
+  { texto: "Destituir a diretoria?",     opcoes: ["sim","nao"],          confidencial: true  },
+  { texto: "Eleger a cadeira 3",         opcoes: ["ana","bruno","carla"],confidencial: true  },
+];
+
+/* O relógio da demo, em ledgers. `apurar` só funciona depois de `fecha_em`, e
+   é melhor a tela contar junto do que o contrato recusar com #7 na frente de
+   todo mundo. Um ledger da testnet leva ~5 s, então `1m` são 12 ledgers — e
+   uma rodada inteira cabe em pouco mais de um minuto. */
+async function lerLedger() {
+  try {
+    const r = await fetch("/api/ledger");
+    const j = await r.json();
+    if (j.ok) { ponte.ledger = j.ledger; return j.ledger; }
+  } catch (_) {}
+  return null;
+}
+function faltam(d) {
+  if (!d || !ponte.ledger || !d.prazo_ledger) return null;
+  return d.prazo_ledger - ponte.ledger;
+}
+function relogio(d) {
+  const f = faltam(d);
+  if (f === null) return "";
+  if (f <= 0) return "encerrada";
+  const seg = f * 5;
+  return seg < 60 ? `faltam ~${seg}s` : `faltam ~${Math.ceil(seg/60)}min`;
+}
+/* Enquanto a votação está aberta, a tela se atualiza sozinha. Sem isso alguém
+   teria de ficar apertando F5 na frente da câmera. */
+let pulso = null;
+function bater(d) {
+  clearInterval(pulso);
+  if (!ponte.viva || !d || !d.prazo_ledger || d.apuracao) return;
+  pulso = setInterval(async () => {
+    await lerLedger();
+    if (faltam(dados) <= 0) clearInterval(pulso);
+    mostrar();
+  }, 5000);
+}
 
 const roteiro = [
   ["I · organizador", "Montar a cédula", painelPerguntas, mecanismoPerguntas],
@@ -931,6 +986,11 @@ function mecanismoPerguntas(d) {
 function painelAbertura(d) {
   const s=el("section"); titulo(s,2,"Abrir a votação");
   texto(s,"div","destaque",`${d.aptos.length} aptos · mesa ${d.mesa.limiar} de ${d.mesa.membros}`);
+  if (ponte.viva) {
+    const f = faltam(d);
+    texto(s,"p", f !== null && f <= 0 ? "fato" : "painel-tag",
+          f === null ? "" : f <= 0 ? "✓ prazo encerrado · pode apurar" : `${relogio(d)} · ledger ${num(ponte.ledger)} de ${num(d.prazo_ledger)}`);
+  }
   const a=el("a","acao","Ver transação de abertura ↗");
   a.href=expert(d,"tx",d.abertura_tx); a.target="_blank"; a.rel="noopener"; s.append(a);
   return s;
@@ -1208,13 +1268,7 @@ function painelApurar(d) {
     if (ponte.viva) {
       const cx=el("div","cartao");
       texto(cx,"h3",null,"Apurar agora");
-      cx.append(botao("A mesa apura →", async () => { await chamar("apurar", { proposta: d.proposta }); }));
-      cx.append(botao("A mesa mente →", async () => {
-        /* O total falso vai à rede de verdade. O contrato recusa de verdade. */
-        const n=contagem(d,[]).filter(c=>c.confidencial).length;
-        await chamar("apurar", { proposta: d.proposta, forcar_total: Array.from({length:n},(_,i)=>i===0?99:0).join(",") });
-      }));
-      terminal(cx); s.append(cx);
+      s.append(acoesApuracao(d)); terminal(s);
     }
     return s;
   }
@@ -1231,12 +1285,31 @@ function painelApurar(d) {
     });
     texto(s,"p","fato",`✓ publicado no ledger ${num(d.apuracao.ledger)}`);
   }
-  const b=el("button","nav-btn",mesaMentindo?"Restaurar total real":"Mesa mentindo →");b.type="button";b.addEventListener("click",()=>{mesaMentindo=!mesaMentindo;mostrar();});s.append(b);
-  if (ponte.viva) {
-    s.append(botao("Conferir com o verificador →", async () => { await chamar("verificar", { proposta: d.proposta }); }));
-    terminal(s);
+  if (!ponte.viva) {
+    const b=el("button","nav-btn",mesaMentindo?"Restaurar total real":"Mesa mentindo →");
+    b.type="button";b.addEventListener("click",()=>{mesaMentindo=!mesaMentindo;mostrar();});s.append(b);
   }
+  if (ponte.viva) { s.append(acoesApuracao(d)); terminal(s); }
   return s;
+}
+
+/* Os botões da apuração. Com a ponte no ar nenhum deles é simulação: o total
+   falso vai à rede, e a recusa que volta é a do contrato. */
+function acoesApuracao(d) {
+  const cx = el("div","cartao");
+  const f = faltam(d);
+  if (f !== null && f > 0) {
+    texto(cx,"p","painel-tag",`${relogio(d)} · a apuração abre quando o prazo fechar`);
+    return cx;
+  }
+  cx.append(botao("A mesa apura →", async () => { await chamar("apurar", { proposta: d.proposta }); }));
+  cx.append(botao("A mesa mente →", async () => {
+    const n = contagem(d,[]).filter(c=>c.confidencial).length;
+    await chamar("apurar", { proposta: d.proposta,
+      forcar_total: Array.from({length:n},(_,i)=>i===0?99:0).join(",") });
+  }));
+  cx.append(botao("Conferir com o verificador →", async () => { await chamar("verificar", { proposta: d.proposta }); }));
+  return cx;
 }
 function mecanismoApurar(d) {
   return terminalMecanica("core/src/pedersen.rs · shamir.rs", [
@@ -1267,18 +1340,74 @@ function mecanismoApurar(d) {
       : "fecha, pergunta por pergunta"],
   ]);
 }
-function painelLimite() {
+/* O painel de τ precisa de um eleitorado diferente do da votação principal:
+   um bloco que abre o voto e encolhe o conjunto secreto abaixo do mínimo. Com
+   a ponte no ar ele monta essa rodada sozinho — abrir, quatro em segredo, três
+   com --publico — e tenta apurar. A recusa que aparece é a do contrato. */
+const tau = { proposta: "", fase: "", saida: "", ledger: 0 };
+
+function painelLimite(d) {
   const s=el("section"); titulo(s,9,"O resultado correto também pode ser recusado");
-  texto(s,"div","recusa-demo","✗ apuração recusada · nada foi publicado\nError(Contract, #19) = AnonimatoInsuficiente");
-  const a=el("a",null,"Ver transação de abertura ↗");a.href="https://stellar.expert/explorer/testnet/tx/ed66a8c78b798539ad9796fd8a985325e137d270e152f2b7325970f00ce2f200";a.target="_blank";a.rel="noopener";s.append(a);
-  if (ponte.viva) {
-    const cx=el("div","cartao");
-    texto(cx,"h3",null,"Reproduzir a recusa, agora");
-    campo(cx,"Proposta a apurar",aoVivo.proposta||"",(v)=>{aoVivo.proposta=v;});
-    cx.append(botao("Tentar apurar →", async () => { await chamar("apurar", { proposta: aoVivo.proposta }); }));
-    terminal(cx); s.append(cx);
+
+  if (!ponte.viva) {
+    texto(s,"div","recusa-demo","✗ apuração recusada · nada foi publicado\nError(Contract, #19) = AnonimatoInsuficiente");
+    const a=el("a",null,"Ver transação ↗");
+    a.href="https://stellar.expert/explorer/testnet/tx/ed66a8c78b798539ad9796fd8a985325e137d270e152f2b7325970f00ce2f200";
+    a.target="_blank";a.rel="noopener";s.append(a);
+    return s;
+  }
+
+  if (tau.fase) texto(s,"p","painel-tag",tau.fase);
+  if (tau.saida) {
+    const pre=el("pre","rolo-cli",tau.saida); s.append(pre);
+  }
+
+  const esperando = tau.ledger && ponte.ledger && ponte.ledger < tau.ledger;
+  if (esperando) {
+    texto(s,"p","painel-tag",`faltam ~${(tau.ledger-ponte.ledger)*5}s para o prazo fechar`);
+  }
+
+  if (!tau.fase || tau.fase.startsWith("✗") || tau.fase.startsWith("✓")) {
+    s.append(botao("Montar a coligação e tentar apurar →", rodarTau));
   }
   return s;
+}
+
+/* Sete aptos: quatro votam em segredo, três abrem o voto. 4 < τ = 5. */
+async function rodarTau() {
+  const nome = "coligacao-" + Date.now().toString(36).slice(-5);
+  const dizer = (f) => { tau.fase = f; mostrar(); };
+
+  tau.proposta = nome; tau.saida = ""; tau.ledger = 0;
+  dizer("abrindo a proposta…");
+  let j = await fetch("/api/abrir", { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ proposta: nome, prazo: "1m", limiar: 3,
+      perguntas: [{ texto:"Manter a coligação?", opcoes:["manter","rescindir"], confidencial:true }] }) }).then(r=>r.json());
+  if (!j.ok) { tau.saida = j.saida || j.erro || ""; return dizer("✗ não consegui abrir"); }
+  tau.ledger = (j.estado && j.estado.prazo_ledger) || 0;
+
+  const quem = ponte.identidades.slice(0,7);
+  for (let i = 0; i < quem.length; i++) {
+    const aberto = i >= 4;            // os três últimos revelam o voto
+    dizer(`${quem[i]} votando ${aberto ? "com o voto aberto" : "em segredo"} · ${i+1} de ${quem.length}`);
+    j = await fetch("/api/votar", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ proposta: nome, identidade: quem[i], opcoes:["manter"], publico: aberto }) }).then(r=>r.json());
+    if (!j.ok) { tau.saida = j.saida || j.erro || ""; return dizer(`✗ ${quem[i]} não conseguiu votar`); }
+  }
+
+  dizer("4 em segredo, 3 abriram o voto · esperando o prazo");
+  while (true) {
+    await lerLedger(); mostrar();
+    if (ponte.ledger >= tau.ledger) break;
+    await new Promise((r) => setTimeout(r, 5000));
+  }
+
+  dizer("a mesa tenta apurar…");
+  j = await fetch("/api/apurar", { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ proposta: nome }) }).then(r=>r.json());
+  tau.saida = j.saida || j.erro || "";
+  dizer(tau.saida.includes("#19") ? "✗ o contrato recusou · nada foi publicado"
+                                  : "✓ terminou — veja a saída");
 }
 function mecanismoLimite() {
   return terminalMecanica("contrato/src/lib.rs · tipos.rs", [
@@ -1335,13 +1464,22 @@ function mostrar() {
   $("#passos").textContent=`${String(passo+1).padStart(2,"0")} / 10 · ${nome}`;
   $("#anterior").disabled=passo===0;$("#proximo").disabled=passo===9;
   const palco=el("div","palco");
-  palco.append(painel(dados),mecanismo(dados));
+  /* Só o painel 1 funciona sem proposta — é ele que a cria. */
+  if (!dados && passo > 0) palco.append(espera(), terminalMecanica("—", []));
+  else palco.append(painel(dados),mecanismo(dados));
   $("#app").replaceChildren(palco);
+}
+function espera() {
+  const s=el("section");
+  titulo(s,passo+1,"A votação ainda não foi aberta");
+  const b=el("button","acao","← montar a cédula");b.type="button";
+  b.addEventListener("click",()=>{passo=0;mostrar();});s.append(b);
+  return s;
 }
 function desenhar(d) {
   dados=d; passo=0; reciboQueimado=false; mesaMentindo=false;
   rascunho=d.perguntas.map(p=>({texto:p.texto,opcoes:[...p.opcoes],confidencial:p.confidencial}));erroRascunho="";
-  cabecalho(d); mostrar();
+  cabecalho(d); bater(d); mostrar();
   document.title = `Tessera Demo · ${d.proposta}`;
 }
 $("#anterior").addEventListener("click",()=>{if(passo>0){passo--;mostrar();scrollTo({top:0,behavior:"smooth"});}});

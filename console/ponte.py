@@ -241,6 +241,22 @@ class Mao(BaseHTTPRequestHandler):
                 return self.responder(404, {"ok": False, "erro": "não encontrada"})
             return self.responder(200, {"ok": True, "estado": d})
 
+        if caminho == "/api/ledger":
+            """O relógio da demo. A tela conta os ledgers que faltam para
+            `fecha_em`, e só libera a apuração quando chegam a zero — que é o
+            que o contrato vai cobrar de qualquer jeito."""
+            import urllib.request
+            try:
+                with urllib.request.urlopen(
+                    "https://horizon-testnet.stellar.org/ledgers?order=desc&limit=1",
+                    timeout=10,
+                ) as r:
+                    v = json.load(r)
+                atual = v["_embedded"]["records"][0]["sequence"]
+                return self.responder(200, {"ok": True, "ledger": atual})
+            except Exception:
+                return self.responder(200, {"ok": False, "erro": "horizon não respondeu"})
+
         if caminho == "/api/propostas":
             dir_estado = DEMO / "estado"
             nomes = sorted(f.stem for f in dir_estado.glob("*.json")) if dir_estado.exists() else []
