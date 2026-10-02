@@ -147,7 +147,7 @@ dia 1. As consequências de desenho estão em
 - `abrir()` estende o TTL de `Proposta` e dos acumuladores ao teto da rede
   (**1,73 XLM**, independente do comparecimento), e deixa as entradas `Votou`
   arquivarem;
-- o aluguel do **próprio contrato** — 21 KB de Wasm por 180 dias — custa
+- o aluguel do **próprio contrato** — 28 KB de Wasm por 180 dias — custa
   **181,70 XLM** e fica numa função `manter()` separada, que qualquer pessoa
   chama. Na primeira versão isso estava dentro de `abrir()`, e a medição na
   testnet mostrou a primeira chamada custando **182,39 XLM** contra **1,72** da
@@ -212,7 +212,7 @@ Contratos na testnet:
 
 | | |
 |---|---|
-| **Tessera (cédula mista)** | `CBAHLZMTSP52CVPJGN6ATDVP4XACCX2PVMGBVIVYMR363JQRSOL7OOTG` |
+| **Tessera (cédula mista)** | `CASXXJXD4XOZ2GPDPZKPNHD7DHXSZ4JBJBWTEWWBKY5ICGGJZQ4CAUTV` |
 | Tessera v1, cédula de uma pergunta | `CBLUSE2LCPPELS7GIQ5MRYKSW7KTILMWY7VBRFRSWAVG3L7TSRQYHP7H` |
 | sondas 1–13 (cripto, CDS e Merkle) | `CCL4CPAJ4ZVP25FP2PO7T3AMYGIVQZLYJZYZS53UAM5IFA5NFYGLUISR` |
 | sonda 9 (TTL) | `CCCZ4HPW3ESHO6BMNFGXX6DJRSWPWA7FBQH2MS6QGHC3U67DIZ434KFC` |

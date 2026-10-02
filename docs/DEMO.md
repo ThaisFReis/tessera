@@ -532,7 +532,7 @@ cd cli && cargo build --release && cd ..
 ```
 
 ```bash
-export TESSERA_CONTRATO=CBAHLZMTSP52CVPJGN6ATDVP4XACCX2PVMGBVIVYMR363JQRSOL7OOTG
+export TESSERA_CONTRATO=CASXXJXD4XOZ2GPDPZKPNHD7DHXSZ4JBJBWTEWWBKY5ICGGJZQ4CAUTV
 python3 console/ponte.py
 ```
 
@@ -565,7 +565,7 @@ for c in core contrato cli bls-smoke; do (cd $c && cargo test); done
 python3 console/guarda.py
 ```
 
-112 testes, 8 afirmações e 33 conferências na guarda.
+129 testes, 8 afirmações e 33 conferências na guarda.
 
 ### 11.2 O problema do prazo — leia antes de começar
 
@@ -654,7 +654,7 @@ sempre a mesma pessoa, e o desenho inteiro fica incompreensível.
 
 ### O fechamento
 
-> Contrato de 22,1 KB, 112 testes, rodando na testnet. Compromisso de Pedersen,
+> Contrato de 28,0 KB, 129 testes, rodando na testnet. Compromisso de Pedersen,
 > prova disjuntiva, Shamir para a mesa. Sem setup confiável, sem cerimônia.
 >
 > E a cédula mista: a mesma assembleia decide o que é público e o que é secreto,
@@ -674,8 +674,8 @@ Nada fora desta tabela deve ser afirmado em quadro.
 
 | | |
 |---|---|
-| Contrato (testnet) | `CBAHLZMTSP52CVPJGN6ATDVP4XACCX2PVMGBVIVYMR363JQRSOL7OOTG` |
-| Wasm otimizado | 22.584 B = **22,1 KB** |
+| Contrato (testnet) | `CASXXJXD4XOZ2GPDPZKPNHD7DHXSZ4JBJBWTEWWBKY5ICGGJZQ4CAUTV` |
+| Wasm otimizado | 22.584 B = **28,0 KB** |
 | Testes | **112** · bls-smoke 13, core 49, contrato 25, cli 25 |
 | `votar`, custo | **9.805.000 + 13.501.500 por opção sigilosa** |
 | 1 pergunta sigilosa, 2 opções | 36.804.670 — **9,2%** do teto |

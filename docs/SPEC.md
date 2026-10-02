@@ -453,7 +453,7 @@ independente do comparecimento** — medido na testnet em 2026-10-01, contra uma
 projeção de ~0,6 XLM que errava por 3×.
 
 **E há um custo que a projeção não tinha: o do próprio contrato.** Aluguel é
-proporcional ao tamanho da entrada, e o Wasm tem 21 KB. Manter instância e
+proporcional ao tamanho da entrada, e o Wasm tem 28 KB. Manter instância e
 código vivos por 180 dias custa **181,70 XLM**.
 
 Esse número achou um defeito de desenho antes de ele chegar na rede. Na
@@ -1116,8 +1116,8 @@ contrato recusa.
 | Recusa por `τ` demonstrada na rede (D3) | ✅ feito |
 | Vídeo de demonstração ponta a ponta | **pendente** |
 
-Contrato na testnet: `CBAHLZMTSP52CVPJGN6ATDVP4XACCX2PVMGBVIVYMR363JQRSOL7OOTG`.
-112 testes passando em quatro pacotes, Wasm de 22,1 KB otimizado.
+Contrato na testnet: `CASXXJXD4XOZ2GPDPZKPNHD7DHXSZ4JBJBWTEWWBKY5ICGGJZQ4CAUTV`.
+129 testes passando em quatro pacotes, Wasm de 28,0 KB otimizado.
 
 **Congelamento de código: 2026-10-04, 12:00.** Submissão fecha 2026-10-05 19:00.
 Uma interface gráfica não entra na v1; o critério de "user experience" fica

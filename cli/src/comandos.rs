@@ -200,6 +200,7 @@ pub fn abrir(
     limiar: u32,
     inicio: &str,
     prazo: &str,
+    anel: bool,
     contrato: &str,
     rede: &str,
     governanca: &str,
@@ -342,6 +343,7 @@ pub fn abrir(
                 ("limiar", limiar.to_string()),
                 ("abre_em", abre_em.to_string()),
                 ("fecha_em", fecha_em.to_string()),
+                ("anel", anel.to_string()),
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -376,6 +378,7 @@ pub fn abrir(
         sigilo_minimo: 5,
         mesa: Mesa { membros: enderecos_mesa.len(), limiar, enderecos: enderecos_mesa, identidades: nomes_mesa },
         inicio_ledger: abre_em,
+        anel,
         prazo_ledger: fecha_em,
         abertura_tx: tx,
         votos: vec![],
@@ -590,6 +593,20 @@ fn nao_apta(e: &Estado) -> R {
 
 pub fn votar(proposta: &str, opcao: &[String], identidade: &str) -> R {
     let mut e = Estado::ler(proposta)?;
+
+    // O contrato recusaria com `ModoErrado`, mas tarde: depois de montar a
+    // cédula inteira e pagar a simulação. Recusar aqui também explica por quê.
+    if e.anel {
+        return Err(format!(
+            "`{}` tem o caderno separado da urna, e a CLI não vota nessas.\n  \
+            Votar aqui seria votar pelo seu endereço — e é exatamente o vínculo\n  \
+            que o anel existe para quebrar. A chave de anel tem de viver no\n  \
+            navegador de quem vota, não num arquivo ao lado deste estado.\n\n  \
+            Use o dapp. A CLI abre as duas, e vota na identificada.",
+            proposta
+        ));
+    }
+
     let endereco = resolver(identidade)?;
 
     // Uma `--opcao` por pergunta, na ordem da cédula. Faltar uma é recusa, não

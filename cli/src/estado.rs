@@ -94,6 +94,14 @@ pub struct Estado {
     /// ela já está aberta — é o caso comum.
     #[serde(default)]
     pub inicio_ledger: u64,
+    /// Proposta com o caderno separado da urna. Até `inicio_ledger` as pessoas
+    /// comparecem com nome; depois disso as cédulas chegam de chaves sem dono.
+    ///
+    /// A CLI abre as duas, mas só vota na identificada — o voto em anel é do
+    /// dapp, que é onde a chave de anel pode viver no navegador de quem vota em
+    /// vez de num arquivo ao lado do estado.
+    #[serde(default)]
+    pub anel: bool,
     pub prazo_ledger: u64,
     pub abertura_tx: String,
     pub votos: Vec<Voto>,

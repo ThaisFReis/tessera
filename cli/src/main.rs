@@ -56,6 +56,12 @@ enum Comando {
         /// de ledgers.
         #[arg(long, default_value = "2h")]
         prazo: String,
+        /// Separa o caderno da urna: até `--inicio` as pessoas comparecem com
+        /// nome, e depois disso as cédulas chegam de chaves sem dono, com uma
+        /// assinatura em anel. É o desenho da urna — quem faltou é público,
+        /// de quem é cada cédula não é.
+        #[arg(long)]
+        anel: bool,
         #[arg(long, env = "TESSERA_CONTRATO")]
         contrato: String,
         #[arg(long, default_value = "testnet")]
@@ -109,8 +115,8 @@ enum Comando {
 fn main() {
     let cli = Cli::parse();
     let r = match &cli.comando {
-        Comando::Abrir { proposta, pergunta, opcoes, aptos, mesa, limiar, inicio, prazo, contrato, rede, governanca } =>
-            comandos::abrir(proposta, pergunta, opcoes.as_deref(), aptos, mesa, *limiar, inicio, prazo, contrato, rede, governanca),
+        Comando::Abrir { proposta, pergunta, opcoes, aptos, mesa, limiar, inicio, prazo, anel, contrato, rede, governanca } =>
+            comandos::abrir(proposta, pergunta, opcoes.as_deref(), aptos, mesa, *limiar, inicio, prazo, *anel, contrato, rede, governanca),
         Comando::Cedula { proposta, identidade } => comandos::mostrar_cedula(proposta, identidade),
         Comando::Votar { proposta, opcao, identidade } => comandos::votar(proposta, opcao, identidade),
         Comando::Queimar { identidade } => comandos::queimar(identidade),
