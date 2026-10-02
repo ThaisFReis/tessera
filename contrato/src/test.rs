@@ -1414,7 +1414,7 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
 
     let env = Env::default();
     env.mock_all_auths();
-    env.ledger().set_sequence_number(10);
+    env.ledger().set_sequence_number(4_989_900);
     let id = env.register(Tessera, ());
     let cliente = TesseraClient::new(&env, &id);
 
@@ -1436,7 +1436,7 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
     cliente.abrir(
         &Address::generate(&env), &proposta, &perg,
         &BytesN::from_array(&env, &arvore.raiz()), &mesa_sdk,
-        &3u32, &50u32, &1000u32, &true,
+        &3u32, &4_989_990u32, &4_990_190u32, &true,
     );
 
     let g = pedersen::gerador();
@@ -1479,7 +1479,7 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
     }
 
     // ---- a janela vira ----
-    env.ledger().set_sequence_number(60);
+    env.ledger().set_sequence_number(4_990_000);
 
     // Comparecer depois que a votação abriu mudaria o conjunto debaixo de quem
     // já votou.
@@ -1600,7 +1600,7 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
 /// pela primeira vez numa demonstração ao vivo.
 #[test]
 fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
-    use tessera_cliente::{mensagem as msg_cliente, montar, PerguntaJs};
+    use tessera_cliente::{anonima, mensagem as msg_cliente, PerguntaJs};
     use tessera_core::anel;
 
     let env = Env::default();
@@ -1630,7 +1630,7 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
     cliente.abrir(
         &Address::generate(&env), &proposta, &perg,
         &BytesN::from_array(&env, &arvore.raiz()), &mesa_sdk,
-        &3u32, &50u32, &1000u32, &true,
+        &3u32, &4_989_990u32, &4_990_190u32, &true,
     );
 
     let g = pedersen::gerador();
@@ -1648,7 +1648,7 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
         }
         cliente.comparecer(&proposta, &aptos[i], &g1(&env, pk), &irmaos, &c.indice);
     }
-    env.ledger().set_sequence_number(60);
+    env.ledger().set_sequence_number(4_990_000);
 
     // ---- a cédula, montada pelo cliente do navegador ----
     const EU: usize = 1;
@@ -1659,16 +1659,30 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
         PerguntaJs { opcoes: 2, confidencial: false },
     ];
     let escolhas_feitas = [2u32, 0u32];
-    let c = montar(
-        &proposta.to_array(), &ident, &h_hex, &perguntas_js, &escolhas_feitas, 0, 0,
+    let anel_hex: Vetor<std::string::String> = anel_ark.iter().map(ponto::para_hex).collect();
+    let segredo = pedersen::fr_para_bytes_be(&xs[EU]);
+    let segredo_hex: std::string::String =
+        segredo.iter().map(|b| std::format!("{:02x}", b)).collect();
+    // O caminho inteiro do cliente, numa chamada só — inclusive a mensagem que
+    // o anel assina. Montar isso por fora foi o que deixou passar uma
+    // assinatura sobre a cédula errada até a testnet.
+    let a = anonima(
+        &ponto_hex(&proposta.to_array()), &ponto::para_hex(&hp), &h_hex,
+        &anel_hex, EU, &segredo_hex, &perguntas_js, &escolhas_feitas,
     )
-    .expect("o cliente nao montou a cedula");
+    .expect("o cliente nao montou a cedula anonima");
+    let c = &a.cedula;
     assert!(c.parcelas.is_empty(), "sem mesa, nao pode sair parcela de Shamir");
-
-    let anel_hex: Vetor<std::string::String> =
-        anel_ark.iter().map(ponto::para_hex).collect();
     let msg = msg_cliente(&proposta.to_array(), &c.compromissos, &c.escolhas).unwrap();
-    let s = anel::assinar(&msg, &g, &hp, &anel_ark, EU, &xs[EU]).unwrap();
+    let s = anel::Assinatura {
+        imagem: ponto::de_hex(&a.imagem).unwrap(),
+        c0: pedersen::fr_de_bytes_be(&hex_bytes(&a.c0)),
+        z: a.z.iter().map(|h| pedersen::fr_de_bytes_be(&hex_bytes(h))).collect(),
+    };
+    assert!(
+        anel::verificar(&msg, &g, &hp, &anel_ark, &s),
+        "a assinatura do cliente nao fecha sobre a mensagem que o contrato le"
+    );
 
     // A mensagem do cliente e a do contrato têm de ser os mesmos bytes.
     let mut compr_sdk: Vec<Bls12381G1Affine> = Vec::new(&env);
@@ -1734,4 +1748,9 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
 
 fn hex_bytes(s: &str) -> Vetor<u8> {
     (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
+}
+
+
+fn ponto_hex(b: &[u8]) -> std::string::String {
+    b.iter().map(|x| std::format!("{:02x}", x)).collect()
 }

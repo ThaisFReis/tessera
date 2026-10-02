@@ -217,10 +217,34 @@ pub fn cedula_anonima(
     perguntas_js: JsValue,
     escolhas: Vec<u32>,
 ) -> Result<JsValue, JsValue> {
-    let proposta = de_hex(&proposta_hex)?;
+    let perguntas: Vec<PerguntaJs> = serde_wasm_bindgen::from_value(perguntas_js)?;
+    let js = anonima(&proposta_hex, &hp_hex, &h_hex, &anel_hex, indice, &secreta_hex, &perguntas, &escolhas)?;
+    serde_wasm_bindgen::to_value(&js).map_err(Into::into)
+}
+
+/// A mesma coisa, em tipos Rust puros — é esta que o teste de aceitação do
+/// contrato chama.
+///
+/// Existir separada não é zelo: a primeira versão montava a mensagem do anel
+/// aqui dentro e o teste a montava de fora, com os mesmos nomes e tipos. As
+/// duas divergiram, a assinatura passou a cobrir outra coisa, e o contrato
+/// recusou com `AnelInvalido` numa rodada de testnet. O teste não pegou porque
+/// não passava por aqui.
+#[allow(clippy::too_many_arguments)]
+pub fn anonima(
+    proposta_hex: &str,
+    hp_hex: &str,
+    h_hex: &str,
+    anel_hex: &[String],
+    indice: usize,
+    secreta_hex: &str,
+    perguntas: &[PerguntaJs],
+    escolhas: &[u32],
+) -> Result<CedulaAnonima, JsValue> {
+    let proposta = de_hex(proposta_hex)?;
     let g = pedersen::gerador();
-    let hp = ponto_de(&hp_hex)?;
-    let x = fr_de(&secreta_hex)?;
+    let hp = ponto_de(hp_hex)?;
+    let x = fr_de(secreta_hex)?;
     let anel_pts: Vec<G1Affine> = anel_hex
         .iter()
         .map(|s| ponto_de(s))
@@ -230,20 +254,22 @@ pub fn cedula_anonima(
     let ident = ponto::serializar(&imagem).to_vec();
 
     // Sem mesa: a cédula anônima do dapp aberto não reparte `r` com ninguém.
-    let perguntas: Vec<PerguntaJs> = serde_wasm_bindgen::from_value(perguntas_js)?;
-    let c = montar(&proposta, &ident, &h_hex, &perguntas, &escolhas, 0, 0)?;
+    let c = montar(&proposta, &ident, h_hex, perguntas, escolhas, 0, 0)?;
 
-    let msg = mensagem(&proposta, &c.compromissos, &escolhas)?;
+    // `c.escolhas` — as respostas públicas expandidas —, NÃO o `escolhas` de
+    // entrada, que é uma por pergunta. É o que o contrato lê em
+    // `mensagem_cedula`, e assinar o outro faz a assinatura cobrir uma cédula
+    // que ninguém mandou.
+    let msg = mensagem(&proposta, &c.compromissos, &c.escolhas)?;
     let s = anel::assinar(&msg, &g, &hp, &anel_pts, indice, &x)
         .map_err(|e| JsValue::from_str(&format!("anel: {:?}", e)))?;
 
-    let js = CedulaAnonima {
+    Ok(CedulaAnonima {
         imagem: ponto::para_hex(&s.imagem),
         c0: fr_hex(&s.c0),
         z: s.z.iter().map(fr_hex).collect(),
         cedula: c,
-    };
-    serde_wasm_bindgen::to_value(&js).map_err(Into::into)
+    })
 }
 
 /// `proposta ‖ len(compromissos) ‖ compromissos ‖ len(escolhas) ‖ escolhas`.

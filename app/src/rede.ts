@@ -49,7 +49,7 @@ const endereco = (g: string) => new Address(g).toScVal();
  * não bate e ninguém prova aptidão.
  */
 export const enderecoXdr = (g: string): string =>
-  bytesParaHex(new Address(g).toScAddress().toXDR());
+  bytesParaHex(new Address(g).toScVal().toXDR());
 
 // ---------- leitura ----------
 
