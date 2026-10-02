@@ -80,29 +80,58 @@ E, atrás de tudo, a coluna da mecânica.
 
 ## 2. A tela, em dois lados
 
-Uma coluna para a pessoa, uma para a mecânica. Em telas estreitas a mecânica cai
-para baixo do painel.
+À esquerda, a pessoa. À direita, **um terminal com o código rodando**.
 
 ```
-┌──────────────────────────────┬─────────────────────────────┐
-│  O QUE VOCÊ VÊ               │  O QUE ACONTECE             │
-│                              │                             │
-│  Destituir a diretoria?      │  C = v·G + r·H              │
-│                              │                             │
-│   ( ) SIM    ( ) NAO         │  v  é 0 ou 1, o seu voto    │
-│                              │  r  é acaso só seu          │
-│  [ votar ]                   │                             │
-│                              │  C não contém informação    │
-│                              │  sobre v. Nem para sempre.  │
-└──────────────────────────────┴─────────────────────────────┘
+┌──────────────────────────────┬─────────────────────────────────┐
+│  Destituir a diretoria?      │  core/src/cds.rs                │
+│                              │                                 │
+│   ( ) SIM    ( ) NAO         │  if v == 0 {                    │
+│                              │      // ramo 0 é o real;        │
+│  [ votar ]                   │      // o ramo 1 é fabricado    │
+│                              │      // de trás para frente     │
+│                              │      let a0 = (*h * t).into();  │
+│                              │      ...                        │
+│                              │                                 │
+│                              │  v = 1 na escolhida, 0 nas outras│
+│                              │  r = ▓▓▓▓▓  nunca enviado       │
+│                              │  C = 024018d9e520aa4f…          │
+└──────────────────────────────┴─────────────────────────────────┘
 ```
 
-**A regra da coluna direita:** ela mostra **o objeto**, não uma metáfora. Bytes
-reais, a fórmula real, o tamanho real. Quem assiste não precisa entender
-BLS12-381 — precisa ver que existe algo concreto ali, e não uma promessa.
+**A coluna direita não resume: ela mostra.** As linhas de código são recortes
+literais de `core/src/*.rs`, com os valores desta rodada passando por elas. O
+comentário que já estava no crate explica o sigilo melhor do que qualquer
+parágrafo escrito em volta dele.
 
-**A coluna nunca fica vazia.** Se um painel não tem mecânica para mostrar, ele
-está no lugar errado da demo.
+> `// ramo 0 é o real; o ramo 1 é fabricado de trás para frente`
+
+**Os valores que a demo se recusa a mostrar aparecem tarjados**, com o motivo
+ao lado — `r` não está no estado, e não existe parcela de Shamir de um voto
+individual. A ausência é parte da explicação, não uma lacuna.
+
+**Isso cria uma dívida, e ela é real:** se o código mudar e estes recortes não
+mudarem junto, a demo passa a mentir. Eles vivem em `console/index.html`, nas
+dez funções `mecanismo*`.
+
+Com a mecânica carregando os dados, a esquerda pôde emagrecer. A regra passou a
+ser: **se o terminal já diz, a esquerda não repete.** A apuração perdeu dois
+cartões de dez linhas e ficou só com o placar, legível do fundo da sala.
+
+Os dez traços:
+
+| Painel | Arquivo | O que mostra |
+|---|---|---|
+| 1 | `contrato/src/tipos.rs` | `Pergunta { opcoes, confidencial }` e os limites |
+| 2 | `core/src/merkle.rs` | `folha`, `no`, e a lista que nunca é publicada |
+| 3 | `core/src/merkle.rs` | `verificar` — provar aptidão sem consultar cadastro |
+| 4 | `core/src/pedersen.rs` | `comprometer` — `v`, `r` tarjado, `C` |
+| 5 | `cli/src/recibo.rs` | os dois arquivos, e o teste que separa um do outro |
+| 6 | `core/src/cds.rs` | `provar` — o ramo real e o fabricado |
+| 7 | `core/src/soma.rs` | a prova por pergunta, e o desafio com `pergunta` |
+| 8 | `core/src/pedersen.rs` | `agregar` e `verifica_agregado`, linha a linha |
+| 9 | `contrato/src/lib.rs` | a guarda de `TAU`, e os dois `✓` antes da recusa |
+| 10 | `cli/src/comandos.rs` | o laço do verificador — e o que a página não faz |
 
 ---
 
