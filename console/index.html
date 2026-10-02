@@ -1526,7 +1526,7 @@ function mecanismoApurar(d) {
    um bloco que abre o voto e encolhe o conjunto secreto abaixo do mínimo. Com
    a ponte no ar ele monta essa rodada sozinho — abrir, quatro em segredo, três
    com --publico — e tenta apurar. A recusa que aparece é a do contrato. */
-const tau = { proposta: "", fase: "", saida: "", ledger: 0 };
+const tau = { proposta: "", fase: "", saida: "", ledger: 0, estado: null };
 
 function painelLimite(d) {
   const s=el("section"); titulo(s,9,"O resultado correto também pode ser recusado");
@@ -1572,7 +1572,7 @@ async function rodarTau() {
       perguntas: [{ texto:"Manter a coligação?", opcoes:["manter","rescindir"], confidencial:true }] }) }).then(r=>r.json());
   if (!j.ok) { tau.saida = j.saida || j.erro || ""; return dizer("✗ não consegui abrir"); }
   tau.ledger = (j.estado && j.estado.prazo_ledger) || 0;
-  registrar("abrir", null, j.estado);
+  registrar("abrir", null, j.estado); tau.estado = j.estado;
 
   const quem = ponte.identidades.slice(0,7);
   for (let i = 0; i < quem.length; i++) {
@@ -1586,7 +1586,7 @@ async function rodarTau() {
     dizer(`${quem[i]} votando ${aberto ? "com o voto aberto" : "em segredo"} · ${i+1} de ${quem.length} · ${relogio({prazo_ledger: tau.ledger})}`);
     j = await fetch("/api/votar", { method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ proposta: nome, identidade: quem[i], opcoes:["manter"], publico: aberto }) }).then(r=>r.json());
-    if (j.ok) registrar("votar", { votos: (j.estado?.votos || []).slice(0, i) }, j.estado);
+    if (j.ok) { registrar("votar", { votos: (j.estado?.votos || []).slice(0, i) }, j.estado); tau.estado = j.estado; }
     if (!j.ok) {
       tau.saida = j.saida || j.erro || "";
       const tarde = ponte.ledger && tau.ledger && ponte.ledger >= tau.ledger;
@@ -1607,33 +1607,67 @@ async function rodarTau() {
   j = await fetch("/api/apurar", { method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({ proposta: nome }) }).then(r=>r.json());
   registrar("apurar", null, j.estado);
+  if (j.estado) tau.estado = j.estado;
   tau.saida = j.saida || j.erro || "";
   dizer(tau.saida.includes("#19") ? "✗ o contrato recusou · nada foi publicado"
                                   : "✓ terminou — veja a saída");
 }
+/* Esta coluna lia números que eu havia digitado: 7 aptos, 4 em segredo, 3
+   abertos, e os dois acumuladores da rodada de setembro. Enquanto o painel era
+   reencenação isso passava; depois que ele passou a rodar de verdade, virou
+   uma mentira com cara de saída de programa.
+
+   Agora ela lê da rodada que está na tela. Sem rodada, mostra só o código —
+   que é o que dá para afirmar sem ter executado nada. */
 function mecanismoLimite() {
-  return terminalMecanica("contrato/src/lib.rs · tipos.rs", [
+  const base = [
     ["cod","if confidenciais < TAU {"],
     ["cod","    return Err(Erro::AnonimatoInsuficiente);"],
     ["cod","}"],
     ["cod","// tipos.rs"],
     ["cod","pub const TAU: u32 = 5;"],
     [],
-    ["val","eleitorado","7"],
-    ["val","em segredo","4"],
-    ["val","abriram o voto","3"],
-    ["x","4 < 5 → Error(Contract, #19)"],
-    [],
-    ["ok","acumulado MANTER    4·G + R·H"],
-    ["ok","acumulado RESCINDIR 0·G + R·H"],
-    ["//","os dois fecharam. o contrato tinha o"],
-    ["//","resultado correto na mão — e não publicou."],
+  ];
+  const fim = [
     [],
     ["//","revelar o próprio voto é um direito. em bloco,"],
     ["//","particiona o eleitorado; numa célula pequena o"],
     ["//","agregado para de proteger quem está nela."],
     ["nota","τ é global: o sigilo é da pergunta, então quem votou em segredo é o mesmo conjunto em todas. A partição tem duas células."],
-  ]);
+  ];
+  const arq = "contrato/src/lib.rs · contrato/src/tipos.rs";
+
+  const e = ponte.viva ? tau.estado : null;
+  if (!e) return terminalMecanica(arq,
+    ponte.viva ? [...base, ["//","nenhuma rodada montada ainda"], ...fim]
+               : [...base, ...fim]);
+
+  const segredo = e.votos.filter((v) => !v.publico).length;
+  const abertos = e.votos.filter((v) => v.publico).length;
+  const linhas = [
+    ...base,
+    ["val","eleitorado", String(e.aptos.length)],
+    ["val","votaram", String(e.votos.length)],
+    ["val","em segredo", String(segredo)],
+    ["val","abriram o voto", String(abertos)],
+  ];
+
+  /* Os acumuladores só entram se a apuração foi tentada e a CLI os imprimiu.
+     Calculá-los aqui seria inventar justamente o que o contrato tem de dizer. */
+  const conferidos = (tau.saida || "").split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("Acumulado"));
+  if (tau.saida && segredo > 0 && segredo < e.sigilo_minimo)
+    linhas.push(["x", `${segredo} < ${e.sigilo_minimo} → Error(Contract, #19)`]);
+  if (conferidos.length) {
+    linhas.push([]);
+    conferidos.forEach((l) =>
+      linhas.push(["ok", l.replace(/\.{2,}/g, " ").replace(/✓\s*$/, "")
+                          .replace(/\s+/g, " ").trim()]));
+    linhas.push(["//","os dois fecharam. o contrato tinha o"]);
+    linhas.push(["//","resultado correto na mão — e não publicou."]);
+  }
+  return terminalMecanica(arq, [...linhas, ...fim]);
 }
 function mecanismoVerificador(d) {
   const nconf = d.votos.filter(v=>!v.publico).length;
