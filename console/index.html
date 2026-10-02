@@ -1081,13 +1081,12 @@ function rolo() {
 
 /* ---------- O terminal da mecânica ----------
 
-   A coluna da direita não resume o que acontece: ela mostra o código que faz
-   acontecer, com os valores desta rodada passando por ele. As linhas `cod` são
-   recortes literais de `core/src/*.rs` — se o código mudar e isto não mudar
-   junto, a demo passa a mentir.
+   A coluna da direita mostra o que está acontecendo: em cima o diário, que é
+   saída de verdade da CLI, e embaixo os valores desta rodada com o porquê de
+   cada um. Os recortes de fonte Rust saíram — eram cópia, e cópia envelhece.
+   O nome do arquivo continua declarado em cada card para `guarda.py`.
 
    Tipos de linha:
-     ["cod", texto]            fonte, como está no crate
      ["val", chave, valor]     um valor de verdade desta rodada
      ["oculto", chave, porque] um valor que a demo se recusa a mostrar
      ["//", texto]             comentário
@@ -1157,7 +1156,12 @@ function terminalMecanica(arquivo, linhas) {
   void arquivo;
   if (ponte.viva) m.append(el("div","term-corte"));
   const t = el("div","term");
-  const nos = linhas.map(linhaMecanica);
+  /* Tirar os recortes deixou brancos encostados e brancos nas pontas. Em vez
+     de caçá-los um a um nos dez painéis, o terminal normaliza na hora. */
+  const limpas = linhas.filter((l, i, t) =>
+    (l && l.length) || (i > 0 && i < t.length - 1 && t[i - 1] && t[i - 1].length));
+  while (limpas.length && !(limpas[limpas.length - 1] || []).length) limpas.pop();
+  const nos = limpas.map(linhaMecanica);
   const jaVisto = datilo.vistos.has(passo);
   datilo.vistos.add(passo);
   if (jaVisto || semMovimento || nos.length < 3) t.append(...nos);
@@ -1250,12 +1254,6 @@ function painelAbertura(d) {
 }
 function mecanismoAbertura(d) {
   return terminalMecanica("core/src/merkle.rs · shamir.rs", [
-    ["cod","pub fn folha(a: &Apto) -> Hash {"],
-    ["cod","    sha256(0x00 ‖ addr_xdr ‖ peso_be)"],
-    ["cod","}"],
-    ["cod","pub fn no(esq: &Hash, dir: &Hash) -> Hash {"],
-    ["cod","    sha256(0x01 ‖ esq ‖ dir)"],
-    ["cod","}"],
     [],
     ["val","aptos",`${d.aptos.length} pessoas`],
     ["val","raiz",curto(d.raiz_aptos,16,8)],
@@ -1265,7 +1263,7 @@ function mecanismoAbertura(d) {
     ["//","o eleitor prova aptidão por caminho."],
     ["//","provar não é consultar um cadastro."],
     [],
-    ["cod","// shamir.rs — a mesa recebe as parcelas agora"],
+    ["//","a mesa recebe as parcelas agora"],
     ["val","k de n",`${d.mesa.limiar} de ${d.mesa.membros}`],
     ["val","reconstrói","Σr, e só Σr"],
     ["oculto","r_i de cada voto","não existe parcela disso"],
@@ -1289,14 +1287,6 @@ function painelAnalise(d) {
 function mecanismoAnalise(d) {
   const abertas = d.perguntas.filter(p=>!p.confidencial).length;
   return terminalMecanica("core/src/merkle.rs", [
-    ["cod","pub fn verificar(a, caminho, raiz) -> bool {"],
-    ["cod","    let mut h = folha(a);"],
-    ["cod","    for (irmao, esq) in caminho {"],
-    ["cod","        h = if esq { no(irmao, &h) }"],
-    ["cod","            else    { no(&h, irmao) };"],
-    ["cod","    }"],
-    ["cod","    h == *raiz"],
-    ["cod","}"],
     [],
     ["ok","você é apta"],
     ["//","conferido no cliente, contra a raiz."],
@@ -1399,10 +1389,6 @@ function urna(d) {
 function mecanismoVotar(d) {
   const v = d.votos.find(x=>!x.publico && x.compromissos?.length);
   return terminalMecanica("core/src/pedersen.rs", [
-    ["cod","pub fn comprometer(g, h,"],
-    ["cod","                   v: &Fr, r: &Fr) -> G1Affine {"],
-    ["cod","    ((*g * v) + (*h * r)).into()"],
-    ["cod","}"],
     [],
     ["//","uma chamada por opção sigilosa:"],
     ["val","v","1 na opção escolhida, 0 nas outras"],
@@ -1413,8 +1399,8 @@ function mecanismoVotar(d) {
     ["//","não \"difícil\": compatível. é por isso que"],
     ["//","nem tempo infinito separa os dois."],
     [],
-    ["cod","// pergunta em aberto: nada disso acontece"],
-    ["cod","escolhas: Vec<u32>   // um inteiro, e o endereço"],
+    ["//","pergunta em aberto: nada disso acontece"],
+    ["//","vai só um inteiro em claro, e o endereço"],
     [],
     ["ok","tudo verificado antes de gravar qualquer coisa"],
   ]);
@@ -1453,13 +1439,9 @@ function painelRecibo(d) {
 
 function mecanismoRecibo() {
   return terminalMecanica("cli/src/recibo.rs", [
-    ["cod","// `votar` não chama mais recibo::gravar."],
-    ["cod","#[test] fn nenhum_comando_grava_recibo() {"],
-    ["cod","    let fonte = include_str!(\"comandos.rs\");"],
-    ["cod","    assert!(!fonte.contains(\"recibo::gravar\"));"],
-    ["cod","}"],
+    ["//","`votar` não chama mais recibo::gravar"],
     [],
-    ["ocl","r","existiu no processo, e morreu com ele"],
+    ["oculto","r","existiu no processo, e morreu com ele"],
     ["val","no disco","nada"],
     [],
     ["//","a v1 gravava o recibo e pedia para apagar."],
@@ -1467,9 +1449,9 @@ function mecanismoRecibo() {
     ["//","comando lia o arquivo, nem para conferir voto"],
     ["//","nem para apurar. era passivo puro."],
     [],
-    ["cod","estado/<proposta>.json"],
-    ["cod","  compromissos: [...]   ← público"],
-    ["cod","  provas:       [...]   ← público"],
+    ["//","estado/<proposta>.json"],
+    ["//","  compromissos: [...]   ← público"],
+    ["//","  provas:       [...]   ← público"],
     ["ok","tudo que o verificador precisa continua lá"],
     ["nota","Não existe prova do seu voto em lugar nenhum — e a auditoria não perdeu nada, porque ela nunca dependeu do segredo."],
   ]);
@@ -1477,22 +1459,6 @@ function mecanismoRecibo() {
 
 function mecanismoCedula() {
   return terminalMecanica("core/src/cds.rs", [
-    ["cod","pub fn provar(ctx, g, h, c,"],
-    ["cod","              v: u64, r: &Fr) -> Prova {"],
-    ["cod","    let t = fr()?;"],
-    ["cod","    if v == 0 {"],
-    ["cod","        // ramo 0 é o real; o ramo 1 é"],
-    ["cod","        // fabricado de trás para frente"],
-    ["cod","        let a0 = (*h * t).into();"],
-    ["cod","        let e1 = fr()?;"],
-    ["cod","        let z1 = fr()?;"],
-    ["cod","        let a1 = (*h * z1"],
-    ["cod","                  - c_menos_g * e1).into();"],
-    ["cod","        let e  = desafio(ctx, c, &a0, &a1);"],
-    ["cod","        let e0 = e - e1;"],
-    ["cod","        let z0 = t + e0 * r;"],
-    ["cod","    } else { /* espelhado: o real é o 1 */ }"],
-    ["cod","}"],
     [],
     ["//","um ramo é provado, o outro é simulado."],
     ["//","os dois saem com a mesma distribuição."],
@@ -1506,9 +1472,7 @@ function mecanismoCedula() {
 function mecanismoGrade(d) {
   const nconf = d.votos.filter(v=>!v.publico).length;
   return terminalMecanica("core/src/soma.rs", [
-    ["cod","// D = (Σ C_j) − peso·G  deve ser múltiplo de H"],
-    ["cod","pub fn provar(ctx, h, d: &G1Affine, rho: &Fr)"],
-    ["cod","    -> Prova      // Schnorr na base H"],
+    ["//","D = (Σ C_j) − peso·G deve ser múltiplo de H"],
     [],
     ["//","se as opções não somarem o peso, não existe"],
     ["//","ρ que feche. a prova é impossível de forjar."],
@@ -1522,7 +1486,7 @@ function mecanismoGrade(d) {
     ["//","a soma total. por isso é uma por pergunta."],
     [],
     ["//","o que entra no desafio:"],
-    ["cod","proposta ‖ addr_xdr ‖ pergunta ‖ opção"],
+    ["//","proposta ‖ addr_xdr ‖ pergunta ‖ opção"],
     ["//","sem `pergunta`, a opção 0 da pergunta 1 e a"],
     ["//","da pergunta 2 teriam o mesmo desafio — e a"],
     ["//","prova seria copiável de uma para a outra."],
@@ -1580,21 +1544,15 @@ function acoesApuracao(d) {
 }
 function mecanismoApurar(d) {
   return terminalMecanica("core/src/pedersen.rs · shamir.rs", [
-    ["cod","pub fn agregar(cs: &[G1Affine]) -> G1Affine {"],
-    ["cod","    cs.iter()"],
-    ["cod","      .fold(identity, |acc, c| acc + c)"],
-    ["cod","}"],
-    ["cod","// ΣC = (Σv)·G + (Σr)·H   ← homomórfico"],
+    ["//","ΣC = (Σv)·G + (Σr)·H ← homomórfico"],
     [],
     ["//","a rede soma pontos a cada voto, sem ler nenhum."],
     [],
-    ["cod","// shamir.rs — cada membro soma localmente"],
+    ["//","cada membro soma localmente"],
     ["val","endossos",`${d.mesa.limiar} de ${d.mesa.membros}`],
     ["val","reconstruído","Σr"],
     ["oculto","qualquer r_i","nem a mesa inteira reunida"],
     [],
-    ["cod","pub fn verifica_agregado(a, total, soma_r)"],
-    ["cod","    -> bool { a == total·G + soma_r·H }"],
     [],
     ...(d.apuracao
       ? contagem(d,d.apuracao.afirmado||[]).filter(c=>c.confidencial).map((c,i)=>
@@ -1681,10 +1639,6 @@ async function rodarTau() {
 
 function mecanismoLimite() {
   const base = [
-    ["cod","if confidenciais < TAU {"],
-    ["cod","    return Err(Erro::AnonimatoInsuficiente);"],
-    ["cod","}"],
-    ["cod","pub const TAU: u32 = 5;"],
     [],
   ];
   const fim = [
@@ -1736,13 +1690,7 @@ function mecanismoLimite() {
 function mecanismoVerificador(d) {
   const nconf = d.votos.filter(v=>!v.publico).length;
   return terminalMecanica("cli/src/comandos.rs", [
-    ["cod","// outro processo. não fala com o contrato."],
-    ["cod","for voto in estado.votos {"],
-    ["cod","    cds::verificar(...)?;"],
-    ["cod","    soma::verificar(...)?;"],
-    ["cod","}"],
-    ["cod","pedersen::agregar(&todos)"],
-    ["cod","    == acumulado_on_chain"],
+    ["//","outro processo. não fala com o contrato."],
     [],
     ["val","disjuntivas",`${nconf*opcoesConf(d)} refeitas`],
     ["val","somas",`${nconf*nPerguntasConf(d)} refeitas`],
