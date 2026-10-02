@@ -794,25 +794,38 @@ function textoRelogio(d) {
 /* Enquanto a votação está aberta, a tela se atualiza sozinha. Sem isso alguém
    teria de ficar apertando F5 na frente da câmera. */
 let pulso = null;
+
+/* Enquanto a votação está aberta, a tela se atualiza sozinha — sem isso
+   alguém teria de ficar apertando F5 na frente da câmera.
+
+   O ritmo é reagendado a cada batida, e não fixado uma vez: longe do fim não
+   há o que ver mudar e bater de 5 em 5 s só enche o log da ponte; perto do fim
+   a contagem precisa ser fina, porque é ela que libera a apuração. */
 function bater(d) {
-  clearInterval(pulso);
+  clearTimeout(pulso);
   if (!ponte.viva || !d || !d.prazo_ledger || d.apuracao) return;
-  pulso = setInterval(async () => {
+
+  const proxima = () => {
+    const f = faltam(dados);
+    return f !== null && f * 5 > 90 ? 20000 : 5000;
+  };
+
+  const tique = async () => {
     const antes = faltam(dados) <= 0;
     await lerLedger();
-    const agora = faltam(dados) <= 0;
     /* Redesenhar o palco inteiro arrancaria o botão de baixo do dedo de quem
        está votando. No tique comum só o relógio e o diário mudam; o palco só
        é refeito quando o prazo vira, porque aí a apuração precisa aparecer. */
-    if (agora && !antes) { clearInterval(pulso); mostrar(); return; }
+    if (faltam(dados) <= 0 && !antes) { mostrar(); return; }
     const r = document.querySelector("[data-relogio]");
     if (r) r.textContent = textoRelogio(dados);
     const dv = document.querySelector(".diario");
-    if (dv && dv.childElementCount !== diario.slice(-120).length) {
-      dv.replaceWith(rolo());
-    }
-  }, 5000);
+    if (dv && dv.childElementCount !== diario.slice(-120).length) dv.replaceWith(rolo());
+    pulso = setTimeout(tique, proxima());
+  };
+  pulso = setTimeout(tique, proxima());
 }
+
 
 const roteiro = [
   ["I · organizador", "Montar a cédula", painelPerguntas, mecanismoPerguntas],

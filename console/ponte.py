@@ -208,7 +208,13 @@ def identidades():
 class Mao(BaseHTTPRequestHandler):
     server_version = "tessera-ponte"
 
+    # O relógio bate a cada poucos segundos. Registrá-lo afoga o log justamente
+    # onde se quer enxergar abrir, votar e apurar.
+    SILENCIOSOS = ("/api/ledger", "/favicon.ico")
+
     def log_message(self, formato, *args):
+        if any(q in self.path for q in self.SILENCIOSOS):
+            return
         sys.stderr.write("  %s\n" % (formato % args))
 
     def responder(self, codigo, corpo, tipo="application/json; charset=utf-8"):
