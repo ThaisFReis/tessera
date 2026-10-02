@@ -110,8 +110,25 @@ pub fn contexto(
     pergunta: u32,
     opcao: u32,
 ) -> Bytes {
+    contexto_de(env, proposta, &votante.clone().to_xdr(env), pergunta, opcao)
+}
+
+/// O mesmo contexto, com a identidade em bytes crus.
+///
+/// No voto identificado a identidade é o XDR do endereço. No voto em anel não
+/// existe endereço de membro — a identidade é a **imagem de chave**, que é
+/// única por pessoa e por proposta, e não diz quem é. As duas servem ao mesmo
+/// propósito: impedir que o `C` e a prova de uma pessoa sejam copiados como
+/// voto de outra.
+pub fn contexto_de(
+    env: &Env,
+    proposta: &BytesN<32>,
+    identidade: &Bytes,
+    pergunta: u32,
+    opcao: u32,
+) -> Bytes {
     let mut b = Bytes::from_array(env, &proposta.to_array());
-    b.append(&votante.clone().to_xdr(env));
+    b.append(identidade);
     b.extend_from_array(&pergunta.to_be_bytes());
     b.extend_from_array(&opcao.to_be_bytes());
     b
@@ -258,6 +275,7 @@ pub fn verificar_aptidao(
 // ===================== o anel =====================================
 
 pub const DST_ANEL: &[u8] = b"TESSERA-V1-ANEL";
+pub const DST_CONJUNTO: &[u8] = b"TESSERA-V1-ANEL-CONJUNTO";
 
 /// `Hp` da proposta, por hash-to-curve do host.
 ///
@@ -284,13 +302,29 @@ pub fn calcular_hp(env: &Env, proposta: &BytesN<32>) -> Bls12381G1Affine {
 /// É também o que a `Proposta` guarda: conferir que a lista apresentada é a que
 /// foi fixada na abertura custa um hash, não guardar `n` pontos no estado.
 pub fn preambulo_anel(env: &Env, msg: &Bytes, anel: &Vec<Bls12381G1Affine>) -> BytesN<32> {
-    let mut buf = Bytes::from_slice(env, DST_ANEL);
-    buf.extend_from_array(&(msg.len() as u32).to_be_bytes());
-    buf.append(msg);
+    compor_anel(env, msg, &digesto_anel(env, anel))
+}
+
+/// O compromisso com o **conjunto**, sem mensagem nenhuma.
+///
+/// É isto que a proposta guarda quando o comparecimento fecha: 32 bytes. A
+/// cédula traz a lista inteira, o contrato re-hasheia e compara. Guardar o
+/// digesto em vez dos `n` pontos é o que mantém a leitura de estado constante.
+pub fn digesto_anel(env: &Env, anel: &Vec<Bls12381G1Affine>) -> BytesN<32> {
+    let mut buf = Bytes::from_slice(env, DST_CONJUNTO);
     buf.extend_from_array(&(anel.len() as u32).to_be_bytes());
     for p in anel.iter() {
         buf.extend_from_array(&p.to_array());
     }
+    env.crypto().sha256(&buf).into()
+}
+
+/// Junta a mensagem ao digesto do conjunto.
+pub fn compor_anel(env: &Env, msg: &Bytes, digesto: &BytesN<32>) -> BytesN<32> {
+    let mut buf = Bytes::from_slice(env, DST_ANEL);
+    buf.extend_from_array(&(msg.len() as u32).to_be_bytes());
+    buf.append(msg);
+    buf.extend_from_array(&digesto.to_array());
     env.crypto().sha256(&buf).into()
 }
 
@@ -355,4 +389,27 @@ pub fn verificar_anel(
         c = elo_anel(env, pre, imagem, &a, &b);
     }
     c == *c0
+}
+
+/// A mensagem que a assinatura em anel assina: **esta** cédula, nesta proposta.
+///
+/// Sem isto o anel provaria só pertencimento, e uma assinatura válida poderia
+/// ser recortada e colada numa cédula diferente. Os compromissos entram porque
+/// são a cédula; as escolhas em claro entram porque também são.
+pub fn mensagem_cedula(
+    env: &Env,
+    proposta: &BytesN<32>,
+    compromissos: &Vec<Bls12381G1Affine>,
+    escolhas: &Vec<u32>,
+) -> Bytes {
+    let mut b = Bytes::from_array(env, &proposta.to_array());
+    b.extend_from_array(&(compromissos.len() as u32).to_be_bytes());
+    for c in compromissos.iter() {
+        b.extend_from_array(&c.to_array());
+    }
+    b.extend_from_array(&(escolhas.len() as u32).to_be_bytes());
+    for e in escolhas.iter() {
+        b.extend_from_array(&e.to_be_bytes());
+    }
+    b
 }

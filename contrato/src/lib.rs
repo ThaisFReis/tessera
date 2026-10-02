@@ -34,6 +34,7 @@ use soroban_sdk::{
     crypto::bls12_381::{Bls12381Fr, Bls12381G1Affine},
     Address, Bytes, BytesN, Env, Vec,
 };
+use soroban_sdk::xdr::ToXdr;
 use tipos::{Chave, Instancia, MAX_OPCOES, MAX_PERGUNTAS, TAU};
 
 #[contract]
@@ -68,6 +69,7 @@ impl Tessera {
         limiar: u32,
         abre_em: u32,
         fecha_em: u32,
+        anel: bool,
     ) -> Result<(), Erro> {
         governanca.require_auth();
 
@@ -125,7 +127,14 @@ impl Tessera {
         }
 
         let n_perguntas = perguntas.len();
-        let p = Proposta { perguntas, raiz_aptos, mesa, limiar, abre_em, fecha_em };
+        let p = Proposta { perguntas, raiz_aptos, mesa, limiar, abre_em, fecha_em, anel };
+        if anel {
+            // O anel nasce vazio e cresce com o comparecimento. Sem esta
+            // escrita, o primeiro `comparecer` não teria onde se somar.
+            let k = Chave::Anel(proposta.clone());
+            env.storage().persistent().set(&k, &Vec::<Bls12381G1Affine>::new(&env));
+            guardar_longo(&env, &k);
+        }
         env.storage().persistent().set(&Chave::Proposta(proposta.clone()), &p);
         guardar_longo(&env, &Chave::Proposta(proposta.clone()));
 
@@ -153,7 +162,7 @@ impl Tessera {
 
         env.events().publish(
             (symbol_short!("abrir"), proposta),
-            (n_perguntas, conf_opcoes, abre_em, fecha_em, limiar),
+            (n_perguntas, conf_opcoes, abre_em, fecha_em, limiar, anel),
         );
         Ok(())
     }
@@ -197,6 +206,11 @@ impl Tessera {
     ) -> Result<(), Erro> {
         votante.require_auth();
         let p = abrir_proposta(&env, &proposta)?;
+        // Os dois modos não se misturam: numa proposta de anel, votar pelo
+        // endereço recriaria o vínculo que o anel existe para quebrar.
+        if p.anel {
+            return Err(Erro::ModoErrado);
+        }
 
         if env.ledger().sequence() < p.abre_em {
             return Err(Erro::VotacaoAindaNaoComecou);
@@ -215,98 +229,173 @@ impl Tessera {
         conferir_aptidao(&env, &p, &votante, peso, indice, &caminho)?;
         marcar_votou(&env, &proposta, &votante)?;
 
-        let g = gerador_g(&env);
-        let h: Bls12381G1Affine = env
-            .storage()
-            .instance()
-            .get(&Instancia::GeradorH)
-            .ok_or(Erro::PropostaNaoExiste)?;
-        let bls = env.crypto().bls12_381();
-
-        let mut off_conf = 0u32; // posição em `compromissos`/`provas`
-        let mut off_publ = 0u32; // posição em `escolhas`
-        let mut i_soma = 0u32; // qual prova de soma
-        for (q, pg) in p.perguntas.iter().enumerate() {
-            let q = q as u32;
-            if !pg.confidencial {
-                conferir_bloco(&escolhas, off_publ, pg.opcoes, peso)?;
-                off_publ += pg.opcoes;
-                continue;
-            }
-
-            // Todo ponto que chega é validado: o host não valida sozinho, e
-            // um ponto de ordem pequena vazaria informação sobre o escalar
-            // (sonda 10).
-            let mut soma = infinito(&env);
-            for j in 0..pg.opcoes {
-                let c = compromissos.get(off_conf + j).unwrap();
-                let pr = provas.get(off_conf + j).unwrap();
-                validar(&env, &c)?;
-                validar(&env, &pr.a0)?;
-                validar(&env, &pr.a1)?;
-
-                let ctx = contexto(&env, &proposta, &votante, q, j);
-                if !verificar_cds(&env, &ctx, &g, &h, &c, &pr) {
-                    return Err(Erro::ProvaBinariaInvalida);
-                }
-                soma = bls.g1_add(&soma, &c);
-            }
-
-            // D = (Σ C_j da pergunta) − w·G tem de ser múltiplo conhecido de
-            // H. Com cada v_j ∈ {0,1} pelas disjuntivas, isso fecha a boa
-            // formação **desta** pergunta.
-            let ps = provas_soma.get(i_soma).unwrap();
-            validar(&env, &ps.a)?;
-            let d = bls.g1_add(&soma, &(-bls.g1_mul(&g, &fr(&env, peso))));
-            let ctx = contexto(&env, &proposta, &votante, q, u32::MAX);
-            if !verificar_soma(&env, &ctx, &h, &d, &ps) {
-                return Err(Erro::ProvaDeSomaInvalida);
-            }
-            i_soma += 1;
-            off_conf += pg.opcoes;
-        }
-
-        // Daqui para baixo a cédula inteira já passou. Só agora se escreve —
-        // uma pergunta mal formada não deixa rastro parcial no acumulador.
-        let mut off_conf = 0u32;
-        let mut off_publ = 0u32;
-        for (q, pg) in p.perguntas.iter().enumerate() {
-            let q = q as u32;
-            for j in 0..pg.opcoes {
-                if pg.confidencial {
-                    // Agregação homomórfica: g1_add é ~30× mais barato que
-                    // g1_mul, então somar é praticamente de graça.
-                    let k = Chave::Acum(proposta.clone(), q, j);
-                    let a: Bls12381G1Affine = env.storage().persistent().get(&k).unwrap();
-                    let c = compromissos.get(off_conf + j).unwrap();
-                    env.storage().persistent().set(&k, &bls.g1_add(&a, &c));
-                    guardar_longo(&env, &k);
-                } else {
-                    let k = Chave::TotalPublico(proposta.clone(), q, j);
-                    let t: u32 = env.storage().persistent().get(&k).unwrap();
-                    env.storage()
-                        .persistent()
-                        .set(&k, &(t + escolhas.get(off_publ + j).unwrap()));
-                    guardar_longo(&env, &k);
-                }
-            }
-            if pg.confidencial {
-                off_conf += pg.opcoes;
-            } else {
-                off_publ += pg.opcoes;
-            }
-        }
-
-        let kc = Chave::Comparecimento(proposta.clone());
-        let (conf, publ): (u32, u32) = env.storage().persistent().get(&kc).unwrap();
-        env.storage().persistent().set(&kc, &(conf + 1, publ));
-        guardar_longo(&env, &kc);
+        conferir_e_somar(&env, &p, &proposta, &votante.clone().to_xdr(&env), &compromissos,
+                         &provas, &provas_soma, &escolhas, peso)?;
 
         // O evento é o que o nível 2 do verificador lê dos arquivos de
         // histórico para recalcular o acumulador sem depender do RPC (§8.3).
         env.events().publish(
             (symbol_short!("votar"), proposta, votante),
             (compromissos, escolhas),
+        );
+        Ok(())
+    }
+
+    /// **O caderno.** Identificado, público, e separado da urna.
+    ///
+    /// A pessoa prova que está na lista de aptos e registra a chave pública com
+    /// que vai assinar o anel. É o único ato em que o nome dela aparece — e é o
+    /// que permite voto obrigatório: `aptos − compareceram` é a lista de quem
+    /// faltou.
+    ///
+    /// Só vale **antes** de `abre_em`. Depois que a votação abre, o anel está
+    /// congelado: aceitar mais um membro mudaria o conjunto debaixo de quem já
+    /// votou, e uma assinatura feita sobre o conjunto antigo deixaria de fechar.
+    ///
+    /// Devolve o tamanho do anel até agora, que é o tamanho do esconderijo.
+    pub fn comparecer(
+        env: Env,
+        proposta: BytesN<32>,
+        votante: Address,
+        chave_anel: Bls12381G1Affine,
+        caminho: Vec<BytesN<32>>,
+        indice: u32,
+    ) -> Result<u32, Erro> {
+        votante.require_auth();
+        let p = abrir_proposta(&env, &proposta)?;
+        if !p.anel {
+            return Err(Erro::ModoErrado);
+        }
+        if env.ledger().sequence() >= p.abre_em {
+            return Err(Erro::ComparecimentoEncerrado);
+        }
+        conferir_aptidao(&env, &p, &votante, 1, indice, &caminho)?;
+
+        let kc = Chave::Compareceu(proposta.clone(), votante.clone());
+        if env.storage().persistent().has(&kc) {
+            return Err(Erro::JaCompareceu);
+        }
+        // Validado aqui, uma vez. Depois disso o digesto do conjunto prende
+        // estes pontos exatos, então a cédula não precisa revalidar os `n`.
+        validar(&env, &chave_anel)?;
+
+        let ka = Chave::Anel(proposta.clone());
+        let mut anel: Vec<Bls12381G1Affine> =
+            env.storage().persistent().get(&ka).ok_or(Erro::ModoErrado)?;
+        anel.push_back(chave_anel);
+        let tamanho = anel.len();
+        env.storage().persistent().set(&ka, &anel);
+        guardar_longo(&env, &ka);
+
+        env.storage().persistent().set(&kc, &true);
+        guardar_longo(&env, &kc);
+
+        env.events()
+            .publish((symbol_short!("comparec"), proposta, votante), tamanho);
+        Ok(tamanho)
+    }
+
+    /// **A urna.** Sem endereço de membro, e sem nada que leve a um.
+    ///
+    /// Quem assina a transação é uma chave efêmera que só paga a taxa. A
+    /// elegibilidade vem da assinatura em anel: ela prova que quem montou esta
+    /// cédula conhece a chave de **um** dos que compareceram, e nada diz qual.
+    ///
+    /// O voto duplo é barrado pela imagem de chave, não pelo endereço: a mesma
+    /// pessoa produz sempre a mesma `I = x·Hp` dentro desta proposta, e o
+    /// contrato recusa a segunda — **sem saber de quem é**.
+    #[allow(clippy::too_many_arguments)]
+    pub fn votar_anonimo(
+        env: Env,
+        proposta: BytesN<32>,
+        anel: Vec<Bls12381G1Affine>,
+        imagem: Bls12381G1Affine,
+        c0: Bls12381Fr,
+        z: Vec<Bls12381Fr>,
+        compromissos: Vec<Bls12381G1Affine>,
+        provas: Vec<ProvaCds>,
+        provas_soma: Vec<ProvaSoma>,
+        escolhas: Vec<u32>,
+    ) -> Result<(), Erro> {
+        let p = abrir_proposta(&env, &proposta)?;
+        if !p.anel {
+            return Err(Erro::ModoErrado);
+        }
+        if env.ledger().sequence() < p.abre_em {
+            return Err(Erro::VotacaoAindaNaoComecou);
+        }
+        if env.ledger().sequence() >= p.fecha_em {
+            return Err(Erro::VotacaoEncerrada);
+        }
+        let (n_conf, n_publ, n_perg_conf) = formato(&p);
+        if compromissos.len() != n_conf
+            || provas.len() != n_conf
+            || provas_soma.len() != n_perg_conf
+            || escolhas.len() != n_publ
+            || anel.is_empty()
+            || z.len() != anel.len()
+        {
+            return Err(Erro::ArgumentoMalFormado);
+        }
+
+        // O digesto do conjunto é calculado uma vez, na primeira cédula, e
+        // guardado. Daí em diante conferir o anel é comparar 32 bytes em vez de
+        // reler `n` pontos do estado.
+        let kd = Chave::DigestoAnel(proposta.clone());
+        let registrado: BytesN<32> = match env.storage().persistent().get(&kd) {
+            Some(d) => d,
+            None => {
+                let congelado: Vec<Bls12381G1Affine> = env
+                    .storage()
+                    .persistent()
+                    .get(&Chave::Anel(proposta.clone()))
+                    .ok_or(Erro::ModoErrado)?;
+                let d = digesto_anel(&env, &congelado);
+                env.storage().persistent().set(&kd, &d);
+                guardar_longo(&env, &kd);
+                d
+            }
+        };
+        if digesto_anel(&env, &anel) != registrado {
+            return Err(Erro::AnelInvalido);
+        }
+
+        validar(&env, &imagem)?;
+        let msg = mensagem_cedula(&env, &proposta, &compromissos, &escolhas);
+        let pre = compor_anel(&env, &msg, &registrado);
+        let hp = calcular_hp(&env, &proposta);
+        if !verificar_anel(&env, &pre, &gerador_g(&env), &hp, &anel, &imagem, &c0, &z) {
+            return Err(Erro::AnelInvalido);
+        }
+
+        // A imagem entra como chave pelo seu hash: 32 bytes em vez de 96, e o
+        // que importa é a colisão, não o ponto.
+        let ki = Chave::ImagemUsada(
+            proposta.clone(),
+            env.crypto()
+                .sha256(&Bytes::from_array(&env, &imagem.to_array()))
+                .into(),
+        );
+        if env.storage().persistent().has(&ki) {
+            return Err(Erro::ImagemJaUsada);
+        }
+
+        // A identidade que prende as provas é a imagem. Ela é única por pessoa
+        // e por proposta, e não diz quem é — exatamente o que o contexto
+        // precisa ser.
+        let ident = Bytes::from_array(&env, &imagem.to_array());
+        conferir_e_somar(
+            &env, &p, &proposta, &ident, &compromissos, &provas, &provas_soma, &escolhas, 1,
+        )?;
+
+        env.storage().persistent().set(&ki, &true);
+        guardar_longo(&env, &ki);
+
+        // O evento NÃO carrega remetente. É o que separa este evento do
+        // `votar`: ali o tópico tem o endereço, aqui tem a imagem.
+        env.events().publish(
+            (symbol_short!("anonimo"), proposta),
+            (imagem, compromissos, escolhas),
         );
         Ok(())
     }
@@ -601,6 +690,115 @@ impl Tessera {
 /// Estende o TTL ao teto da rede. Aplicado a tudo que o verificador precisará
 /// depois do sétimo dia, e **não** às entradas `Votou`: estender 10.000 delas
 /// custaria ~2.070 XLM, e elas só impedem voto duplo *durante* a votação.
+
+/// O miolo de uma cédula: conferir tudo, e só depois somar.
+///
+/// `identidade` é o que prende as provas a quem vota — o XDR do endereço no
+/// voto identificado, a imagem de chave no voto em anel. É o único ponto em que
+/// os dois modos divergem, e por isso o resto é compartilhado: duas cópias
+/// desta função divergiriam, e a divergência seria silenciosa.
+#[allow(clippy::too_many_arguments)]
+fn conferir_e_somar(
+    env: &Env,
+    p: &Proposta,
+    proposta: &BytesN<32>,
+    identidade: &Bytes,
+    compromissos: &Vec<Bls12381G1Affine>,
+    provas: &Vec<ProvaCds>,
+    provas_soma: &Vec<ProvaSoma>,
+    escolhas: &Vec<u32>,
+    peso: u32,
+) -> Result<(), Erro> {
+        let g = gerador_g(env);
+        let h: Bls12381G1Affine = env
+            .storage()
+            .instance()
+            .get(&Instancia::GeradorH)
+            .ok_or(Erro::PropostaNaoExiste)?;
+        let bls = env.crypto().bls12_381();
+
+        let mut off_conf = 0u32; // posição em `compromissos`/`provas`
+        let mut off_publ = 0u32; // posição em `escolhas`
+        let mut i_soma = 0u32; // qual prova de soma
+        for (q, pg) in p.perguntas.iter().enumerate() {
+            let q = q as u32;
+            if !pg.confidencial {
+                conferir_bloco(&escolhas, off_publ, pg.opcoes, peso)?;
+                off_publ += pg.opcoes;
+                continue;
+            }
+
+            // Todo ponto que chega é validado: o host não valida sozinho, e
+            // um ponto de ordem pequena vazaria informação sobre o escalar
+            // (sonda 10).
+            let mut soma = infinito(env);
+            for j in 0..pg.opcoes {
+                let c = compromissos.get(off_conf + j).unwrap();
+                let pr = provas.get(off_conf + j).unwrap();
+                validar(env, &c)?;
+                validar(env, &pr.a0)?;
+                validar(env, &pr.a1)?;
+
+                let ctx = contexto_de(env, proposta, identidade, q, j);
+                if !verificar_cds(env, &ctx, &g, &h, &c, &pr) {
+                    return Err(Erro::ProvaBinariaInvalida);
+                }
+                soma = bls.g1_add(&soma, &c);
+            }
+
+            // D = (Σ C_j da pergunta) − w·G tem de ser múltiplo conhecido de
+            // H. Com cada v_j ∈ {0,1} pelas disjuntivas, isso fecha a boa
+            // formação **desta** pergunta.
+            let ps = provas_soma.get(i_soma).unwrap();
+            validar(env, &ps.a)?;
+            let d = bls.g1_add(&soma, &(-bls.g1_mul(&g, &fr(env, peso))));
+            let ctx = contexto_de(env, proposta, identidade, q, u32::MAX);
+            if !verificar_soma(env, &ctx, &h, &d, &ps) {
+                return Err(Erro::ProvaDeSomaInvalida);
+            }
+            i_soma += 1;
+            off_conf += pg.opcoes;
+        }
+
+        // Daqui para baixo a cédula inteira já passou. Só agora se escreve —
+        // uma pergunta mal formada não deixa rastro parcial no acumulador.
+        let mut off_conf = 0u32;
+        let mut off_publ = 0u32;
+        for (q, pg) in p.perguntas.iter().enumerate() {
+            let q = q as u32;
+            for j in 0..pg.opcoes {
+                if pg.confidencial {
+                    // Agregação homomórfica: g1_add é ~30× mais barato que
+                    // g1_mul, então somar é praticamente de graça.
+                    let k = Chave::Acum(proposta.clone(), q, j);
+                    let a: Bls12381G1Affine = env.storage().persistent().get(&k).unwrap();
+                    let c = compromissos.get(off_conf + j).unwrap();
+                    env.storage().persistent().set(&k, &bls.g1_add(&a, &c));
+                    guardar_longo(env, &k);
+                } else {
+                    let k = Chave::TotalPublico(proposta.clone(), q, j);
+                    let t: u32 = env.storage().persistent().get(&k).unwrap();
+                    env.storage()
+                        .persistent()
+                        .set(&k, &(t + escolhas.get(off_publ + j).unwrap()));
+                    guardar_longo(env, &k);
+                }
+            }
+            if pg.confidencial {
+                off_conf += pg.opcoes;
+            } else {
+                off_publ += pg.opcoes;
+            }
+        }
+
+        let kc = Chave::Comparecimento(proposta.clone());
+        let (conf, publ): (u32, u32) = env.storage().persistent().get(&kc).unwrap();
+        env.storage().persistent().set(&kc, &(conf + 1, publ));
+        guardar_longo(env, &kc);
+
+    Ok(())
+}
+
 fn guardar_longo(env: &Env, k: &Chave) {
     let m = env.storage().max_ttl();
     env.storage().persistent().extend_ttl(k, m - 1, m);

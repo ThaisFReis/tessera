@@ -114,6 +114,9 @@
                 },
                 {
                   "u32": 1000
+                },
+                {
+                  "bool": false
                 }
               ]
             }
@@ -189,6 +192,9 @@
                 },
                 {
                   "u32": 1000
+                },
+                {
+                  "bool": false
                 }
               ]
             }
@@ -373,6 +379,14 @@
                   },
                   {
                     "key": {
+                      "symbol": "anel"
+                    },
+                    "val": {
+                      "bool": false
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "fecha_em"
                     },
                     "val": {
@@ -476,6 +490,14 @@
                     },
                     "val": {
                       "u32": 0
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "anel"
+                    },
+                    "val": {
+                      "bool": false
                     }
                   },
                   {

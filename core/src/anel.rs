@@ -65,6 +65,9 @@ pub const DST_DESAFIO: &[u8] = b"TESSERA-V1-ANEL";
 /// DST do `Hp` por proposta.
 pub const DST_HP: &[u8] = b"TESSERA-V1-ANEL-HP";
 
+/// DST do compromisso com o conjunto.
+pub const DST_CONJUNTO: &[u8] = b"TESSERA-V1-ANEL-CONJUNTO";
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Assinatura {
     /// O desafio que fecha o ciclo. Verificar é dar a volta no anel e cair
@@ -153,14 +156,32 @@ pub fn imagem(hp: &G1Affine, x: &Fr) -> G1Affine {
 /// consegue conferir que a lista apresentada é a mesma que foi fixada na
 /// abertura sem guardar a lista inteira.
 pub fn preambulo(msg: &[u8], anel: &[G1Affine]) -> [u8; 32] {
+    compor(msg, &digesto(anel))
+}
+
+/// O compromisso com o **conjunto**, sem mensagem nenhuma.
+///
+/// É isto que o contrato guarda quando o comparecimento fecha. Conferir que a
+/// lista apresentada numa cédula é a lista registrada custa um hash de `n`
+/// pontos, não `n` pontos de armazenamento relidos a cada voto.
+pub fn digesto(anel: &[G1Affine]) -> [u8; 32] {
     let mut h = Sha256::new();
-    h.update(DST_DESAFIO);
-    h.update((msg.len() as u32).to_be_bytes());
-    h.update(msg);
+    h.update(DST_CONJUNTO);
     h.update((anel.len() as u32).to_be_bytes());
     for p in anel {
         h.update(ponto::serializar(p));
     }
+    h.finalize().into()
+}
+
+/// Junta a mensagem ao digesto do conjunto. Separar as duas coisas é o que
+/// permite ao contrato guardar uma e receber a outra.
+pub fn compor(msg: &[u8], digesto: &[u8; 32]) -> [u8; 32] {
+    let mut h = Sha256::new();
+    h.update(DST_DESAFIO);
+    h.update((msg.len() as u32).to_be_bytes());
+    h.update(msg);
+    h.update(digesto);
     h.finalize().into()
 }
 

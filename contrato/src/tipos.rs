@@ -87,6 +87,20 @@ pub enum Erro {
     PerguntasForaDaFaixa = 25,
     /// A janela ainda não começou: `ledger < abre_em`.
     VotacaoAindaNaoComecou = 26,
+    /// O comparecimento já fechou: `ledger >= abre_em`. Depois que a votação
+    /// abre o anel está congelado, e aceitar mais um membro mudaria o conjunto
+    /// debaixo de quem já votou.
+    ComparecimentoEncerrado = 27,
+    JaCompareceu = 28,
+    /// A assinatura em anel não fecha, ou o anel apresentado não é o que foi
+    /// registrado no comparecimento.
+    AnelInvalido = 29,
+    /// Esta imagem de chave já votou. É o voto duplo, detectado **sem** saber
+    /// de quem é.
+    ImagemJaUsada = 30,
+    /// A proposta não é de anel, ou é de anel e a chamada identificada foi
+    /// usada. Os dois modos não se misturam na mesma proposta.
+    ModoErrado = 31,
 }
 
 #[contracttype]
@@ -116,6 +130,19 @@ pub enum Chave {
     Endosso(BytesN<32>, BytesN<32>, Address),
     /// Quantos membros já endossaram aquele digest.
     Endossos(BytesN<32>, BytesN<32>),
+    /// **O caderno.** Um registro por membro que compareceu, identificado e
+    /// público — é dele que sai a lista de quem faltou.
+    Compareceu(BytesN<32>, Address),
+    /// As chaves de anel de quem compareceu, na ordem em que chegaram. Cresce
+    /// durante o comparecimento e congela quando a votação abre.
+    Anel(BytesN<32>),
+    /// `sha256` do conjunto, calculado uma vez quando a primeira cédula chega.
+    /// A cédula traz a lista inteira e o contrato compara — 32 bytes de estado
+    /// em vez de `n` pontos relidos a cada voto.
+    DigestoAnel(BytesN<32>),
+    /// Uma imagem de chave já usada. **Não é um endereço**: é `I = x·Hp`, que
+    /// identifica a pessoa dentro desta proposta e em nenhuma outra.
+    ImagemUsada(BytesN<32>, BytesN<32>),
 }
 
 /// Chave de instância do segundo gerador.
@@ -160,6 +187,16 @@ pub struct Proposta {
     pub abre_em: u32,
     /// Sequência de ledger a partir da qual não se vota mais.
     pub fecha_em: u32,
+    /// **O caderno e a urna, separados.**
+    ///
+    /// Com `anel = true` a proposta tem duas fases: até `abre_em` as pessoas
+    /// comparecem com nome e endereço, e o contrato monta o anel; depois disso
+    /// as cédulas chegam de chaves efêmeras, com uma assinatura em anel que
+    /// prova pertencimento sem dizer de quem é.
+    ///
+    /// É o desenho da urna: o caderno diz quem faltou — e voto obrigatório
+    /// precisa disso —, a cédula não diz de quem é, e nada liga os dois.
+    pub anel: bool,
 }
 
 /// Prova disjuntiva de Cramer–Damgård–Schoenmakers: `v ∈ {0,1}`.

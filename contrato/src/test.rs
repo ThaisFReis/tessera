@@ -123,6 +123,7 @@ fn montar_janela(
         &3u32,
         &abre_em,
         &fecha_em,
+        &false,
     );
 
     let h = ponto::de_hex(&{
@@ -771,7 +772,7 @@ fn a_janela_precisa_ter_duracao() {
         c.cliente.try_abrir(
             &Address::generate(&c.env), &outra, &perg,
             &BytesN::from_array(&c.env, &c.arvore.raiz()), &mesa_sdk,
-            &3u32, &300u32, &300u32,
+            &3u32, &300u32, &300u32, &false,
         ),
         Err(Ok(Erro::PrazoNoPassado))
     );
@@ -843,28 +844,28 @@ fn abrir_recusa_configuracao_invalida() {
     let ok = cedula(&[(2, true)]);
 
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&[(1, true)]), &raiz, &mesa, &2u32, &0u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &cedula(&[(1, true)]), &raiz, &mesa, &2u32, &0u32, &1000u32, &false),
         Err(Ok(Erro::OpcoesForaDaFaixa))
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&[(17, true)]), &raiz, &mesa, &2u32, &0u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &cedula(&[(17, true)]), &raiz, &mesa, &2u32, &0u32, &1000u32, &false),
         Err(Ok(Erro::OpcoesForaDaFaixa))
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&[]), &raiz, &mesa, &2u32, &0u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &cedula(&[]), &raiz, &mesa, &2u32, &0u32, &1000u32, &false),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
     // Nove perguntas passam de MAX_PERGUNTAS.
     let nove: Vetor<(u32, bool)> = (0..9).map(|_| (2u32, false)).collect();
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&nove), &raiz, &mesa, &2u32, &0u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &cedula(&nove), &raiz, &mesa, &2u32, &0u32, &1000u32, &false),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
     // Cada pergunta cabe, mas o total confidencial passa de MAX_OPCOES — e é
     // o total que o orçamento de CPU limita.
     let gordas: Vetor<(u32, bool)> = (0..3).map(|_| (16u32, true)).collect();
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&gordas), &raiz, &mesa, &2u32, &0u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &cedula(&gordas), &raiz, &mesa, &2u32, &0u32, &1000u32, &false),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
     // As mesmas 48 opções, mas públicas, não custam disjuntiva nenhuma.
@@ -878,20 +879,21 @@ fn abrir_recusa_configuracao_invalida() {
             &mesa,
             &2u32,
             &0u32,
-            &1000u32
+            &1000u32,
+            &false
         )
         .is_ok());
 
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &4u32, &0u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &4u32, &0u32, &1000u32, &false),
         Err(Ok(Erro::LimiarInvalido))
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &0u32, &0u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &0u32, &0u32, &1000u32, &false),
         Err(Ok(Erro::LimiarInvalido))
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &5u32),
+        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &5u32, &false),
         Err(Ok(Erro::PrazoNoPassado))
     );
 
@@ -900,13 +902,13 @@ fn abrir_recusa_configuracao_invalida() {
     repetida.push_back(m.clone());
     repetida.push_back(m);
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &repetida, &2u32, &0u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &ok, &raiz, &repetida, &2u32, &0u32, &1000u32, &false),
         Err(Ok(Erro::MembroRepetido))
     );
 
-    cliente.abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32);
+    cliente.abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32, &false);
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32),
+        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32, &false),
         Err(Ok(Erro::PropostaJaExiste))
     );
 }
@@ -1392,4 +1394,196 @@ fn orcamento_do_anel() {
         "anel de 10 custa {}, e nao sobra espaco para a cedula",
         custo_10
     );
+}
+
+// ===================== o caderno e a urna ===========================
+
+/// **A tese inteira, executável: quem faltou é público, e de quem é cada cédula
+/// não é.**
+///
+/// Dez membros, voto obrigatório. Sete comparecem — com nome, endereço e prova
+/// de Merkle — e três não. Depois a votação abre e as sete cédulas chegam de
+/// chaves efêmeras, cada uma com uma assinatura em anel sobre os sete que
+/// compareceram.
+///
+/// No fim: o caderno nomeia os três que faltaram, e **nenhuma cédula carrega
+/// endereço de membro**. Os dois registros existem, e nada liga um ao outro.
+#[test]
+fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
+    use tessera_core::anel;
+
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(10);
+    let id = env.register(Tessera, ());
+    let cliente = TesseraClient::new(&env, &id);
+
+    let aptos: Vetor<Address> = (0..10).map(|_| Address::generate(&env)).collect();
+    let folhas: Vetor<merkle::Apto> = aptos
+        .iter()
+        .map(|a| merkle::Apto { endereco: bytes_de(&a.clone().to_xdr(&env)), peso: 1 })
+        .collect();
+    let arvore = merkle::Arvore::montar(&folhas).unwrap();
+
+    let mut mesa_sdk = Vec::new(&env);
+    for _ in 0..5 {
+        mesa_sdk.push_back(Address::generate(&env));
+    }
+    let mut perg = Vec::new(&env);
+    perg.push_back(Pergunta { opcoes: 2, confidencial: true });
+
+    let proposta: BytesN<32> = BytesN::from_array(&env, &[7u8; 32]);
+    cliente.abrir(
+        &Address::generate(&env), &proposta, &perg,
+        &BytesN::from_array(&env, &arvore.raiz()), &mesa_sdk,
+        &3u32, &50u32, &1000u32, &true,
+    );
+
+    let g = pedersen::gerador();
+    let h = ponto::desserializar(&cliente.gerador_h().to_array()).unwrap();
+    let hp = ponto::desserializar(&cripto::calcular_hp(&env, &proposta).to_array()).unwrap();
+
+    // ---- fase 1: o caderno ----
+    const COMPARECERAM: usize = 7;
+    let xs: Vetor<ArkFr> = (0..COMPARECERAM).map(|_| pedersen::acaso_fr().unwrap()).collect();
+    let mut anel_ark: Vetor<ArkG1> = Vetor::new();
+    for (i, x) in xs.iter().enumerate() {
+        let pk = anel::chave_publica(&g, x);
+        let (caminho, indice) = {
+            let p = arvore.caminho(i).unwrap();
+            let mut c = Vec::new(&env);
+            for irmao in &p.irmaos {
+                c.push_back(BytesN::from_array(&env, irmao));
+            }
+            (c, p.indice)
+        };
+        let tamanho = cliente.comparecer(&proposta, &aptos[i], &g1(&env, &pk), &caminho, &indice);
+        assert_eq!(tamanho, i as u32 + 1, "o anel nao cresceu com o comparecimento");
+        anel_ark.push(pk);
+    }
+
+    // Quem não compareceu é derivável do caderno, e é isso que o voto
+    // obrigatório precisa.
+    for i in 0..10 {
+        let compareceu = env.as_contract(&id, || {
+            env.storage()
+                .persistent()
+                .has(&Chave::Compareceu(proposta.clone(), aptos[i].clone()))
+        });
+        assert_eq!(compareceu, i < COMPARECERAM, "o caderno errou sobre o membro {}", i);
+    }
+
+    let mut anel_sdk: Vec<Bls12381G1Affine> = Vec::new(&env);
+    for p in &anel_ark {
+        anel_sdk.push_back(g1(&env, p));
+    }
+
+    // ---- a janela vira ----
+    env.ledger().set_sequence_number(60);
+
+    // Comparecer depois que a votação abriu mudaria o conjunto debaixo de quem
+    // já votou.
+    let (caminho, indice) = {
+        let p = arvore.caminho(8).unwrap();
+        let mut c = Vec::new(&env);
+        for irmao in &p.irmaos {
+            c.push_back(BytesN::from_array(&env, irmao));
+        }
+        (c, p.indice)
+    };
+    let atrasado = anel::chave_publica(&g, &pedersen::acaso_fr().unwrap());
+    assert_eq!(
+        cliente.try_comparecer(&proposta, &aptos[8], &g1(&env, &atrasado), &caminho, &indice),
+        Err(Ok(Erro::ComparecimentoEncerrado))
+    );
+
+    // ---- fase 2: a urna ----
+    // Monta a cédula de quem assina com `xs[i]`, com o contexto preso à imagem.
+    let cedula = |i: usize, escolha: u32| {
+        let img = anel::imagem(&hp, &xs[i]);
+        let ident: Vetor<u8> = ponto::serializar(&img).to_vec();
+
+        let rs: Vetor<ArkFr> = (0..2).map(|_| pedersen::acaso_fr().unwrap()).collect();
+        let cs: Vetor<ArkG1> = (0..2)
+            .map(|j| {
+                let v = if j == escolha { 1u64 } else { 0 };
+                pedersen::comprometer(&g, &h, &pedersen::escalar(v), &rs[j as usize])
+            })
+            .collect();
+
+        let ctx_de = |opcao: u32| {
+            let mut v: Vetor<u8> = proposta.to_array().to_vec();
+            v.extend(ident.iter().copied());
+            v.extend(0u32.to_be_bytes());
+            v.extend(opcao.to_be_bytes());
+            v
+        };
+
+        let mut compromissos = Vec::new(&env);
+        let mut provas = Vec::new(&env);
+        for j in 0..2u32 {
+            let v = if j == escolha { 1u64 } else { 0 };
+            let p = cds::provar(&ctx_de(j), &g, &h, &cs[j as usize], v, &rs[j as usize]).unwrap();
+            compromissos.push_back(g1(&env, &cs[j as usize]));
+            provas.push_back(ProvaCds {
+                a0: g1(&env, &p.a0), a1: g1(&env, &p.a1),
+                e0: escalar(&env, &p.e0), z0: escalar(&env, &p.z0),
+                e1: escalar(&env, &p.e1), z1: escalar(&env, &p.z1),
+            });
+        }
+        let rho = rs.iter().fold(ArkFr::from(0u64), |a, r| a + r);
+        let d = soma::alvo(&g, &cs, 1);
+        let ps = soma::provar(&ctx_de(u32::MAX), &h, &d, &rho).unwrap();
+        let mut provas_soma = Vec::new(&env);
+        provas_soma.push_back(ProvaSoma { a: g1(&env, &ps.a), z: escalar(&env, &ps.z) });
+        let escolhas: Vec<u32> = Vec::new(&env);
+
+        let msg = cripto::mensagem_cedula(&env, &proposta, &compromissos, &escolhas);
+        let s = anel::assinar(&bytes_de(&msg), &g, &hp, &anel_ark, i, &xs[i]).unwrap();
+        let mut z = Vec::new(&env);
+        for zi in &s.z {
+            z.push_back(escalar(&env, zi));
+        }
+        (anel_sdk.clone(), g1(&env, &s.imagem), escalar(&env, &s.c0), z,
+         compromissos, provas, provas_soma, escolhas)
+    };
+
+    for i in 0..COMPARECERAM {
+        let (a, img, c0, z, cs, pr, psm, esc) = cedula(i, (i % 2) as u32);
+        cliente.votar_anonimo(&proposta, &a, &img, &c0, &z, &cs, &pr, &psm, &esc);
+    }
+
+    // A mesma pessoa de novo: a imagem colide, e o contrato recusa **sem saber
+    // de quem é**.
+    let (a, img, c0, z, cs, pr, psm, esc) = cedula(3, 1);
+    assert_eq!(
+        cliente.try_votar_anonimo(&proposta, &a, &img, &c0, &z, &cs, &pr, &psm, &esc),
+        Err(Ok(Erro::ImagemJaUsada))
+    );
+
+    // Votar pelo endereço numa proposta de anel recriaria o vínculo.
+    let (caminho, indice) = {
+        let p = arvore.caminho(0).unwrap();
+        let mut c = Vec::new(&env);
+        for irmao in &p.irmaos {
+            c.push_back(BytesN::from_array(&env, irmao));
+        }
+        (c, p.indice)
+    };
+    assert_eq!(
+        cliente.try_votar(&proposta, &aptos[0], &cs, &pr, &psm, &esc, &caminho, &indice, &1u32),
+        Err(Ok(Erro::ModoErrado))
+    );
+
+    // E o comparecimento confidencial bateu: sete cédulas, nenhuma com dono.
+    let (conf, _publ): (u32, u32) = env.as_contract(&id, || {
+        env.storage().persistent().get(&Chave::Comparecimento(proposta.clone())).unwrap()
+    });
+    assert_eq!(conf, COMPARECERAM as u32);
+
+    std::println!("\n== CADERNO E URNA ==");
+    std::println!("aptos ............... 10");
+    std::println!("compareceram ........ {}  (o caderno nomeia os 3 que faltaram)", COMPARECERAM);
+    std::println!("cedulas ............. {}  (nenhuma com endereco de membro)", conf);
+    std::println!("anel ................ {} ramos, {} bytes", COMPARECERAM, anel::tamanho(COMPARECERAM));
 }
