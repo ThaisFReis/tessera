@@ -73,6 +73,7 @@ button{font:inherit; cursor:pointer}
 .d-tx{color:var(--acento)}
 .d-ok::before{content:"✓ "}
 .d-ok{color:var(--acento)}
+.t-alerta{color:var(--secundario)}
 .d-x::before{content:"✗ "}
 .d-x{color:var(--recusa)}
 .d-com::before{content:"// "}
@@ -674,13 +675,13 @@ async function chamar(verbo, corpo) {
     ponte.saida = j.saida || j.erro || "";
     /* Recusa é resultado, não silêncio. Era o buraco mais feio do diário:
        um voto fora do prazo não deixava rastro nenhum na coluna. */
-    if (j.ok) registrar(verbo, dados, j.estado);
+    if (j.ok) registrar(verbo, dados, j.estado, corpo.identidade);
     else {
       reg("cmd", `tessera ${verbo}`);
-      const motivo = (j.saida || j.erro || "").split("\n")
+      const motivo = (j.saida || "").split("\n")
         .map((l) => l.trim())
         .find((l) => l.startsWith("✗") || l.startsWith("❌") || l.includes("Error(Contract"));
-      reg("x", motivo || "a rede recusou");
+      reg("x", motivo || j.erro || "a rede recusou");
     }
     /* `ok: false` não é defeito: a recusa do contrato é um resultado da demo,
        e o painel de τ existe para mostrá-la. */
@@ -752,7 +753,7 @@ async function sondarPonte() {
 }
 
 /* O que o organizador está montando, e com que nome vai ao ar. */
-const aoVivo = { proposta: "", prazo: "3m", identidade: "", escolhas: [], publico: false };
+const aoVivo = { proposta: "", prazo: "3m", identidade: "", escolhas: [], publico: false, ultimo: "", recibo: "" };
 
 /* O rascunho com que a tela abre quando a ponte está no ar. Não há proposta
    ainda: ela vai existir quando alguém clicar em abrir. */
@@ -999,7 +1000,15 @@ function registrarApuracao(d) {
 }
 
 /* Chamado depois de cada ação, com o estado novo em mãos. */
-function registrar(verbo, antes, depois) {
+function registrar(verbo, antes, depois, extra) {
+  /* `queimar` não mexe em proposta nenhuma, então volta sem estado. A guarda
+     de `!depois` engolia o registro justo da ação mais grave da demo. */
+  if (verbo === "queimar") {
+    reg("cmd", `tessera queimar --identidade ${extra || ""}`);
+    reg("fn",  "recibo::queimar  sobrescreve o arquivo");
+    reg("ok",  "nem quem votou prova mais o próprio voto");
+    return;
+  }
   if (!depois) return;
   if (verbo === "abrir")  return registrarAbertura(depois);
   if (verbo === "apurar") return registrarApuracao(depois);
@@ -1008,11 +1017,6 @@ function registrar(verbo, antes, depois) {
     const novos = (depois.votos || []).filter((v) => !vistos.has(v.tx));
     if (!novos.length) return;
     return novos.forEach((v) => registrarVoto(depois, v));
-  }
-  if (verbo === "queimar") {
-    reg("cmd", "tessera queimar");
-    reg("fn",  "recibo::queimar  sobrescreve o arquivo");
-    reg("ok",  "nem quem votou prova mais o próprio voto");
   }
   if (verbo === "verificar") {
     reg("cmd", `tessera verificar --proposta ${depois.proposta}`);
@@ -1052,7 +1056,8 @@ function rolo() {
      ["val", chave, valor]     um valor de verdade desta rodada
      ["oculto", chave, porque] um valor que a demo se recusa a mostrar
      ["//", texto]             comentário
-     ["ok", texto] / ["x", t]  veredito
+     ["ok", t] / ["x", t]      veredito: aconteceu
+     ["!", texto]              ressalva ou hipótese — não é falha
      ["nota", texto]           a frase em prosa, no fim e só uma
      []                        linha em branco                                */
 function terminalMecanica(arquivo, linhas) {
@@ -1071,6 +1076,7 @@ function terminalMecanica(arquivo, linhas) {
     if (tipo === "//")    return t.append(el("div","t-com", "// " + a));
     if (tipo === "ok")    return t.append(el("div","t-ok", "✓ " + a));
     if (tipo === "x")     return t.append(el("div","t-x", "✗ " + a));
+    if (tipo === "!")     return t.append(el("div","t-alerta", "⚠ " + a));
     if (tipo === "nota")  return t.append(el("p","t-nota", a));
     if (tipo === "oculto") {
       const d = el("div"); d.append(el("span","t-chv", a + " = "));
@@ -1306,15 +1312,19 @@ function urna(d) {
   cx.append(abre);
 
   const faltam = d.perguntas.length - aoVivo.escolhas.filter(Boolean).length;
-  if (faltam > 0) texto(cx,"p","peq dim",`falta escolher ${faltam} de ${d.perguntas.length}`);
+  /* Sem ninguém para votar não há botão. Ele continuava na tela depois do
+     sétimo voto, com a identidade já vazia, e cada clique virava um
+     `tessera votar` sem eleitor — foi o que apareceu duas vezes no diário. */
+  if (!faltantes.length) texto(cx,"p","fato","Todas as pessoas aptas já votaram.");
+  else if (faltam > 0) texto(cx,"p","peq dim",`falta escolher ${faltam} de ${d.perguntas.length}`);
   else cx.append(botao(`Enviar o voto de ${aoVivo.identidade} →`, async () => {
+    const quemVota = aoVivo.identidade;
     const j = await chamar("votar", {
-      proposta: d.proposta, identidade: aoVivo.identidade,
+      proposta: d.proposta, identidade: quemVota,
       opcoes: aoVivo.escolhas, publico: aoVivo.publico,
     });
-    if (j.ok) { aoVivo.escolhas = []; aoVivo.publico = false; mostrar(); }
+    if (j.ok) { aoVivo.ultimo = quemVota; aoVivo.escolhas = []; aoVivo.publico = false; mostrar(); }
   }));
-  if (!faltantes.length) texto(cx,"p","fato","Todas as pessoas aptas já votaram.");
   terminal(cx);
   return cx;
 }
@@ -1350,15 +1360,37 @@ function painelRecibo(d) {
     texto(caixa,"h3",null,"⚠ A chave em ./recibos/<identidade>.key prova o seu voto");
     texto(caixa,"p",null,"Enquanto ela existir, você consegue provar a qualquer pessoa em que votou — e quem te obrigar a mostrar consegue conferir.");
     texto(caixa,"p","dim","A rede nunca vai saber. Mas você pode ser forçada a contar.");
-    caixa.append(ponte.viva
-      ? botao(`Queimar o recibo de ${aoVivo.identidade||ponte.identidades[0]||""}`, async () => {
-          const j = await chamar("queimar", { identidade: aoVivo.identidade || ponte.identidades[0] });
+    if (ponte.viva) {
+      /* Numa rodada de sete, "o recibo de quem?" é pergunta de verdade. Antes
+         a tela chutava, e quando o chute saía vazio a ponte devolvia
+         "identidade inválido" — erro sem informação nenhuma para quem assiste. */
+      const quem = (d?.votos || []).map((v) => v.identidade);
+      const lista = quem.length ? quem : ponte.identidades;
+      if (!aoVivo.recibo || !lista.includes(aoVivo.recibo))
+        aoVivo.recibo = aoVivo.ultimo && lista.includes(aoVivo.ultimo)
+          ? aoVivo.ultimo : lista[lista.length - 1] || "";
+      if (!lista.length) {
+        texto(caixa,"p","recusa-demo","Ninguém votou ainda — não há recibo para queimar.");
+      } else {
+        texto(caixa,"label","campo-rot","De quem é o recibo");
+        const sel = el("select","campo-demo");
+        lista.forEach((nm) => { const o = el("option", null, nm); o.value = nm; sel.append(o); });
+        sel.value = aoVivo.recibo;
+        sel.addEventListener("change", () => { aoVivo.recibo = sel.value; });
+        caixa.append(sel);
+        caixa.append(botao(`Queimar o recibo de ${aoVivo.recibo}`, async () => {
+          const j = await chamar("queimar", { identidade: aoVivo.recibo });
           if (j.ok) { reciboQueimado = true; mostrar(); }
-        })
-      : (() => { const b=el("button","acao","Simular a queima do recibo");b.type="button";
-                 b.addEventListener("click",()=>{reciboQueimado=true;mostrar();});return b; })());
+        }));
+      }
+    } else {
+      const b=el("button","acao","Simular a queima do recibo");b.type="button";
+      b.addEventListener("click",()=>{reciboQueimado=true;mostrar();});caixa.append(b);
+    }
   } else {
-    texto(caixa,"p","fato","✓ Recibo removido na reencenação");
+    texto(caixa,"p","fato", ponte.viva
+      ? `✓ recibos/${aoVivo.recibo}.key foi sobrescrito`
+      : "✓ Recibo removido na reencenação");
     texto(caixa,"div","destaque","Agora nem você consegue provar em que votou.");
     texto(caixa,"p","dim","Seu voto continua na contagem, e você continua podendo conferir que ele está lá.");
   }
@@ -1384,7 +1416,7 @@ function mecanismoRecibo() {
     ["cod","PROIBIDO = ('\"r\"', 'acaso', 'aleatori',"],
     ["cod","            'segredo', '\"chave\"')"],
     [],
-    [reciboQueimado?"ok":"x", reciboQueimado
+    [reciboQueimado?"ok":"!", reciboQueimado
       ? "recibo sobrescrito · a prova deixou de existir"
       : "enquanto a chave existir, você pode ser forçada a mostrá-la"],
     ["nota","Os segredos num arquivo, as provas no outro. Queimar o recibo não custa auditabilidade — e não sobra o que entregar a quem compra voto."],
@@ -1432,7 +1464,7 @@ function mecanismoGrade(d) {
     ["val","nesta rodada",`${nconf} × ${nPerguntasConf(d)} = ${nconf*nPerguntasConf(d)} provas de soma`],
     ["val","disjuntivas",`${nconf} × ${opcoesConf(d)} = ${nconf*opcoesConf(d)} × 320 B`],
     [],
-    ["x","uma prova só para a cédula inteira seria furada:"],
+    ["!","uma prova só para a cédula inteira seria furada:"],
     ["//","2 votos na pergunta 1 e 0 na 2 fechariam"],
     ["//","a soma total. por isso é uma por pergunta."],
     [],
@@ -1684,7 +1716,7 @@ function mecanismoVerificador(d) {
     ["val","somas",`${nconf*nPerguntasConf(d)} refeitas`],
     ["ok","agregado bate com o acumulado da rede"],
     [],
-    ["x","esta página não roda BLS12-381"],
+    ["!","esta página não roda BLS12-381"],
     ["//","não há uma linha disso no console. ele mostra"],
     ["//","o veredito que o verificador em Rust gravou."],
     [],
