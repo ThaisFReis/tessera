@@ -136,6 +136,12 @@ no meio da animação não a reinicia. O alvo vem do relógio, não de um contad
 ticks — se o navegador estrangular o temporizador durante a gravação, o tick
 seguinte emenda as linhas atrasadas em vez de deixar o terminal pela metade.
 
+**O nome do arquivo não aparece mais na tela.** Ele continua declarado em cada
+card, porque é o que `guarda.py` lê para saber quais recortes aquele painel
+promete — a procedência segue conferida a cada rodada da guarda, só não ocupa
+mais uma linha de cabeçalho em cada um dos dez painéis. A tabela abaixo é,
+portanto, o que a guarda vê, não o que o jurado lê.
+
 Os dez traços:
 
 | Painel | Arquivo | O que mostra |
