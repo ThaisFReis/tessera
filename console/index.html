@@ -901,13 +901,16 @@ function titulo(s, numero, nome, subtitulo) {
    Constantes entram com o valor inteiro de propósito: trocar τ de 5 para 3 sem
    mexer na tela é exatamente o erro que isto existe para pegar.           */
 const ANCORAS = {
+  // Nenhum cabeçalho cita mais este arquivo, e as âncoras que descreviam tipos
+  // — `struct Pergunta`, a chave `Votou` — saíram junto com os recortes. Ficam
+  // as três constantes, porque a tela ainda afirma os valores delas por conta
+  // própria: o botão "+ pergunta" desliga em 8, o formulário recusa em 16, e o
+  // painel 9 imprime `TAU = 5`. A guarda confere toda âncora declarada, citada
+  // em cabeçalho ou não — é isso que prende essas afirmações ao contrato.
   "contrato/src/tipos.rs": [
-    "pub struct Pergunta",
-    "pub confidencial: bool",
     "pub const MAX_PERGUNTAS: u32 = 8;",
     "pub const MAX_OPCOES: u32 = 16;",
     "pub const TAU: u32 = 5;",
-    "Votou(BytesN<32>, Address)",
   ],
   "core/src/merkle.rs": [
     "pub fn folha",
