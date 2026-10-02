@@ -1563,10 +1563,12 @@ async function rodarTau() {
   tau.proposta = nome; tau.saida = ""; tau.ledger = 0;
   dizer("abrindo a proposta…");
   let j = await fetch("/api/abrir", { method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ proposta: nome, prazo: "3m", limiar: 3,
-      /* Sete votos sequenciais levam ~15 s cada. Com 1m o prazo fechava no
-         meio da fila e o quinto voto era recusado — foi o que aconteceu no
-         primeiro teste. 3m dá a volta inteira com folga. */
+    body: JSON.stringify({ proposta: nome, prazo: "5m", limiar: 3,
+      /* O prazo precisa aguentar a pior volta, não a média.
+         Medido numa rodada real: três votos em 10 s e 5 s, e então uma parada
+         de 140 s antes do quarto — provavelmente o Horizon respondendo devagar
+         para a consulta de taxa e ledger. Com 3m a fila morria no quinto voto.
+         5m absorve uma parada dessas e ainda sobra. */
       perguntas: [{ texto:"Manter a coligação?", opcoes:["manter","rescindir"], confidencial:true }] }) }).then(r=>r.json());
   if (!j.ok) { tau.saida = j.saida || j.erro || ""; return dizer("✗ não consegui abrir"); }
   tau.ledger = (j.estado && j.estado.prazo_ledger) || 0;
@@ -1575,7 +1577,13 @@ async function rodarTau() {
   const quem = ponte.identidades.slice(0,7);
   for (let i = 0; i < quem.length; i++) {
     const aberto = i >= 4;            // os três últimos revelam o voto
-    dizer(`${quem[i]} votando ${aberto ? "com o voto aberto" : "em segredo"} · ${i+1} de ${quem.length}`);
+    /* Se o prazo está por fechar, parar aqui é melhor que gastar um voto que
+       vai ser recusado — e deixa claro que foi o relógio, não o protocolo. */
+    await lerLedger();
+    if (ponte.ledger && tau.ledger && (tau.ledger - ponte.ledger) * 5 < 20) {
+      return dizer(`✗ o prazo fecha em instantes · pararam ${i} de ${quem.length} votos`);
+    }
+    dizer(`${quem[i]} votando ${aberto ? "com o voto aberto" : "em segredo"} · ${i+1} de ${quem.length} · ${relogio({prazo_ledger: tau.ledger})}`);
     j = await fetch("/api/votar", { method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ proposta: nome, identidade: quem[i], opcoes:["manter"], publico: aberto }) }).then(r=>r.json());
     if (j.ok) registrar("votar", { votos: (j.estado?.votos || []).slice(0, i) }, j.estado);

@@ -200,9 +200,14 @@ impl Cadeia {
 
     /// Taxa e ledger vêm do Horizon, não da CLI: a `stellar contract invoke`
     /// não os imprime, e a demo mostra os dois.
+    ///
+    /// Com limite de tempo, e de propósito: são números de enfeite. Sem eles a
+    /// demo perde duas linhas; com a consulta travada ela perde a votação —
+    /// medi uma parada de 140 s no meio de uma fila de votos, que levou o
+    /// prazo junto.
     pub fn detalhes(&self, tx: &str) -> Option<(u64, u64)> {
         let url = format!("https://horizon-{}.stellar.org/transactions/{}", self.rede, tx);
-        let s = Command::new("curl").args(["-s", &url]).output().ok()?;
+        let s = Command::new("curl").args(["-s", "--max-time", "10", &url]).output().ok()?;
         let v: serde_json::Value = serde_json::from_slice(&s.stdout).ok()?;
         let taxa = v.get("fee_charged")?.as_str()?.parse().ok()?;
         let ledger = v.get("ledger")?.as_u64()?;
@@ -215,7 +220,7 @@ impl Cadeia {
             "https://horizon-{}.stellar.org/ledgers?order=desc&limit=1",
             rede
         );
-        let s = Command::new("curl").args(["-s", &url]).output().ok()?;
+        let s = Command::new("curl").args(["-s", "--max-time", "10", &url]).output().ok()?;
         let v: serde_json::Value = serde_json::from_slice(&s.stdout).ok()?;
         v["_embedded"]["records"][0]["sequence"].as_u64()
     }
