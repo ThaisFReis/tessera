@@ -7,7 +7,7 @@
 use crate::cadeia::Cadeia;
 use crate::cedula::{self, Cedula};
 use crate::estado::{Apuracao, Estado, Mesa, PerguntaEstado, Verificacao, Voto};
-use crate::recibo::{self, Recibo};
+use crate::recibo;
 use crate::tela;
 use sha2::{Digest, Sha256};
 use tessera_core::ark::{Fr, G1Affine};
@@ -588,7 +588,7 @@ fn nao_apta(e: &Estado) -> R {
 
 // ===================== votar =========================================
 
-pub fn votar(proposta: &str, opcao: &[String], identidade: &str, publico: bool) -> R {
+pub fn votar(proposta: &str, opcao: &[String], identidade: &str) -> R {
     let mut e = Estado::ler(proposta)?;
     let endereco = resolver(identidade)?;
 
@@ -654,15 +654,13 @@ pub fn votar(proposta: &str, opcao: &[String], identidade: &str, publico: bool) 
             &format!(
                 "{}   [{}]",
                 opcao[q].to_uppercase(),
-                if publico || !pg.confidencial { "em claro" } else { "em segredo" }
+                if pg.confidencial { "em segredo" } else { "em claro" }
             ),
         );
     }
     tela::campo(
         "Sigilo",
-        if publico {
-            "PÚBLICO — a cédula inteira vai em claro para o ledger"
-        } else if e.e_mista() {
+        if e.e_mista() {
             "misto — as perguntas sigilosas em segredo, as outras em claro"
         } else {
             "em segredo"
@@ -672,45 +670,7 @@ pub fn votar(proposta: &str, opcao: &[String], identidade: &str, publico: bool) 
     let c = Cadeia::nova(&e.contrato, &e.rede);
     let tx;
 
-    if publico {
-        // Revelação voluntária: a cédula INTEIRA em claro, inclusive as
-        // perguntas sigilosas.
-        let mut escolhas: Vec<u32> = Vec::new();
-        for (q, pg) in e.perguntas.iter().enumerate() {
-            for j in 0..pg.opcoes.len() {
-                escolhas.push(if j == escolhas_idx[q] { 1 } else { 0 });
-            }
-        }
-        tela::secao("o que a rede vai guardar");
-        tela::linha(&format!(
-            "a escolha em claro: [{}]",
-            escolhas.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ")
-        ));
-        tela::branco();
-        tela::linha("Uma cédula pública não tem o que ocultar — e por isso ela");
-        tela::linha("encolhe o conjunto de anonimato de quem escolheu sigilo.");
-
-        let r = c
-            .invocar(
-                identidade,
-                true,
-                "votar_publico",
-                &[
-                    ("proposta", hex(&id32(proposta))),
-                    ("votante", endereco.clone()),
-                    ("escolhas", serde_json::to_string(&escolhas).unwrap()),
-                    ("caminho", cedula::hashes_json(&caminho.irmaos)),
-                    ("indice", caminho.indice.to_string()),
-                    ("peso", "1".into()),
-                ],
-            )
-            .map_err(|x| x.to_string())?;
-        tx = r.tx.unwrap_or_default();
-        registrar(
-            &mut e, proposta, identidade, &endereco, vec![], vec![], vec![],
-            true, Some(escolhas), &tx, &c,
-        )?;
-    } else {
+    {
         let h = h_do_contrato(&e)?;
         let addr = cedula::xdr(&endereco)?;
         let perg: Vec<cedula::Pergunta> = e
@@ -762,14 +722,15 @@ pub fn votar(proposta: &str, opcao: &[String], identidade: &str, publico: bool) 
             false, publicas, &tx, &c,
         )?;
 
-        // No recibo vai **só o segredo**. As provas são públicas e ficam no
-        // estado, para que queimar o recibo não custe auditabilidade.
-        recibo::gravar(&Recibo {
-            identidade: identidade.into(),
-            proposta: proposta.into(),
-            escolhas: escolhas_idx.clone(),
-            acasos: ced.acasos.iter().map(|r| hex(&pedersen::fr_para_bytes_be(r))).collect(),
-        })?;
+        // **O recibo não é gravado, e isso é o desenho.**
+        //
+        // Ele guardaria o acaso `r`, e com `r` qualquer um prova a quem quiser
+        // em que votou — que é exatamente o que a compra de voto precisa. Ele
+        // não servia para mais nada: nenhum comando o lia, nem para conferir
+        // voto, nem para apurar. Era passivo puro.
+        //
+        // Gravar e apagar em seguida deixaria uma janela; não gravar não deixa
+        // janela nenhuma. `r` vive no processo e morre com ele.
     }
 
     let (taxa, ledger) = c.detalhes(&tx).unwrap_or((0, 0));
@@ -780,41 +741,26 @@ pub fn votar(proposta: &str, opcao: &[String], identidade: &str, publico: bool) 
     tela::secao("enviado");
     tela::campo("Transação", &format!("{}       ledger {}", &tx[..8.min(tx.len())], ledger));
     tela::campo("Taxa", &format!("{} stroops", taxa));
-    if !publico {
-        // Verificabilidade individual numa frase que Dona Marta entende: não é
-        // "seu commitment está no acumulador", é "você é a 27ª de 43".
-        tela::campo("Posição", &format!("{} de {} em segredo", posicao, conf));
-    }
+    // Verificabilidade individual numa frase que Dona Marta entende: não é
+    // "seu commitment está no acumulador", é "você é a 27ª de 43".
+    tela::campo("Posição", &format!("{} de {} em segredo", posicao, conf));
     tela::confere("seu voto está na contagem");
     tela::branco();
     tela::regua();
 
-    if publico {
-        tela::proximo(
-            "Sua escolha é pública e não há recibo a queimar. Para conferir:",
-            &format!("tessera status --proposta {}", proposta),
-        );
-        return Ok(());
-    }
-
-    // O aviso de coação é o último bloco e o maior. A última coisa na tela é a
-    // que fica na memória e a que sobra no scroll — é a decisão de design mais
-    // importante deste comando. UX-CLI §3.1, UX §5.2.
-    //
-    // E não é vermelho: vermelho é da apuração recusada. Aqui não é erro, é a
-    // verdade sobre o estado do mundo.
-    tela::atencao(&format!(
-        "A CHAVE EM ./recibos/{}.key PROVA O SEU VOTO",
-        identidade
-    ));
+    // A última coisa na tela é a que fica na memória. Antes era um aviso de
+    // coação e um comando para apagar o recibo; agora o recibo não existe, e o
+    // que sobra é a garantia. UX-CLI §3.1.
+    tela::confere("seu sigilo está protegido");
     tela::branco();
-    tela::linha("   Enquanto ela existir, você consegue provar a qualquer pessoa");
-    tela::linha("   em que votou — e quem te obrigar a mostrar consegue conferir.");
+    tela::linha("   Nenhum arquivo nesta máquina prova em que você votou.");
+    tela::linha("   O acaso que escondeu o seu voto morreu com este comando —");
+    tela::linha("   nem você consegue mais demonstrar a sua escolha.");
     tela::branco();
-    tela::linha("   A rede nunca vai saber. Mas você pode ser forçada a contar.");
+    tela::linha("   O voto continua na contagem, e continua conferível.");
     tela::proximo(
-        "   Apague agora:",
-        &format!("  tessera queimar --identidade {}", identidade),
+        "   Conferir:",
+        &format!("  tessera verificar --proposta {}", proposta),
     );
     Ok(())
 }

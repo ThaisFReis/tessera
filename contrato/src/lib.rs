@@ -311,74 +311,28 @@ impl Tessera {
         Ok(())
     }
 
-    /// Registra uma cédula **pública**: a escolha vai em claro para o ledger.
-    ///
-    /// Sugestão de um membro da SDF, e encaixa sem primitiva nova — um campo
-    /// público é apenas um compromisso cuja abertura é revelada, e revelar a
-    /// abertura torna o compromisso redundante.
-    ///
-    /// **Não é gratuito.** Toda informação pública particiona o conjunto de
-    /// anonimato (SPEC §6.6): 50 votantes, 48 públicos e o total conhecido
-    /// determinam os 2 confidenciais por subtração. Por isso `apurar()` recusa
-    /// publicar com menos de `TAU` cédulas confidenciais.
-    pub fn votar_publico(
-        env: Env,
-        proposta: BytesN<32>,
-        votante: Address,
-        escolhas: Vec<u32>,
-        caminho: Vec<BytesN<32>>,
-        indice: u32,
-        peso: u32,
-    ) -> Result<(), Erro> {
-        votante.require_auth();
-        let p = abrir_proposta(&env, &proposta)?;
-
-        if env.ledger().sequence() < p.abre_em {
-            return Err(Erro::VotacaoAindaNaoComecou);
-        }
-        if env.ledger().sequence() >= p.fecha_em {
-            return Err(Erro::VotacaoEncerrada);
-        }
-        // Aqui `escolhas` cobre a cédula **inteira**, inclusive as perguntas
-        // sigilosas: é a revelação voluntária, e quem a usa abre tudo.
-        let total_opcoes = p.perguntas.iter().fold(0u32, |a, q| a + q.opcoes);
-        if escolhas.len() != total_opcoes {
-            return Err(Erro::ArgumentoMalFormado);
-        }
-        conferir_aptidao(&env, &p, &votante, peso, indice, &caminho)?;
-        marcar_votou(&env, &proposta, &votante)?;
-
-        // As mesmas regras da cédula sigilosa, só que conferíveis a olho:
-        // cada escolha é binária e cada pergunta soma o peso.
-        let mut off = 0u32;
-        for pg in p.perguntas.iter() {
-            conferir_bloco(&escolhas, off, pg.opcoes, peso)?;
-            off += pg.opcoes;
-        }
-
-        let mut off = 0u32;
-        for (q, pg) in p.perguntas.iter().enumerate() {
-            let q = q as u32;
-            for j in 0..pg.opcoes {
-                let k = Chave::TotalPublico(proposta.clone(), q, j);
-                let t: u32 = env.storage().persistent().get(&k).unwrap();
-                env.storage()
-                    .persistent()
-                    .set(&k, &(t + escolhas.get(off + j).unwrap()));
-                guardar_longo(&env, &k);
-            }
-            off += pg.opcoes;
-        }
-
-        let kc = Chave::Comparecimento(proposta.clone());
-        let (conf, publ): (u32, u32) = env.storage().persistent().get(&kc).unwrap();
-        env.storage().persistent().set(&kc, &(conf, publ + 1));
-        guardar_longo(&env, &kc);
-
-        env.events()
-            .publish((symbol_short!("voto_pub"), proposta, votante), escolhas);
-        Ok(())
-    }
+    // `votar_publico` existia aqui e foi **removido**.
+    //
+    // Ele deixava qualquer eleitor abrir a própria cédula inteira no ledger,
+    // inclusive as perguntas sigilosas. Era revelação voluntária, e parecia um
+    // direito — mas um voto aberto on-chain é a forma mais forte de coação que
+    // existe: quem coage confere sozinho, lendo o ledger, sem precisar da
+    // pessoa na frente. Coação verificável em escala.
+    //
+    // Pior, em bloco ele particionava o eleitorado e derrubava a apuração por
+    // `TAU` (§6.6). Três pessoas abrindo o voto vetavam a assembleia inteira —
+    // negação de serviço contra a própria eleição.
+    //
+    // Nenhuma eleição séria aceita isso. O Brasil protege a célula pequena
+    // **antes**, agregando seções com menos de 50 eleitores, e nunca recusando
+    // a contagem depois (TSE, Res. 23.669/2021). Sem revelação individual não
+    // há partição a induzir, e `TAU` volta a ser o que deveria: quórum,
+    // declarado na abertura.
+    //
+    // **Pergunta pública continua existindo** e é outra coisa: `Pergunta {
+    // confidencial: false }` vale para todo mundo, é decidida pelo estatuto em
+    // `abrir()`, e vai em claro no `escolhas` do `votar()` normal. O que saiu
+    // foi o indivíduo abrindo o que o estatuto mandou manter em sigilo.
 
     // ===================== apurar ========================================
 

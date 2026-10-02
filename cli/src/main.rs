@@ -80,10 +80,6 @@ enum Comando {
         opcao: Vec<String>,
         #[arg(long)]
         identidade: String,
-        /// Abre a cédula **inteira** em claro — inclusive as perguntas
-        /// sigilosas. É a revelação voluntária.
-        #[arg(long)]
-        publico: bool,
     },
     /// Sobrescreve o recibo. Depois disso nem você prova em que votou.
     Queimar {
@@ -116,7 +112,7 @@ fn main() {
         Comando::Abrir { proposta, pergunta, opcoes, aptos, mesa, limiar, inicio, prazo, contrato, rede, governanca } =>
             comandos::abrir(proposta, pergunta, opcoes.as_deref(), aptos, mesa, *limiar, inicio, prazo, contrato, rede, governanca),
         Comando::Cedula { proposta, identidade } => comandos::mostrar_cedula(proposta, identidade),
-        Comando::Votar { proposta, opcao, identidade, publico } => comandos::votar(proposta, opcao, identidade, *publico),
+        Comando::Votar { proposta, opcao, identidade } => comandos::votar(proposta, opcao, identidade),
         Comando::Queimar { identidade } => comandos::queimar(identidade),
         Comando::Status { proposta } => comandos::status(proposta),
         Comando::Apurar { proposta, forcar_total } => comandos::apurar(proposta, forcar_total.as_deref()),

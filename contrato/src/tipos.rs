@@ -6,18 +6,31 @@ use soroban_sdk::{
     Address, BytesN, Vec,
 };
 
-/// Limiar mínimo de anonimato. Ver SPEC §6.6, o teorema da partição.
+/// Quórum de sigilo: mínimo de cédulas para que a apuração não entregue quem
+/// votou. Ver SPEC §6.6.
 ///
-/// Nenhuma célula da partição induzida pelos campos públicos pode ser apurada
-/// com menos de `TAU` cédulas confidenciais. Há duas células — confidencial e
-/// pública — então a regra se reduz a: ou ninguém votou em sigilo, ou pelo
-/// menos `TAU` votaram.
+/// Com poucas cédulas o total determina os votos por subtração — no limite,
+/// uma cédula só *é* o voto daquela pessoa. O sigilo dos compromissos é
+/// perfeito **e irrelevante**: quem ataca usa aritmética, não criptanálise.
 ///
-/// **Numa cédula mista a regra continua global, não por pergunta.** O conjunto
-/// confidencial é o mesmo em todas as perguntas sigilosas — quem vota por
-/// `votar()` compromete *todas* elas — então uma checagem cobre a cédula
-/// inteira. Fosse a confidencialidade escolhida por pergunta pelo eleitor,
-/// haveria uma célula por pergunta e τ teria de ser conferido em cada uma.
+/// **Isto é quórum, declarado na abertura — não uma recusa surpresa.** A
+/// diferença importa, e custou um redesenho: enquanto existia `votar_publico`,
+/// qualquer um podia abrir o próprio voto e encolher o conjunto sigiloso de
+/// fora, e três pessoas bastavam para vetar a assembleia inteira. Recusar o
+/// resultado correto virava negação de serviço contra a eleição.
+///
+/// Nenhum sistema eleitoral sério aceita isso. O Brasil protege a célula
+/// pequena **antes**, agregando seções com menos de 50 eleitores, e nunca
+/// recusa a contagem depois (TSE, Res. 23.669/2021); quando há nulidade, o
+/// remédio é eleição nova (CE art. 224), não ausência de resultado.
+///
+/// Removido `votar_publico`, não há partição a induzir: toda cédula é
+/// sigilosa, e o único jeito de ficar abaixo de `TAU` é comparecimento baixo.
+/// O remédio é o mesmo do Brasil — estender o prazo ou refazer com um
+/// eleitorado que caiba no sigilo.
+///
+/// Perguntas públicas não mexem nisso: são do estatuto, iguais para todos, e
+/// não distinguem um eleitor de outro.
 pub const TAU: u32 = 5;
 
 /// Máximo de perguntas numa cédula.

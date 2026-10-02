@@ -779,51 +779,17 @@ fn a_janela_precisa_ter_duracao() {
 
 // ===================== semi-confidencial e o teorema da partição =====
 
-/// A cédula pública entra, soma no resultado, e o sigilo de quem escolheu
-/// sigilo continua intacto.
-#[test]
-fn voto_publico_soma_no_resultado() {
-    let c = montar(16);
-    let mut soma_r = [ArkFr::from(0u64); OPCOES as usize];
-    for i in 0..5 {
-        let rs = c.votar(i, 0);
-        for j in 0..OPCOES as usize {
-            soma_r[j] += rs[j];
-        }
-    }
-    // duas pessoas votam em público, na opção 1
-    for i in 5..7 {
-        let (caminho, indice) = c.caminho(i);
-        let mut e = Vec::new(&c.env);
-        e.push_back(0u32);
-        e.push_back(1u32);
-        c.cliente.votar_publico(&c.proposta, &c.aptos[i], &e, &caminho, &indice, &1u32);
-    }
-    assert_eq!(c.cliente.comparecimento(&c.proposta), (5, 2));
-
-    c.env.ledger().set_sequence_number(FECHA_EM + 1);
-    let mut t = Vec::new(&c.env);
-    t.push_back(5u32);
-    t.push_back(0u32);
-    let mut a = Vec::new(&c.env);
-    for j in 0..OPCOES as usize {
-        a.push_back(escalar(&c.env, &soma_r[j]));
-    }
-    let r = c.endossar(3, &t, &a).unwrap().unwrap();
-    assert_eq!(r.get(0).unwrap(), 5, "5 confidenciais na opcao 0");
-    assert_eq!(r.get(1).unwrap(), 2, "2 publicas na opcao 1");
-}
-
-/// **O teorema da partição, executável.**
+/// **O quórum de sigilo, executável.**
 ///
-/// Quatro pessoas votam em sigilo — abaixo de `τ = 5`. O contrato recusa
-/// publicar, porque com poucos confidenciais o total determina os votos por
-/// subtração. O sigilo dos compromissos é perfeito **e irrelevante**: quem
-/// ataca usa aritmética, não criptanálise.
+/// Quatro cédulas, abaixo de `τ = 5`. O contrato recusa publicar, porque com
+/// poucas cédulas o total determina os votos por subtração.
 ///
-/// A troca é deliberada e está declarada: impor `τ` converte uma quebra de
-/// privacidade numa falha de liveness. Uma votação travada é contestável e
-/// repetível; um voto vazado não volta atrás.
+/// Antes isto era um ataque: bastavam três pessoas abrindo o voto por
+/// `votar_publico` para encolher o conjunto sigiloso e vetar a assembleia.
+/// Sem aquela função, o único caminho até aqui é comparecimento baixo — e aí a
+/// recusa deixa de ser negação de serviço e vira quórum, com o mesmo remédio
+/// que o Brasil usa: estender o prazo, ou refazer com um eleitorado que caiba
+/// no sigilo.
 #[test]
 fn abaixo_de_tau_a_apuracao_trava_em_vez_de_vazar() {
     let c = montar(16);
@@ -846,52 +812,6 @@ fn abaixo_de_tau_a_apuracao_trava_em_vez_de_vazar() {
     assert_eq!(
         c.cliente.try_apurar(&c.proposta, &c.mesa[0], &t, &a),
         Err(Ok(Erro::AnonimatoInsuficiente))
-    );
-}
-
-/// Uma votação inteiramente pública apura normalmente: não há sigilo a
-/// proteger, então `τ` não se aplica.
-#[test]
-fn votacao_toda_publica_apura() {
-    let c = montar(16);
-    for i in 0..3 {
-        let (caminho, indice) = c.caminho(i);
-        let mut e = Vec::new(&c.env);
-        e.push_back(1u32);
-        e.push_back(0u32);
-        c.cliente.votar_publico(&c.proposta, &c.aptos[i], &e, &caminho, &indice, &1u32);
-    }
-    c.env.ledger().set_sequence_number(FECHA_EM + 1);
-
-    let mut t = Vec::new(&c.env);
-    t.push_back(0u32);
-    t.push_back(0u32);
-    let mut a = Vec::new(&c.env);
-    a.push_back(escalar(&c.env, &ArkFr::from(0u64)));
-    a.push_back(escalar(&c.env, &ArkFr::from(0u64)));
-    let r = c.endossar(3, &t, &a).unwrap().unwrap();
-    assert_eq!(r.get(0).unwrap(), 3);
-}
-
-#[test]
-fn voto_publico_tambem_obedece_as_regras_da_cedula() {
-    let c = montar(16);
-    let (caminho, indice) = c.caminho(0);
-
-    let mut duas = Vec::new(&c.env);
-    duas.push_back(1u32);
-    duas.push_back(1u32);
-    assert_eq!(
-        c.cliente.try_votar_publico(&c.proposta, &c.aptos[0], &duas, &caminho, &indice, &1u32),
-        Err(Ok(Erro::SomaDiferenteDoPeso))
-    );
-
-    let mut tres = Vec::new(&c.env);
-    tres.push_back(3u32);
-    tres.push_back(0u32);
-    assert_eq!(
-        c.cliente.try_votar_publico(&c.proposta, &c.aptos[0], &tres, &caminho, &indice, &1u32),
-        Err(Ok(Erro::EscolhaForaDoBinario))
     );
 }
 
@@ -1067,17 +987,6 @@ fn orcamento_de_votar_e_de_apurar() {
             .votar(&c.proposta, &c.aptos[0], &cs, &provas, &psoma, &pubs, &caminho, &indice, &1u32)
     });
 
-    let (cse, _, _, _, _) = c.cedula(1, 1);
-    let (cam1, ind1) = c.caminho(1);
-    let mut e = Vec::new(&c.env);
-    e.push_back(0u32);
-    e.push_back(1u32);
-    let custo_publico = cpu(&c.env, || {
-        c.cliente
-            .votar_publico(&c.proposta, &c.aptos[1], &e, &cam1, &ind1, &1u32)
-    });
-    let _ = cse;
-
     // mais quatro confidenciais, para passar de τ
     let mut soma_r = [ArkFr::from(0u64); OPCOES as usize];
     for i in 2..6 {
@@ -1095,18 +1004,12 @@ fn orcamento_de_votar_e_de_apurar() {
     std::println!("   % do teto de 400M ............. {:.1}%", 100.0 * custo_votar as f64 / TETO as f64);
     std::println!("   folga ......................... {:.1}x", TETO as f64 / custo_votar as f64);
     std::println!("   projecao somada das sondas .... {:>10}", 33_480_865u64);
-    std::println!("votar_publico() .................. {:>10}", custo_publico);
-    std::println!("   razao confidencial/publico .... {:.0}x", custo_votar as f64 / custo_publico as f64);
 
     // Portão 1 do PLANO: ≤200M segue sem cortes.
     assert!(
         custo_votar <= 200_000_000,
         "votar() custa {}, acima dos 200M do Portao 1",
         custo_votar
-    );
-    assert!(
-        custo_publico < custo_votar / 10,
-        "a cedula publica deveria ser ao menos 10x mais barata"
     );
 }
 
@@ -1344,36 +1247,6 @@ fn a_parte_publica_fecha_por_pergunta() {
         ),
         Err(Ok(Erro::SomaDiferenteDoPeso))
     );
-}
-
-/// Quem abre o voto numa cédula mista abre a **cédula inteira**, inclusive as
-/// perguntas sigilosas. É a revelação voluntária, e é o τ que protege quem
-/// ficou no grupo residual.
-#[test]
-fn revelacao_voluntaria_abre_a_cedula_inteira() {
-    let c = montar_cedula(16, &[(2, false), (2, true)]);
-    let (caminho, indice) = c.caminho(0);
-
-    // Só as perguntas públicas não basta: `escolhas` cobre tudo.
-    let mut curta = Vec::new(&c.env);
-    curta.push_back(1u32);
-    curta.push_back(0u32);
-    assert_eq!(
-        c.cliente
-            .try_votar_publico(&c.proposta, &c.aptos[0], &curta, &caminho, &indice, &1u32),
-        Err(Ok(Erro::ArgumentoMalFormado))
-    );
-
-    let mut inteira = Vec::new(&c.env);
-    for v in [1u32, 0, 0, 1] {
-        inteira.push_back(v);
-    }
-    c.cliente
-        .votar_publico(&c.proposta, &c.aptos[0], &inteira, &caminho, &indice, &1u32);
-
-    // A resposta sigilosa aberta entra no total público daquela pergunta.
-    let tp = c.cliente.total_publico(&c.proposta);
-    assert_eq!(tp.get(3).unwrap(), 1, "a pergunta sigilosa recebeu em claro");
 }
 
 /// **O custo da cédula mista, medido.**
