@@ -1392,7 +1392,7 @@ function urna(d) {
 }
 function mecanismoVotar(d) {
   const v = d.votos.find(x=>!x.publico && x.compromissos?.length);
-  return terminalMecanica("core/src/pedersen.rs · contrato/src/tipos.rs", [
+  return terminalMecanica("core/src/pedersen.rs", [
     ["cod","pub fn comprometer(g, h,"],
     ["cod","                   v: &Fr, r: &Fr) -> G1Affine {"],
     ["cod","    ((*g * v) + (*h * r)).into()"],
@@ -1410,8 +1410,6 @@ function mecanismoVotar(d) {
     ["cod","// pergunta em aberto: nada disso acontece"],
     ["cod","escolhas: Vec<u32>   // um inteiro, e o endereço"],
     [],
-    ["cod","// contrato/src/tipos.rs"],
-    ["cod","Chave::Votou(proposta, eleitor)   // uma por cédula"],
     ["ok","tudo verificado antes de gravar qualquer coisa"],
   ]);
 }
@@ -1501,7 +1499,7 @@ function mecanismoCedula() {
 }
 function mecanismoGrade(d) {
   const nconf = d.votos.filter(v=>!v.publico).length;
-  return terminalMecanica("core/src/soma.rs · contrato/src/cripto.rs", [
+  return terminalMecanica("core/src/soma.rs", [
     ["cod","// D = (Σ C_j) − peso·G  deve ser múltiplo de H"],
     ["cod","pub fn provar(ctx, h, d: &G1Affine, rho: &Fr)"],
     ["cod","    -> Prova      // Schnorr na base H"],
@@ -1517,7 +1515,7 @@ function mecanismoGrade(d) {
     ["//","2 votos na pergunta 1 e 0 na 2 fechariam"],
     ["//","a soma total. por isso é uma por pergunta."],
     [],
-    ["cod","// cripto.rs — o que entra no desafio"],
+    ["//","o que entra no desafio:"],
     ["cod","proposta ‖ addr_xdr ‖ pergunta ‖ opção"],
     ["//","sem `pergunta`, a opção 0 da pergunta 1 e a"],
     ["//","da pergunta 2 teriam o mesmo desafio — e a"],
@@ -1680,7 +1678,6 @@ function mecanismoLimite() {
     ["cod","if confidenciais < TAU {"],
     ["cod","    return Err(Erro::AnonimatoInsuficiente);"],
     ["cod","}"],
-    ["cod","// tipos.rs"],
     ["cod","pub const TAU: u32 = 5;"],
     [],
   ];
@@ -1698,7 +1695,7 @@ function mecanismoLimite() {
     ["//","nulidade, o remédio é eleição nova, art. 224."],
     ["nota","Sem voto aberto não há partição a induzir: o único caminho até aqui é comparecimento baixo. O remédio é o mesmo — estender o prazo, ou refazer com um eleitorado que caiba no sigilo."],
   ];
-  const arq = "contrato/src/lib.rs · contrato/src/tipos.rs";
+  const arq = "contrato/src/lib.rs";
 
   const e = ponte.viva ? tau.estado : null;
   if (!e) return terminalMecanica(arq,
