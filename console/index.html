@@ -62,6 +62,23 @@ button{font:inherit; cursor:pointer}
   padding:0 4px; border-radius:2px}
 .painel-tag{font:10px var(--mono); color:var(--secundario); letter-spacing:.12em; text-transform:uppercase}
 .marca-painel{font:11px var(--mono); color:var(--acento); margin-bottom:22px}
+.diario{font:10.5px/1.65 var(--mono); max-height:330px; overflow-y:auto;
+  margin-bottom:22px; padding-right:6px; overflow-wrap:anywhere}
+.d-linha{display:flex; gap:9px; align-items:baseline}
+.d-hora{color:var(--hairline); flex:0 0 auto}
+.d-cmd{color:var(--acento); font-weight:500}
+.d-fn{color:var(--texto)}
+.d-val{color:var(--secundario)}
+.d-hex{color:var(--apagado); font-size:9px}
+.d-tx{color:var(--acento)}
+.d-ok::before{content:"✓ "}
+.d-ok{color:var(--acento)}
+.d-x::before{content:"✗ "}
+.d-x{color:var(--recusa)}
+.d-com::before{content:"// "}
+.d-com{color:var(--apagado)}
+.d-ocl{color:transparent; white-space:pre;
+  background:repeating-linear-gradient(90deg,var(--hairline) 0 4px,transparent 4px 7px)}
 .rolo-cli{font:11px/1.45 var(--mono); white-space:pre-wrap; word-break:break-word; max-height:300px; overflow-y:auto; margin:10px 0 0; color:var(--secundario); background:var(--profundo); padding:12px}
 .selo-vivo,.selo-eco{font:9px var(--mono); letter-spacing:.14em; padding:2px 7px; border-radius:999px; vertical-align:middle; white-space:nowrap}
 .selo-vivo{color:var(--acento); border:1px solid var(--acento)}
@@ -655,6 +672,16 @@ async function chamar(verbo, corpo) {
     });
     const j = await r.json();
     ponte.saida = j.saida || j.erro || "";
+    /* Recusa é resultado, não silêncio. Era o buraco mais feio do diário:
+       um voto fora do prazo não deixava rastro nenhum na coluna. */
+    if (j.ok) registrar(verbo, dados, j.estado);
+    else {
+      reg("cmd", `tessera ${verbo}`);
+      const motivo = (j.saida || j.erro || "").split("\n")
+        .map((l) => l.trim())
+        .find((l) => l.startsWith("✗") || l.startsWith("❌") || l.includes("Error(Contract"));
+      reg("x", motivo || "a rede recusou");
+    }
     /* `ok: false` não é defeito: a recusa do contrato é um resultado da demo,
        e o painel de τ existe para mostrá-la. */
     if (!j.ok && !j.saida) ponte.falha = j.erro || "a ponte recusou";
@@ -758,6 +785,12 @@ function relogio(d) {
   const seg = f * 5;
   return seg < 60 ? `faltam ~${seg}s` : `faltam ~${Math.ceil(seg/60)}min`;
 }
+function textoRelogio(d) {
+  const f = faltam(d);
+  if (f === null) return "";
+  return f <= 0 ? "✓ prazo encerrado · pode apurar"
+                : `${relogio(d)} · ledger ${num(ponte.ledger)} de ${num(d.prazo_ledger)}`;
+}
 /* Enquanto a votação está aberta, a tela se atualiza sozinha. Sem isso alguém
    teria de ficar apertando F5 na frente da câmera. */
 let pulso = null;
@@ -765,9 +798,19 @@ function bater(d) {
   clearInterval(pulso);
   if (!ponte.viva || !d || !d.prazo_ledger || d.apuracao) return;
   pulso = setInterval(async () => {
+    const antes = faltam(dados) <= 0;
     await lerLedger();
-    if (faltam(dados) <= 0) clearInterval(pulso);
-    mostrar();
+    const agora = faltam(dados) <= 0;
+    /* Redesenhar o palco inteiro arrancaria o botão de baixo do dedo de quem
+       está votando. No tique comum só o relógio e o diário mudam; o palco só
+       é refeito quando o prazo vira, porque aí a apuração precisa aparecer. */
+    if (agora && !antes) { clearInterval(pulso); mostrar(); return; }
+    const r = document.querySelector("[data-relogio]");
+    if (r) r.textContent = textoRelogio(dados);
+    const dv = document.querySelector(".diario");
+    if (dv && dv.childElementCount !== diario.slice(-120).length) {
+      dv.replaceWith(rolo());
+    }
   }, 5000);
 }
 
@@ -862,6 +905,128 @@ const ANCORAS = {
   ],
 };
 
+/* ---------- O diário ----------
+
+   A coluna da direita não é um texto de apoio: é o registro do que acabou de
+   acontecer, escrito enquanto acontece. Cada ação da tela empilha aqui as
+   funções que rodaram e os valores que saíram delas.
+
+   Nada é inventado. Hash, transação, ledger, taxa e tamanho vêm do estado que
+   a CLI gravou ou da saída que ela imprimiu. O que o diário acrescenta são os
+   nomes das funções — e esses são os mesmos que a guarda confere.          */
+const diario = [];
+function reg(cls, txt) { diario.push({ h: new Date(), cls, txt }); }
+function regs(cls, linhas) { linhas.forEach((l) => reg(cls, l)); }
+
+const hhmmss = (d) =>
+  [d.getHours(), d.getMinutes(), d.getSeconds()]
+    .map((x) => String(x).padStart(2, "0")).join(":");
+
+/* ── o que cada verbo escreve ── */
+
+function registrarAbertura(d) {
+  reg("cmd", `tessera abrir --proposta ${d.proposta}`);
+  reg("fn",  `merkle::folha  × ${d.aptos.length}`);
+  reg("fn",  "merkle::no     até a raiz");
+  reg("val", `raiz_aptos = ${d.raiz_aptos}`);
+  reg("com", "32 bytes no contrato. A lista não vai.");
+  reg("fn",  `shamir::repartir  ${d.mesa.limiar} de ${d.mesa.membros}`);
+  reg("com", "as parcelas reconstroem Σr, nunca um voto");
+  d.perguntas.forEach((pg, i) =>
+    reg("val", `perguntas[${i}] = { opcoes: ${pg.opcoes.length}, confidencial: ${pg.confidencial} }`));
+  reg("val", `fecha_em = ledger ${d.prazo_ledger}`);
+  if (d.abertura_tx) reg("tx", `tx ${d.abertura_tx}`);
+  reg("ok",  "votação aberta");
+}
+
+function registrarVoto(d, v) {
+  const conf = d.perguntas.filter((p) => p.confidencial);
+  const nOpc = conf.reduce((a, p) => a + p.opcoes.length, 0);
+  reg("cmd", `tessera votar --proposta ${d.proposta} --identidade ${v.identidade}`);
+  reg("fn",  `merkle::verificar  caminho → raiz`);
+  if (v.publico) {
+    reg("com", "cédula aberta por escolha de quem vota");
+    reg("val", `escolhas = [${(v.escolhas || []).join(", ")}]`);
+  } else {
+    reg("fn",  `pedersen::acaso_fr()  × ${nOpc}`);
+    reg("ocl", "r fica na máquina de quem vota");
+    reg("fn",  "pedersen::comprometer   C = v·G + r·H");
+    (v.compromissos || []).forEach((c, j) => {
+      reg("hex", `C${j} = ${c.slice(0, 40)}…`);
+      diario[diario.length - 1].cheio = c;
+    });
+    reg("fn",  `cds::provar   × ${(v.provas || []).length}   ${(v.provas || []).length * 320} B`);
+    reg("com", "um ramo real, um fabricado — indistinguíveis");
+    reg("fn",  `soma::provar  × ${(v.provas_soma || []).length}   ${(v.provas_soma || []).length * 128} B`);
+    reg("com", "uma por pergunta: ninguém compensa entre elas");
+    const bytes = (v.compromissos || []).length * 96
+                + (v.provas || []).length * 320
+                + (v.provas_soma || []).length * 128;
+    reg("val", `carga da cédula = ${bytes} B`);
+  }
+  if (v.tx) reg("tx", `tx ${v.tx}   ledger ${v.ledger}`);
+  reg("ok", `${v.identidade} está na contagem`);
+}
+
+function registrarApuracao(d) {
+  reg("cmd", `tessera apurar --proposta ${d.proposta}`);
+  const conf = d.votos.filter((x) => !x.publico).length;
+  reg("val", `confidenciais = ${conf}   τ = ${d.sigilo_minimo}`);
+  if (conf > 0 && conf < d.sigilo_minimo) {
+    reg("fn", "lib.rs: if confidenciais < TAU");
+    reg("x",  `${conf} < ${d.sigilo_minimo} → Error(Contract, #19)`);
+    return;
+  }
+  reg("fn", `shamir::juntar  ${d.mesa.limiar} parcelas → Σr`);
+  reg("fn", "pedersen::verifica_agregado  A == total·G + Σr·H");
+  if (d.apuracao) {
+    reg("tx", `tx ${d.apuracao.tx || ""}   ledger ${d.apuracao.ledger || ""}`);
+    reg("ok", "resultado publicado");
+  }
+}
+
+/* Chamado depois de cada ação, com o estado novo em mãos. */
+function registrar(verbo, antes, depois) {
+  if (!depois) return;
+  if (verbo === "abrir")  return registrarAbertura(depois);
+  if (verbo === "apurar") return registrarApuracao(depois);
+  if (verbo === "votar") {
+    const vistos = new Set((antes?.votos || []).map((v) => v.tx));
+    const novos = (depois.votos || []).filter((v) => !vistos.has(v.tx));
+    if (!novos.length) return;
+    return novos.forEach((v) => registrarVoto(depois, v));
+  }
+  if (verbo === "queimar") {
+    reg("cmd", "tessera queimar");
+    reg("fn",  "recibo::queimar  sobrescreve o arquivo");
+    reg("ok",  "nem quem votou prova mais o próprio voto");
+  }
+  if (verbo === "verificar") {
+    reg("cmd", `tessera verificar --proposta ${depois.proposta}`);
+    reg("com", "outro processo, em Rust. esta página não roda BLS12-381.");
+  }
+}
+
+/* O rolo. Sempre mostra o fim, que é onde está o que acabou de acontecer. */
+function rolo() {
+  const cx = el("div", "diario");
+  if (!diario.length) {
+    cx.append(el("div", "t-com", "// nada aconteceu ainda"));
+    return cx;
+  }
+  diario.slice(-120).forEach((l, i, todas) => {
+    const d = el("div", "d-linha");
+    const abre = l.cls === "cmd" || i === 0;
+    d.append(el("span", "d-hora", abre ? hhmmss(l.h) : ""));
+    const corpo = el("span", "d-" + l.cls, l.txt);
+    if (l.cheio) corpo.title = l.cheio;
+    d.append(corpo);
+    cx.append(d);
+  });
+  requestAnimationFrame(() => { cx.scrollTop = cx.scrollHeight; });
+  return cx;
+}
+
 /* ---------- O terminal da mecânica ----------
 
    A coluna da direita não resume o que acontece: ela mostra o código que faz
@@ -879,7 +1044,12 @@ const ANCORAS = {
      []                        linha em branco                                */
 function terminalMecanica(arquivo, linhas) {
   const m = el("aside","mecanica");
-  texto(m,"div","term-topo", arquivo);
+  /* Em cima o que aconteceu, embaixo o código que fez acontecer. */
+  if (ponte.viva) {
+    texto(m,"div","term-topo","o que está acontecendo");
+    m.append(rolo());
+  }
+  texto(m,"div","term-topo", arquivo || "");
   const t = el("div","term");
   linhas.forEach((l) => {
     if (!l || !l.length) { t.append(el("div","t-vazio")); return; }
@@ -986,10 +1156,9 @@ function mecanismoPerguntas(d) {
 function painelAbertura(d) {
   const s=el("section"); titulo(s,2,"Abrir a votação");
   texto(s,"div","destaque",`${d.aptos.length} aptos · mesa ${d.mesa.limiar} de ${d.mesa.membros}`);
-  if (ponte.viva) {
-    const f = faltam(d);
-    texto(s,"p", f !== null && f <= 0 ? "fato" : "painel-tag",
-          f === null ? "" : f <= 0 ? "✓ prazo encerrado · pode apurar" : `${relogio(d)} · ledger ${num(ponte.ledger)} de ${num(d.prazo_ledger)}`);
+  if (ponte.viva && faltam(d) !== null) {
+    const r = texto(s,"p", faltam(d) <= 0 ? "fato" : "painel-tag", textoRelogio(d));
+    r.setAttribute("data-relogio","");
   }
   const a=el("a","acao","Ver transação de abertura ↗");
   a.href=expert(d,"tx",d.abertura_tx); a.target="_blank"; a.rel="noopener"; s.append(a);
@@ -1388,6 +1557,7 @@ async function rodarTau() {
       perguntas: [{ texto:"Manter a coligação?", opcoes:["manter","rescindir"], confidencial:true }] }) }).then(r=>r.json());
   if (!j.ok) { tau.saida = j.saida || j.erro || ""; return dizer("✗ não consegui abrir"); }
   tau.ledger = (j.estado && j.estado.prazo_ledger) || 0;
+  registrar("abrir", null, j.estado);
 
   const quem = ponte.identidades.slice(0,7);
   for (let i = 0; i < quem.length; i++) {
@@ -1395,6 +1565,7 @@ async function rodarTau() {
     dizer(`${quem[i]} votando ${aberto ? "com o voto aberto" : "em segredo"} · ${i+1} de ${quem.length}`);
     j = await fetch("/api/votar", { method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ proposta: nome, identidade: quem[i], opcoes:["manter"], publico: aberto }) }).then(r=>r.json());
+    if (j.ok) registrar("votar", { votos: (j.estado?.votos || []).slice(0, i) }, j.estado);
     if (!j.ok) {
       tau.saida = j.saida || j.erro || "";
       const tarde = ponte.ledger && tau.ledger && ponte.ledger >= tau.ledger;
@@ -1414,6 +1585,7 @@ async function rodarTau() {
   dizer("a mesa tenta apurar…");
   j = await fetch("/api/apurar", { method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({ proposta: nome }) }).then(r=>r.json());
+  registrar("apurar", null, j.estado);
   tau.saida = j.saida || j.erro || "";
   dizer(tau.saida.includes("#19") ? "✗ o contrato recusou · nada foi publicado"
                                   : "✓ terminou — veja a saída");
