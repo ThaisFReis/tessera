@@ -1381,7 +1381,10 @@ async function rodarTau() {
   tau.proposta = nome; tau.saida = ""; tau.ledger = 0;
   dizer("abrindo a proposta…");
   let j = await fetch("/api/abrir", { method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ proposta: nome, prazo: "1m", limiar: 3,
+    body: JSON.stringify({ proposta: nome, prazo: "3m", limiar: 3,
+      /* Sete votos sequenciais levam ~15 s cada. Com 1m o prazo fechava no
+         meio da fila e o quinto voto era recusado — foi o que aconteceu no
+         primeiro teste. 3m dá a volta inteira com folga. */
       perguntas: [{ texto:"Manter a coligação?", opcoes:["manter","rescindir"], confidencial:true }] }) }).then(r=>r.json());
   if (!j.ok) { tau.saida = j.saida || j.erro || ""; return dizer("✗ não consegui abrir"); }
   tau.ledger = (j.estado && j.estado.prazo_ledger) || 0;
@@ -1392,7 +1395,13 @@ async function rodarTau() {
     dizer(`${quem[i]} votando ${aberto ? "com o voto aberto" : "em segredo"} · ${i+1} de ${quem.length}`);
     j = await fetch("/api/votar", { method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ proposta: nome, identidade: quem[i], opcoes:["manter"], publico: aberto }) }).then(r=>r.json());
-    if (!j.ok) { tau.saida = j.saida || j.erro || ""; return dizer(`✗ ${quem[i]} não conseguiu votar`); }
+    if (!j.ok) {
+      tau.saida = j.saida || j.erro || "";
+      const tarde = ponte.ledger && tau.ledger && ponte.ledger >= tau.ledger;
+      return dizer(tarde
+        ? `✗ o prazo fechou antes de ${quem[i]} votar — abra de novo com prazo maior`
+        : `✗ ${quem[i]} não conseguiu votar`);
+    }
   }
 
   dizer("4 em segredo, 3 abriram o voto · esperando o prazo");
@@ -1464,8 +1473,10 @@ function mostrar() {
   $("#passos").textContent=`${String(passo+1).padStart(2,"0")} / 10 · ${nome}`;
   $("#anterior").disabled=passo===0;$("#proximo").disabled=passo===9;
   const palco=el("div","palco");
-  /* Só o painel 1 funciona sem proposta — é ele que a cria. */
-  if (!dados && passo > 0) palco.append(espera(), terminalMecanica("—", []));
+  /* Dois painéis funcionam sem proposta, porque cada um cria a sua: o 1, que
+     abre a votação principal, e o 9, que monta a coligação do limiar. */
+  const bastaSozinho = passo === 0 || (passo === 8 && ponte.viva);
+  if (!dados && !bastaSozinho) palco.append(espera(), terminalMecanica("", []));
   else palco.append(painel(dados),mecanismo(dados));
   $("#app").replaceChildren(palco);
 }

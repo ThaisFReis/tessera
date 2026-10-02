@@ -54,7 +54,10 @@ def arquivos_citados(fonte):
     completa os seguintes.
     """
     citados = set()
-    for cab in re.findall(r'terminalMecanica\("([^"]+)"', fonte):
+    for cab in re.findall(r'terminalMecanica\("([^"]*)"', fonte):
+        # Um painel sem arquivo (o vazio que espera a proposta) não declara nada.
+        if "." not in cab:
+            continue
         partes = [x.strip() for x in cab.split("·")]
         pasta = str(Path(partes[0]).parent)
         for parte in partes:
