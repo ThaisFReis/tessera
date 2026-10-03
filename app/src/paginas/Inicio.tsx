@@ -24,10 +24,14 @@ const TEMPO = [
   { quando: "ANOS DEPOIS", titulo: "O vazamento volta no tempo.", txt: "Uma chave comprometida abre votos que já pareciam história." },
 ];
 
+/* `contrato/src/test.rs::ate_quantas_pessoas_cabe_um_anel`: a chamada inteira,
+   não a assinatura sozinha. Somar o anel medido num teste com a cédula medida
+   noutro é a aritmética que o SPEC errou em 9,8%. */
 const CUSTOS = [
-  { o: "anel de 5", i: "54.114.518", p: "13,5%" },
-  { o: "anel de 10", i: "108.228.508", p: "27,1%" },
-  { o: "anel de 20", i: "216.456.488", p: "54,1%" },
+  { o: "5 pessoas", i: "94.517.040", p: "23,6%" },
+  { o: "10 pessoas", i: "148.747.642", p: "37,2%" },
+  { o: "20 pessoas", i: "257.211.151", p: "64,3%" },
+  { o: "30 pessoas", i: "365.680.568", p: "91,4%" },
 ];
 
 export default function Inicio() {
@@ -154,7 +158,7 @@ export default function Inicio() {
           e esse é o preço, medido.
         </p>
         <table className="tabela">
-          <thead><tr><th>verificação do anel</th><th>instruções</th><th>do teto</th></tr></thead>
+          <thead><tr><th>cédula em anel, inteira</th><th>instruções</th><th>do teto</th></tr></thead>
           <tbody>
             {CUSTOS.map((c) => (
               <tr key={c.o}><td>{c.o}</td><td className="num">{c.i}</td><td className="num">{c.p}</td></tr>
@@ -162,9 +166,10 @@ export default function Inicio() {
           </tbody>
         </table>
         <p className="nota-faixa">
-          Linear: 10.822.850 por membro. Com a cédula junto, <strong>vinte pessoas é o limite
-          prático</strong> de um anel — o mesmo limite que o Brasil encontrou, e que lá se
-          responde agregando seções pequenas.
+          A reta é <strong>40,3 M fixos + 10,85 M por pessoa</strong>. A parede aritmética fica
+          em 32 — em 33 a conta estoura. Mas 30 já consome 91,4%, e 8,6% de folga não é folga:
+          basta a pergunta ter mais opções. <strong>Vinte é a margem, não o limite</strong> — ali
+          ainda sobra um terço da transação, e é esse terço que paga uma cédula maior.
         </p>
       </section>
 

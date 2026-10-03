@@ -1754,3 +1754,144 @@ fn hex_bytes(s: &str) -> Vetor<u8> {
 fn ponto_hex(b: &[u8]) -> std::string::String {
     b.iter().map(|x| std::format!("{:02x}", x)).collect()
 }
+
+/// **Até quantas pessoas cabe um anel, de verdade.**
+///
+/// `orcamento_do_anel` mede só a verificação da assinatura. Mas o que a rede
+/// cobra é `votar_anonimo()` inteiro: a assinatura **mais** os compromissos, as
+/// disjuntivas, a prova de soma, a autorização, o estado e o evento. A conta de
+/// cabeça — somar o anel medido com a cédula medida noutro teste — é a mesma
+/// aritmética que o SPEC errou em 9,8% e que este arquivo existe para recusar.
+///
+/// O número que sai daqui é o que a landing tem o direito de publicar.
+#[test]
+fn ate_quantas_pessoas_cabe_um_anel() {
+    use tessera_core::anel;
+
+    std::println!("\n== A CEDULA EM ANEL, INTEIRA ==");
+    std::println!("{:>7}  {:>12}  {:>9}", "no anel", "instrucoes", "% de 400M");
+
+    let mut anterior = 0u64;
+    for n in [5usize, 10, 20, 30] {
+        let env = Env::default();
+        env.mock_all_auths();
+        env.ledger().set_sequence_number(4_989_900);
+        let id = env.register(Tessera, ());
+        let cliente = TesseraClient::new(&env, &id);
+
+        let aptos: Vetor<Address> = (0..n).map(|_| Address::generate(&env)).collect();
+        let folhas: Vetor<merkle::Apto> = aptos
+            .iter()
+            .map(|a| merkle::Apto { endereco: bytes_de(&a.clone().to_xdr(&env)), peso: 1 })
+            .collect();
+        let arvore = merkle::Arvore::montar(&folhas).unwrap();
+
+        let mut mesa_sdk = Vec::new(&env);
+        mesa_sdk.push_back(Address::generate(&env));
+        let mut perg = Vec::new(&env);
+        perg.push_back(Pergunta { opcoes: 2, confidencial: true });
+
+        let proposta: BytesN<32> = BytesN::from_array(&env, &[7u8; 32]);
+        cliente.abrir(
+            &Address::generate(&env), &proposta, &perg,
+            &BytesN::from_array(&env, &arvore.raiz()), &mesa_sdk,
+            &1u32, &4_989_990u32, &4_990_190u32, &true,
+        );
+
+        let g = pedersen::gerador();
+        let h = ponto::desserializar(&cliente.gerador_h().to_array()).unwrap();
+        let hp = ponto::desserializar(&cripto::calcular_hp(&env, &proposta).to_array()).unwrap();
+
+        let xs: Vetor<ArkFr> = (0..n).map(|_| pedersen::acaso_fr().unwrap()).collect();
+        let mut anel_ark: Vetor<ArkG1> = Vetor::new();
+        for (i, x) in xs.iter().enumerate() {
+            let pk = anel::chave_publica(&g, x);
+            let p = arvore.caminho(i).unwrap();
+            let mut c = Vec::new(&env);
+            for irmao in &p.irmaos {
+                c.push_back(BytesN::from_array(&env, irmao));
+            }
+            cliente.comparecer(&proposta, &aptos[i], &g1(&env, &pk), &c, &p.indice);
+            anel_ark.push(pk);
+        }
+        let mut anel_sdk: Vec<Bls12381G1Affine> = Vec::new(&env);
+        for p in &anel_ark {
+            anel_sdk.push_back(g1(&env, p));
+        }
+
+        env.ledger().set_sequence_number(4_990_000);
+
+        // Quem assina é o último: o pior caso do laço de verificação.
+        let i = n - 1;
+        let img = anel::imagem(&hp, &xs[i]);
+        let ident: Vetor<u8> = ponto::serializar(&img).to_vec();
+        let rs: Vetor<ArkFr> = (0..2).map(|_| pedersen::acaso_fr().unwrap()).collect();
+        let cs: Vetor<ArkG1> = (0..2)
+            .map(|j| {
+                let v = if j == 1 { 1u64 } else { 0 };
+                pedersen::comprometer(&g, &h, &pedersen::escalar(v), &rs[j as usize])
+            })
+            .collect();
+        let ctx_de = |opcao: u32| {
+            let mut v: Vetor<u8> = proposta.to_array().to_vec();
+            v.extend(ident.iter().copied());
+            v.extend(0u32.to_be_bytes());
+            v.extend(opcao.to_be_bytes());
+            v
+        };
+        let mut compromissos = Vec::new(&env);
+        let mut provas = Vec::new(&env);
+        for j in 0..2u32 {
+            let v = if j == 1 { 1u64 } else { 0 };
+            let p = cds::provar(&ctx_de(j), &g, &h, &cs[j as usize], v, &rs[j as usize]).unwrap();
+            compromissos.push_back(g1(&env, &cs[j as usize]));
+            provas.push_back(ProvaCds {
+                a0: g1(&env, &p.a0), a1: g1(&env, &p.a1),
+                e0: escalar(&env, &p.e0), z0: escalar(&env, &p.z0),
+                e1: escalar(&env, &p.e1), z1: escalar(&env, &p.z1),
+            });
+        }
+        let rho = rs.iter().fold(ArkFr::from(0u64), |a, r| a + r);
+        let d = soma::alvo(&g, &cs, 1);
+        let ps = soma::provar(&ctx_de(u32::MAX), &h, &d, &rho).unwrap();
+        let mut provas_soma = Vec::new(&env);
+        provas_soma.push_back(ProvaSoma { a: g1(&env, &ps.a), z: escalar(&env, &ps.z) });
+        let escolhas: Vec<u32> = Vec::new(&env);
+
+        let msg = cripto::mensagem_cedula(&env, &proposta, &compromissos, &escolhas);
+        let s = anel::assinar(&bytes_de(&msg), &g, &hp, &anel_ark, i, &xs[i]).unwrap();
+        let mut z = Vec::new(&env);
+        for zi in &s.z {
+            z.push_back(escalar(&env, zi));
+        }
+        let imagem = g1(&env, &s.imagem);
+        let c0 = escalar(&env, &s.c0);
+
+        let custo = cpu(&env, || {
+            cliente.votar_anonimo(
+                &proposta, &anel_sdk, &imagem, &c0, &z,
+                &compromissos, &provas, &provas_soma, &escolhas,
+            );
+        });
+
+        std::println!(
+            "{:>7}  {:>12}  {:>8.1}%",
+            n, custo, 100.0 * custo as f64 / TETO as f64
+        );
+
+        // O que a landing afirma: vinte cabe. Trinta é onde a conta aperta.
+        if n == 20 {
+            assert!(
+                custo <= TETO,
+                "um anel de 20 nao cabe numa transacao: {} de {}",
+                custo, TETO
+            );
+        }
+        // E o crescimento tem de continuar linear: se um dia virar quadrático,
+        // o número publicado deixa de valer sem ninguém perceber.
+        if anterior > 0 {
+            assert!(custo > anterior, "o custo nao cresceu de {} para {}", anterior, custo);
+        }
+        anterior = custo;
+    }
+}
