@@ -21,6 +21,22 @@ export const REDE = {
   explorer: "https://stellar.expert/explorer/testnet",
 };
 
+/**
+ * O lance de inclusão, em stroops.
+ *
+ * `BASE_FEE` são 100, e 100 perde o leilão assim que várias cédulas disputam o
+ * mesmo ledger — foi o que derrubou 9 de 23 numa rodada de carga
+ * (`scripts/rodada-30.mjs`), com `txInsufficientFee`.
+ *
+ * Subir o lance é de graça: a rede cobra o mínimo necessário, não o que você
+ * ofereceu. Medido na testnet, a mesma transação com lance de 100 e de
+ * 1.000.000 foi cobrada idênticos 19.690.096 stroops. Ao lado de uma taxa de
+ * recurso de ~5 milhões por cédula, ser mesquinho aqui nunca economizou nada.
+ */
+const TAXA_INCLUSAO = 1_000_000;
+/** Quantas vezes insistir, multiplicando o lance por 4 a cada vez. */
+const LANCES = 3;
+
 const servidor = new rpc.Server(REDE.rpc);
 const contrato = new Contract(REDE.contrato);
 
@@ -272,13 +288,46 @@ async function enviar(
 ): Promise<string> {
   diario?.({ tipo: "cmd", txt: `${metodo}()` });
   if (resumo) diario?.({ tipo: "val", txt: resumo });
+
+  for (let lance = 0; ; lance++) {
+    try {
+      return await uma(carteira, metodo, args, TAXA_INCLUSAO * 4 ** lance, diario);
+    } catch (e) {
+      // Taxa curta não é erro do voto: a transação não entrou em ledger nenhum.
+      // Re-simular junto com o lance maior também renova o footprint.
+      if (lance >= LANCES - 1 || !(e instanceof NaoEntrou)) throw e;
+      diario?.({ tipo: "nota", txt: "o ledger está disputado; subindo o lance e tentando de novo" });
+    }
+  }
+}
+
+/**
+ * A transação que **não entrou em ledger nenhum** — por lance baixo, ou por ter
+ * sido preterida até a validade expirar. As duas querem a mesma resposta:
+ * oferecer mais e tentar de novo.
+ *
+ * Reenviar é seguro porque o contrato recusa a repetição por conta própria —
+ * `ImagemJaUsada`, `JaCompareceu`, `PropostaJaExiste`. Se a primeira tiver
+ * entrado enquanto esperávamos, a segunda cai num desses e nada se duplica.
+ */
+class NaoEntrou extends Error {}
+
+async function uma(
+  carteira: Carteira,
+  metodo: string,
+  args: xdr.ScVal[],
+  lance: number,
+  diario?: Diario,
+): Promise<string> {
   const conta = await servidor.getAccount(carteira.endereco());
   const bruta = new TransactionBuilder(conta, {
-    fee: BASE_FEE,
+    fee: String(lance),
     networkPassphrase: REDE.passphrase,
   })
     .addOperation(contrato.call(metodo, ...args))
-    .setTimeout(60)
+    // 60 s é curto quando várias cédulas disputam o mesmo ledger: a transação
+    // expira antes de chegar a vez dela, e quem votou vê um erro sem motivo.
+    .setTimeout(180)
     .build();
 
   const sim = await servidor.simulateTransaction(bruta);
@@ -311,11 +360,13 @@ async function enviar(
   );
   const envio = await servidor.sendTransaction(assinada);
   if (envio.status === "ERROR") {
-    diario?.({ tipo: "x", txt: resumir(`a rede recusou: ${JSON.stringify(envio.errorResult)}`) });
-    throw new Error("a rede recusou a transação");
+    const motivo = envio.errorResult?.result().switch().name;
+    if (motivo === "txInsufficientFee") throw new NaoEntrou(motivo);
+    diario?.({ tipo: "x", txt: resumir(`a rede recusou: ${motivo ?? JSON.stringify(envio.errorResult)}`) });
+    throw new Error(`a rede recusou a transação: ${motivo ?? "sem motivo declarado"}`);
   }
 
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 180; i++) {
     const r = await servidor.getTransaction(envio.hash);
     if (r.status === rpc.Api.GetTransactionStatus.SUCCESS) {
       diario?.({ tipo: "ok", txt: `tx ${envio.hash}` });
@@ -327,7 +378,8 @@ async function enviar(
     }
     await new Promise((s) => setTimeout(s, 1000));
   }
-  throw new Error("a transação não confirmou em 40 segundos");
+  // Nunca foi incluída: preterida por quem ofereceu mais. Vale subir o lance.
+  throw new NaoEntrou("a transação não entrou em nenhum ledger a tempo");
 }
 
 export const abrir = (

@@ -1,5 +1,6 @@
 import { Keypair } from "@stellar/stellar-sdk";
 import { REDE } from "./rede";
+import { UmaCedula } from "./usoUnico";
 
 /** Uma carteira é só isto: um endereço e uma assinatura. */
 export interface Carteira {
@@ -25,7 +26,8 @@ export interface Carteira {
 export class CarteiraEfemera implements Carteira {
   readonly tipo = "efemera" as const;
   private par: Keypair;
-  private usada = false;
+  /** A invariante vive em `usoUnico.ts`, sozinha e testável. */
+  private trava = new UmaCedula();
 
   private constructor(par: Keypair) {
     this.par = par;
@@ -48,16 +50,29 @@ export class CarteiraEfemera implements Carteira {
     return this.par.publicKey();
   }
 
+  /**
+   * A regra é **uma cédula por chave** — é ela que mantém as suas cédulas sem
+   * relação entre si no ledger. Não é "uma assinatura por chave".
+   *
+   * A diferença aparece quando a rede recusa por taxa: a transação não entrou
+   * em ledger nenhum, e reassinar *a mesma cédula* com um lance maior não
+   * publica nada de novo. Trocar de chave aí seria mais caro e não esconderia
+   * mais nada, porque o friendbot e o RPC já viram a primeira.
+   *
+   * Então a trava compara a **operação**, não conta assinaturas.
+   */
   async assinar(xdr: string): Promise<string> {
-    if (this.usada) {
-      throw new Error(
-        "esta chave já assinou. Uma chave por cédula é o que mantém as suas " +
-          "cédulas sem relação entre si no ledger.",
-      );
-    }
-    this.usada = true;
     const { TransactionBuilder } = await import("@stellar/stellar-sdk");
     const tx = TransactionBuilder.fromXDR(xdr, REDE.passphrase);
+    // Se o envelope mudar de forma um dia, a marca vira `null` e a trava
+    // volta a ser "uma assinatura e pronto". Falhar fechado.
+    let marca: string | null = null;
+    try {
+      marca = tx.toEnvelope().v1().tx().operations()[0].toXDR("base64");
+    } catch {
+      marca = null;
+    }
+    this.trava.registrar(marca);
     tx.sign(this.par);
     return tx.toXDR();
   }
