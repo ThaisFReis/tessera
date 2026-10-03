@@ -9,7 +9,18 @@ import {
   REDE,
   type PropostaRede,
 } from "../rede";
-import { Erro } from "./comum";
+import { Carregando, Estado, Icone } from "../ui";
+
+const FASES: Record<string, string> = {
+  agendada: "ainda não começou",
+  comparecimento: "comparecimento aberto",
+  votacao: "votação aberta",
+  encerrada: "encerrada",
+};
+
+function Fato({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+  return <div><dt>{rotulo.toUpperCase()}</dt><dd>{children}</dd></div>;
+}
 
 export default function Votacao() {
   const { id = "" } = useParams();
@@ -39,81 +50,88 @@ export default function Votacao() {
     };
   }, [id]);
 
-  if (falha) return <Erro msg={falha} />;
-  if (!p) return <p>lendo a proposta…</p>;
+  if (falha) {
+    return <main className="pagina"><Estado titulo="Não foi possível ler a proposta." curto>
+      <p className="error-message" role="alert">{falha}</p>
+      <Link className="primary-button" to="/">Ver votações <Icone nome="arrow" /></Link>
+    </Estado></main>;
+  }
+  if (!p) return <main className="pagina"><Carregando titulo="Lendo a proposta." /></main>;
 
   const f = calcularFase(p, ledger);
 
   return (
-    <main>
-      <h1>Votação {id.slice(0, 16)}…</h1>
-      <dl>
-        <dt>modo</dt>
-        <dd>
+    <main className="pagina">
+      <header>
+        <span className="eyebrow">VOTAÇÃO · {FASES[f].toUpperCase()}</span>
+        <h1>{id.slice(0, 16)}…</h1>
+        <p className="pagina-sub">
           {p.anel
-            ? "caderno separado da urna — quem faltou é público, de quem é cada cédula não é"
-            : "voto identificado — o ledger mostra que o seu endereço votou, nunca em quê"}
-        </dd>
-        <dt>fase</dt>
-        <dd>{f}</dd>
-        <dt>janela</dt>
-        <dd>
-          abre {p.abre_em} · fecha {p.fecha_em} · agora {ledger}
-        </dd>
-        <dt>perguntas</dt>
-        <dd>
-          {p.perguntas.map((q, i) => (
-            <span key={i}>
-              {i + 1}. {q.opcoes} opções {q.confidencial ? "em sigilo" : "em aberto"};{" "}
-            </span>
-          ))}
-        </dd>
-        <dt>mesa</dt>
-        <dd>
-          {p.mesa.length === 0
-            ? "nenhuma — ninguém pode abrir um voto, e por isso ninguém pode apurar"
-            : `${p.limiar} de ${p.mesa.length} para apurar`}
-        </dd>
-        <dt>quem pode abrir a sua cédula</dt>
-        <dd>
-          {p.anel
-            ? "ninguém — a cédula em anel não reparte o fator com a mesa, então não existe parcela a reunir"
-            : p.mesa.length === 1
-              ? `uma pessoa: ${p.mesa[0]}`
-              : `${p.limiar} de ${p.mesa.length}, em conluio`}
-        </dd>
-        {p.anel && (
-          <>
-            <dt>anel</dt>
-            <dd>
+            ? "Caderno separado da urna — quem faltou é público, de quem é cada cédula não é."
+            : "Voto identificado — o ledger mostra que o seu endereço votou, nunca em quê."}
+        </p>
+      </header>
+
+      {f !== "encerrada" && (
+        <section>
+          <h2>O QUE DÁ PARA FAZER AGORA</h2>
+          {p.anel && f === "comparecimento" && (
+            <>
+              <Link className="primary-button" to={`/comparecer/${id}`}>
+                Confirmar presença <Icone nome="arrow" />
+              </Link>
+              <p>Identificado, e é o que permite votar depois.</p>
+            </>
+          )}
+          {f === "votacao" && (
+            <Link className="primary-button" to={`/votar/${id}`}>
+              Votar <Icone nome="arrow" />
+            </Link>
+          )}
+          {f === "agendada" && <p>A janela ainda não começou. Volte quando o ledger passar de {p.abre_em}.</p>}
+        </section>
+      )}
+      {f === "encerrada" && (
+        <section>
+          <h2>A URNA FECHOU</h2>
+          <Link className="secondary-button" to={`/apurar/${id}`}>Ver a apuração <Icone nome="arrow" /></Link>
+        </section>
+      )}
+
+      <section>
+        <h2>O QUE ESTÁ NO CONTRATO</h2>
+        <dl className="fatos">
+          <Fato rotulo="janela">
+            <span className="valor-mono">abre {p.abre_em} · fecha {p.fecha_em} · agora {ledger}</span>
+          </Fato>
+          <Fato rotulo="perguntas">
+            {p.perguntas.map((q, i) => (
+              <span key={i}>
+                {i + 1}. {q.opcoes} opções {q.confidencial ? "em sigilo" : "em aberto"};{" "}
+              </span>
+            ))}
+          </Fato>
+          <Fato rotulo="mesa">
+            {p.mesa.length === 0
+              ? "nenhuma — ninguém pode abrir um voto, e por isso ninguém pode apurar"
+              : `${p.limiar} de ${p.mesa.length} para apurar`}
+          </Fato>
+          <Fato rotulo="quem pode abrir a sua cédula">
+            {p.anel
+              ? "ninguém — a cédula em anel não reparte o fator com a mesa, então não existe parcela a reunir"
+              : p.mesa.length === 1
+                ? `uma pessoa: ${p.mesa[0]}`
+                : `${p.limiar} de ${p.mesa.length}, em conluio`}
+          </Fato>
+          {p.anel && (
+            <Fato rotulo="anel">
               {anel.length} {anel.length === 1 ? "pessoa compareceu" : "pessoas compareceram"}
               {anel.length === 1 && " — um anel de um não esconde ninguém"}
-            </dd>
-          </>
-        )}
-        <dt>cédulas na urna</dt>
-        <dd>{cedulas}</dd>
-      </dl>
-
-      <h2>o que dá para fazer agora</h2>
-      <ul>
-        {p.anel && f === "comparecimento" && (
-          <li>
-            <Link to={`/comparecer/${id}`}>comparecer</Link> — identificado, e é o que permite
-            votar depois
-          </li>
-        )}
-        {f === "votacao" && (
-          <li>
-            <Link to={`/votar/${id}`}>votar</Link>
-          </li>
-        )}
-        {f === "encerrada" && (
-          <li>
-            <Link to={`/apurar/${id}`}>apurar</Link>
-          </li>
-        )}
-      </ul>
+            </Fato>
+          )}
+          <Fato rotulo="cédulas na urna">{cedulas}</Fato>
+        </dl>
+      </section>
 
       <p>
         <a href={`${REDE.explorer}/contract/${REDE.contrato}`} target="_blank" rel="noopener">

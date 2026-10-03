@@ -1,27 +1,36 @@
-import { Link, Route, Routes } from "react-router-dom";
+import { Link, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import Votacoes from "./paginas/Votacoes";
 import Votacao from "./paginas/Votacao";
 import Abrir from "./paginas/Abrir";
 import Comparecer from "./paginas/Comparecer";
 import Votar from "./paginas/Votar";
 import Apurar from "./paginas/Apurar";
+import Bastidores from "./paginas/Bastidores";
 import { REDE } from "./rede";
 
-/* Sem desenho nenhum, de propósito: enquanto as rotas estão nascendo, o que
-   importa é o fluxo estar certo. A tela vem depois, e vem por cima. */
 export default function App() {
+  const { pathname } = useLocation();
+  // O fluxo de quem vota — presença e cédula — perde a navegação secundária.
+  // A trilha de etapas é a única navegação que faz sentido ali dentro.
+  const participante =
+    pathname.startsWith("/votar/") || pathname === "/demo/votar" || pathname.startsWith("/comparecer/");
   return (
-    <div>
-      <header>
-        <strong>Tessera</strong> · testnet ·{" "}
-        <a href={`${REDE.explorer}/contract/${REDE.contrato}`} target="_blank" rel="noopener">
-          {REDE.contrato.slice(0, 8)}…
+    <div className={participante ? "app participante" : "app"}>
+      <a className="skip-link" href="#conteudo">Ir para o conteúdo</a>
+      <header className="app-header">
+        <Link className="wordmark" to="/" aria-label="Tessera — início">
+          <span className="brand-mark" aria-hidden="true">{Array.from({ length: 9 }, (_, i) => <i key={i} />)}</span>
+          Tessera<span className="brand-period">.</span>
+        </Link>
+        {!participante && <nav aria-label="Navegação principal">
+          <NavLink to="/" end>Votações</NavLink>
+          <NavLink to="/abrir">Organizar</NavLink>
+        </nav>}
+        <a className="network-tag" href={`${REDE.explorer}/contract/${REDE.contrato}`} target="_blank" rel="noopener noreferrer">
+          <span className="status-dot" /> Stellar <span className="network-name">Testnet</span><span aria-hidden="true">↗</span>
         </a>
-        <nav>
-          <Link to="/">votações</Link> | <Link to="/abrir">abrir uma votação</Link>
-        </nav>
       </header>
-      <hr />
+      <div id="conteudo" className={participante ? "participant-content" : "standard-content"}>
       <Routes>
         <Route path="/" element={<Votacoes />} />
         <Route path="/votacao/:id" element={<Votacao />} />
@@ -31,8 +40,13 @@ export default function App() {
         {/* votante */}
         <Route path="/comparecer/:id" element={<Comparecer />} />
         <Route path="/votar/:id" element={<Votar />} />
-        <Route path="*" element={<p>rota inexistente</p>} />
+        <Route path="/demo/votar" element={<Votar demo />} />
+        {/* o outro lado, para a segunda janela do vídeo */}
+        <Route path="/bastidores" element={<Bastidores />} />
+        <Route path="*" element={<p className="pagina">rota inexistente</p>} />
       </Routes>
+      </div>
+      {!participante && <footer className="app-footer"><span>Tessera · A imagem só existe no conjunto.</span><span>Construído na Stellar <span aria-hidden="true">↗</span></span></footer>}
     </div>
   );
 }

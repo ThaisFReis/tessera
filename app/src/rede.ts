@@ -10,6 +10,7 @@ import {
   nativeToScVal,
 } from "@stellar/stellar-sdk";
 import type { Carteira } from "./carteira";
+import type { Anotar } from "./diario";
 
 export const REDE = {
   rpc: "https://soroban-testnet.stellar.org",
@@ -23,9 +24,58 @@ export const REDE = {
 const servidor = new rpc.Server(REDE.rpc);
 const contrato = new Contract(REDE.contrato);
 
-/** Cada passo que a página dá, para a coluna "o que está acontecendo". */
-export type Passo = { tipo: "cmd" | "val" | "ok" | "x" | "nota"; txt: string };
-export type Diario = (p: Passo) => void;
+/** Quem escreve no diário. A loja fica em `src/diario.ts`, porque o diário
+ *  precisa atravessar janelas e esta camada não sabe nada de janelas. */
+export type Diario = Anotar;
+
+/**
+ * Os erros do contrato, por número.
+ *
+ * Espelha `contrato/src/tipos.rs`. Sem isto, a recusa mais importante da demo
+ * inteira — a segunda cédula da mesma pessoa — aparece na tela como
+ * `Error(Contract, #30)`, que não diz nada a ninguém.
+ */
+const ERROS: Record<number, string> = {
+  1: "PropostaJaExiste", 2: "PropostaNaoExiste", 3: "OpcoesForaDaFaixa",
+  4: "LimiarInvalido", 5: "PrazoNoPassado", 6: "VotacaoEncerrada",
+  7: "VotacaoAindaAberta", 8: "JaVotou", 9: "NaoEstaNaListaDeAptos",
+  10: "PesoNaoUnitario", 11: "ProvaBinariaInvalida", 12: "ProvaDeSomaInvalida",
+  13: "PontoForaDoSubgrupo", 14: "AberturaNaoFecha", 15: "JaApurada",
+  16: "MesaAbaixoDoLimiar", 17: "NaoEMembroDaMesa", 18: "MembroRepetido",
+  19: "AnonimatoInsuficiente", 20: "ArgumentoMalFormado", 21: "EscolhaForaDoBinario",
+  22: "SomaDiferenteDoPeso", 23: "TotalDiferenteDoComparecimento", 24: "MembroJaEndossou",
+  25: "PerguntasForaDaFaixa", 26: "VotacaoAindaNaoComecou", 27: "ComparecimentoEncerrado",
+  28: "JaCompareceu", 29: "AnelInvalido", 30: "ImagemJaUsada", 31: "ModoErrado",
+};
+
+/** Arredondar para inteiro faz uma chamada barata ler "0% do teto", que soa
+ *  como ausência de medida em vez de medida pequena. */
+function porcento(cpu: number): string {
+  const p = (cpu / 400_000_000) * 100;
+  return p < 1 ? `${p.toFixed(2).replace(".", ",")}%` : `${Math.round(p)}%`;
+}
+
+/** Dá nome ao número, e deixa o resto intacto. */
+export function traduzir(bruto: string): string {
+  return bruto.replace(/Error\(Contract, #(\d+)\)/g, (todo, n) =>
+    ERROS[Number(n)] ? `${ERROS[Number(n)]} (#${n})` : todo,
+  );
+}
+
+/**
+ * O mesmo erro, do tamanho de uma linha.
+ *
+ * O `HostError` do SDK traz o log de diagnóstico inteiro grudado na mensagem —
+ * cada argumento da chamada em hexadecimal, o que para `votar_anonimo` passa de
+ * mil caracteres. Numa tela de erro isso esconde a frase que importa, e nos
+ * bastidores enterra a rodada inteira. O despejo continua inteiro no console.
+ */
+export function resumir(bruto: string): string {
+  const inteiro = traduzir(bruto);
+  const corte = inteiro.search(/\n\s*Event log/);
+  if (corte < 0) return inteiro;
+  return `${inteiro.slice(0, corte).trim()} · log de diagnóstico no console`;
+}
 
 // ---------- travessia de tipos ----------
 
@@ -218,8 +268,10 @@ async function enviar(
   metodo: string,
   args: xdr.ScVal[],
   diario?: Diario,
+  resumo?: string,
 ): Promise<string> {
   diario?.({ tipo: "cmd", txt: `${metodo}()` });
+  if (resumo) diario?.({ tipo: "val", txt: resumo });
   const conta = await servidor.getAccount(carteira.endereco());
   const bruta = new TransactionBuilder(conta, {
     fee: BASE_FEE,
@@ -231,11 +283,27 @@ async function enviar(
 
   const sim = await servidor.simulateTransaction(bruta);
   if (rpc.Api.isSimulationError(sim)) {
-    diario?.({ tipo: "x", txt: sim.error });
-    throw new Error(sim.error);
+    console.error(sim.error);
+    diario?.({ tipo: "x", txt: resumir(sim.error) });
+    throw new Error(resumir(sim.error));
   }
+
+  // O custo que a simulação descobriu. É o número que sustenta a tese inteira
+  // do projeto — 10.822.850 instruções por membro do anel, e um teto de 400 M
+  // por transação — e até aqui ele nunca tinha aparecido numa tela.
+  try {
+    const r = sim.transactionData.build().resources();
+    const cpu = r.instructions();
+    diario?.({
+      tipo: "val",
+      txt: `${cpu.toLocaleString("pt-BR")} instruções de CPU · ${porcento(cpu)} do teto de 400 M`,
+    });
+  } catch {
+    /* o SDK mudou de forma: o custo é informação, não pode derrubar o voto */
+  }
+
   const pronta = rpc.assembleTransaction(bruta, sim).build();
-  diario?.({ tipo: "val", txt: `taxa = ${pronta.fee} stroops` });
+  diario?.({ tipo: "val", txt: `taxa = ${Number(pronta.fee).toLocaleString("pt-BR")} stroops` });
 
   const assinada = TransactionBuilder.fromXDR(
     await carteira.assinar(pronta.toXDR()),
@@ -243,7 +311,7 @@ async function enviar(
   );
   const envio = await servidor.sendTransaction(assinada);
   if (envio.status === "ERROR") {
-    diario?.({ tipo: "x", txt: `a rede recusou: ${JSON.stringify(envio.errorResult)}` });
+    diario?.({ tipo: "x", txt: resumir(`a rede recusou: ${JSON.stringify(envio.errorResult)}`) });
     throw new Error("a rede recusou a transação");
   }
 
@@ -296,6 +364,8 @@ export const abrir = (
       xdr.ScVal.scvBool(anel),
     ],
     d,
+    `proposta ${id.slice(0, 8)}… · ${perguntas.length} pergunta${perguntas.length === 1 ? "" : "s"} · ` +
+      `mesa ${limiar} de ${mesa.length} · ${anel ? "caderno separado da urna" : "voto identificado"}`,
   );
 
 /** O caderno: identificado, e é o único ato em que o nome da pessoa aparece. */
@@ -312,6 +382,7 @@ export const comparecer = (
     "comparecer",
     [bytesN(id), endereco(c.endereco()), ponto(chaveAnel), vetor(caminho.map(bytesN)), u32(indice)],
     d,
+    `proposta ${id.slice(0, 8)}… · folha ${indice} · caminho com ${caminho.length} irmão${caminho.length === 1 ? "" : "s"}`,
   );
 
 /**
@@ -386,5 +457,6 @@ export function votarAnonimo(
       vetor(escolhas.map(u32)),
     ],
     d,
+    `proposta ${id.slice(0, 8)}… · anel com ${anel.length} · ${compromissos.length} compromisso${compromissos.length === 1 ? "" : "s"}`,
   );
 }

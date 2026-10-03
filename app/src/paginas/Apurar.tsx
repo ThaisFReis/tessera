@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { lerComparecimento, lerProposta, REDE, type PropostaRede } from "../rede";
-import { Erro } from "./comum";
+import { Carregando, Estado, Icone } from "../ui";
 
 /* ORGANIZADOR / QUALQUER PESSOA: a apuração.
    A mesa afirma os totais, o contrato confere contra o acumulado, e recusa se
@@ -30,41 +30,53 @@ export default function Apurar() {
     };
   }, [id]);
 
-  if (falha) return <Erro msg={falha} />;
-  if (!p) return <p>lendo a proposta…</p>;
+  if (falha) {
+    return <main className="pagina"><Estado titulo="Não foi possível ler a proposta." curto>
+      <p className="error-message" role="alert">{falha}</p>
+      <Link className="primary-button" to="/">Ver votações <Icone nome="arrow" /></Link>
+    </Estado></main>;
+  }
+  if (!p) return <main className="pagina"><Carregando titulo="Lendo a proposta." /></main>;
 
   return (
-    <main>
-      <h1>Apurar</h1>
-      <p>votação {id.slice(0, 16)}… · {cedulas} cédulas</p>
+    <main className="pagina">
+      <header>
+        <span className="eyebrow">APURAÇÃO · {cedulas} {cedulas === 1 ? "CÉDULA" : "CÉDULAS"}</span>
+        <h1>{id.slice(0, 16)}…</h1>
+      </header>
 
       {p.mesa.length === 0 ? (
-        <>
-          <h2>esta votação não apura, e isso é o desenho</h2>
-          <p>
-            Ela foi aberta sem mesa. Ninguém recebeu parcela de abertura, então ninguém reconstrói
-            a soma dos fatores que escondem os votos — e sem ela nenhum total pode ser publicado.
-          </p>
-          <p>
-            Não é uma promessa: é o contrato. Qualquer total afirmado sem a abertura correta cai em
-            <code> AberturaNaoFecha</code>. Nem quem abriu a votação consegue.
-          </p>
-          <p>O preço é este: o sigilo é absoluto, e o resultado é impossível.</p>
-        </>
+        <section>
+          <h2>ESTA VOTAÇÃO NÃO APURA, E ISSO É O DESENHO</h2>
+          <div className="painel">
+            <p>
+              Ela foi aberta sem mesa. Ninguém recebeu parcela de abertura, então ninguém
+              reconstrói a soma dos fatores que escondem os votos — e sem ela nenhum total pode ser
+              publicado.
+            </p>
+            <p>
+              Não é uma promessa: é o contrato. Qualquer total afirmado sem a abertura correta cai
+              em <code>AberturaNaoFecha</code>. Nem quem abriu a votação consegue.
+            </p>
+            <p><strong>O preço é este: o sigilo é absoluto, e o resultado é impossível.</strong></p>
+          </div>
+        </section>
       ) : (
-        <>
-          <h2>a mesa precisa se reunir</h2>
-          <p>
-            {p.limiar} de {p.mesa.length} membros reconstroem a abertura agregada, afirmam os
-            totais, e o contrato confere contra o acumulado no ledger. Se os números não fecharem,
-            ele recusa — não é denúncia depois, é recusa na hora.
-          </p>
-          <p>
-            As parcelas vivem no navegador de cada membro. Esta rota ainda não as junta; por
-            enquanto a apuração é pela CLI:
-          </p>
-          <pre>tessera apurar --proposta {id.slice(0, 16)}…</pre>
-        </>
+        <section>
+          <h2>A MESA PRECISA SE REUNIR</h2>
+          <div className="painel">
+            <p>
+              {p.limiar} de {p.mesa.length} membros reconstroem a abertura agregada, afirmam os
+              totais, e o contrato confere contra o acumulado no ledger. Se os números não
+              fecharem, ele recusa — <strong>não é denúncia depois, é recusa na hora</strong>.
+            </p>
+            <p>
+              As parcelas vivem no navegador de cada membro. Esta rota ainda não as junta; por
+              enquanto a apuração é pela CLI:
+            </p>
+            <pre className="bloco-codigo">tessera apurar --proposta {id.slice(0, 16)}…</pre>
+          </div>
+        </section>
       )}
 
       <p>

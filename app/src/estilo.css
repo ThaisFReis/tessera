@@ -1,23 +1,89 @@
 @import "tailwindcss";
+@import "./fontes.css";
+@import "./ui.css";
 
-/* O console nasceu com estas cores e elas são do projeto, não do Tailwind:
-   verde marca o que foi VERIFICADO, nunca o que foi escolhido. */
 @theme {
-  --color-fundo: #0d0f0c;
-  --color-profundo: #0a0b0a;
+  --color-fundo: #080a08;
+  --color-profundo: #080a08;
   --color-texto: #ecefe6;
-  --color-secundario: #9aa093;
+  --color-secundario: #999f93;
   --color-apagado: #6b7065;
   --color-acento: #c8f24f;
   --color-recusa: #ff6b4a;
-  --color-hairline: #23261f;
-  --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
+  --color-hairline: #282d25;
+  --font-mono: "Martian Mono", monospace;
 }
+/* O fundo profundo começou valendo só para a cédula. Vale para o dapp inteiro:
+   a urna não é um lugar à parte do resto da votação. */
+:root { --ink: #080a08; --deep: #080a08; --paper: #ecefe6; --lime: #c8f24f; --muted: #999f93; --line: #282d25; --serif: "Instrument Serif", Georgia, serif; --sans: "Space Grotesk", sans-serif; --mono: "Martian Mono", monospace; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body, #raiz { min-height: 100%; margin: 0; }
+body { background: var(--ink); color: var(--paper); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+button, input, textarea, select { font: inherit; }
+button, a, input, summary { -webkit-tap-highlight-color: transparent; }
+button, summary { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+a { text-decoration: none; }
+button, a, input, summary { outline-offset: 5px; }
+:focus-visible { outline: 2px solid var(--lime); }
+::selection { background: var(--lime); color: var(--ink); }
+.app { max-width: 1600px; min-height: 100vh; margin: auto; padding: 0 64px; display: flex; flex-direction: column; }
+.app-header { height: 98px; flex-shrink: 0; display: flex; align-items: center; border-bottom: 1px solid var(--line); gap: 60px; }
+.wordmark { display: flex; align-items: center; font: 38px/1 var(--serif); letter-spacing: -1.2px; }
+.brand-period { color: var(--lime); }
+.brand-mark { display: grid; grid-template-columns: repeat(3, 5px); gap: 3px; margin-right: 13px; transform: rotate(-6deg); color: var(--lime); }
+.brand-mark i { width: 5px; height: 5px; background: currentColor; }
+.brand-mark i:nth-child(3), .brand-mark i:nth-child(7) { opacity: .3; }
+.app-header nav { height: 100%; display: flex; align-items: stretch; gap: 34px; }
+.app-header nav a { display: flex; align-items: center; color: var(--muted); font-size: 13px; border-bottom: 2px solid transparent; padding-top: 2px; transition: color .2s; }
+.app-header nav a:hover { color: var(--paper); }
+.app-header nav a.active { border-color: var(--lime); color: var(--paper); }
+.network-tag { display: flex; align-items: center; gap: 9px; margin-left: auto; font-size: 12px; }
+.network-tag > :last-child { color: var(--muted); margin-left: 5px; }
+.network-name { font: 8px var(--mono); color: var(--muted); border: 1px solid var(--line); padding: 5px 6px; text-transform: uppercase; }
+.status-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--lime); flex-shrink: 0; }
+.app-footer { margin-top: auto; border-top: 1px solid var(--line); padding: 24px 0; display: flex; justify-content: space-between; gap: 20px; font-size: 11px; color: var(--muted); }
+.app-footer > :last-child { font: 8px/1.5 var(--mono); text-transform: uppercase; letter-spacing: .5px; }
+.app-footer > :last-child span { margin-left: 16px; }
+.skip-link { position: fixed; left: 20px; top: -100px; z-index: 20; background: var(--lime); color: var(--ink); padding: 12px; }
+.skip-link:focus { top: 15px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
-html, body, #raiz { height: 100%; }
-body {
-  background: var(--color-fundo);
-  color: var(--color-texto);
-  font-family: var(--font-mono);
-  -webkit-font-smoothing: antialiased;
+/* `.participante` não carrega mais cor nenhuma: só a composição de foco. */
+.participante .app-header { height: 88px; border-bottom: 0; }
+.participante .wordmark { font-size: 34px; }
+.participante .network-tag { color: var(--muted); font-size: 11px; }
+.participante .network-name { border: 0; padding: 0; font-size: 8px; }
+.participant-content { flex: 1; }
+
+/* As rotas de leitura e de formulário: coluna central, como a cédula. */
+.standard-content { flex: 1; padding: 44px 0 60px; line-height: 1.7; overflow-wrap: anywhere; }
+.pagina { width: 100%; max-width: 760px; margin: 0 auto; }
+.pagina-estreita { max-width: 600px; }
+.pagina > header { margin-bottom: 34px; }
+.pagina h1 { font: 52px/1.08 var(--serif); letter-spacing: -1px; margin: 12px 0 0; text-wrap: balance; }
+.pagina-sub { color: var(--muted); font-size: 13px; line-height: 1.75; margin: 14px 0 0; max-width: 52ch; }
+.pagina section { margin-top: 38px; }
+.pagina section > h2 { font: 11px/1.7 var(--mono); letter-spacing: 1.1px; color: var(--muted); font-weight: 400; margin: 0 0 16px; }
+.pagina p { margin: 12px 0; font-size: 13px; line-height: 1.8; color: var(--muted); }
+.pagina p strong { color: var(--paper); font-weight: 500; }
+.pagina a:not(.cartao):not(.primary-button):not(.secondary-button):not(.link-bastidores) { color: var(--lime); text-underline-offset: 4px; }
+.pagina a:not(.cartao):not(.primary-button):not(.secondary-button):not(.link-bastidores):hover { text-decoration: underline; }
+.pagina code { font: 11px var(--mono); color: var(--paper); }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.8 var(--mono); margin: 0; }
+
+@media (min-width: 1500px) { .app { padding: 0 90px; } }
+@media (max-width: 900px) { .app { padding: 0 28px; } .app-header { gap: 38px; height: 82px; } }
+@media (max-width: 760px) { .participante .app-header { height: 74px; } .pagina h1 { font-size: 44px; } }
+@media (max-width: 560px) {
+  .app { padding: 0 20px; } .app-header { height: 74px; gap: 24px; flex-wrap: wrap; }
+  .wordmark { font-size: 32px; } .app-header nav { gap: 20px; margin-left: auto; } .app-header nav a { font-size: 12px; }
+  .network-tag { display: none; }
+  .participante .network-tag { display: flex; font-size: 10px; }
+  .participante .network-tag > :last-child { display: none; }
+  .participante .wordmark { font-size: 30px; }
+  .app-footer { flex-direction: column; gap: 12px; font-size: 10px; }
+  .standard-content { padding: 30px 0 40px; }
+  .pagina h1 { font-size: clamp(34px, 9vw, 44px); }
 }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }

@@ -1,0 +1,66 @@
+/* A cédula é o centro da experiência; a identidade fica na tipografia.
+   Os primitivos que estavam aqui — botão, estado, aviso, ícone — foram para
+   `src/ui.css`, porque são do aplicativo inteiro e não da cédula. */
+.voting-page { width: 100%; max-width: 600px; margin: 0 auto; padding: 24px 0 60px; }
+.voting-breadcrumb a { color: var(--muted); font-size: 12px; }
+.voting-breadcrumb a:hover { color: var(--paper); }
+.voting-breadcrumb a span { margin-right: 9px; }
+.voting-steps { list-style: none; display: flex; align-items: center; margin: 39px 0 47px; padding: 0; gap: 18px; }
+.voting-steps li { display: flex; align-items: center; gap: 9px; font-size: 11px; color: #8a9183; flex: 1; }
+.voting-steps li:last-child { flex: 0; }
+.step-number { display: grid; place-items: center; width: 19px; height: 19px; flex-shrink: 0; font: 8px var(--mono); color: inherit; }
+.step-number .icone { width: 13px; height: 13px; }
+.voting-steps .complete .step-number { color: var(--lime); }
+.voting-steps .current { color: var(--paper); }
+.voting-steps .current .step-number { background: var(--lime); color: var(--ink); border-radius: 50%; }
+.step-connector { height: 1px; background: var(--line); flex: 1; margin-left: 9px; }
+.ballot-topline { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 20px; }
+.ballot-status { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
+.ballot-status .status-dot { width: 4px; height: 4px; background: var(--muted); }
+.ballot-body h2 { font: 46px/1.08 var(--serif); letter-spacing: -.7px; text-wrap: balance; }
+.ballot-description { color: var(--muted); font-size: 13px; line-height: 1.7; margin-top: 16px; }
+.ballot-options { margin: 29px 0 0; padding: 0; border: 0; min-width: 0; }
+.ballot-options legend { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+.ballot-option { display: flex; position: relative; align-items: center; gap: 15px; min-height: 64px; padding: 17px 20px; margin-bottom: 9px; border: 1px solid var(--line); border-radius: 4px; cursor: pointer; background: #0d100c; transition: border-color .18s, background .18s; }
+.ballot-option:last-child { margin-bottom: 0; }
+.ballot-option:hover { border-color: #5b6452; background: #11160e; }
+.ballot-option.selected { border-color: #b6c0a7; background: #171d12; }
+.ballot-option:focus-within { outline: 2px solid var(--lime); outline-offset: 3px; }
+.ballot-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.option-radio { display: grid; place-items: center; width: 16px; height: 16px; border: 1px solid #737b68; border-radius: 50%; flex-shrink: 0; }
+.selected .option-radio { border-color: var(--paper); }
+.selected .option-radio::after { content: ''; width: 6px; height: 6px; background: var(--paper); border-radius: 50%; }
+.option-copy strong { display: block; font-size: 14px; line-height: 22px; font-weight: 400; }
+.option-copy small { display: block; color: var(--muted); font-size: 11px; margin-top: 3px; }
+.ballot-options:disabled { opacity: .5; }
+.ballot-options:disabled .ballot-option { cursor: not-allowed; }
+.ballot-action { display: flex; align-items: center; gap: 18px; margin-top: 24px; }
+.demo-note { text-align: center; color: #8a9183; font-size: 10px; margin-top: 19px; }
+.review-body > .eyebrow { display: block; margin: 26px 0 17px; }
+.review-selection { position: relative; border: 1px solid #59644c; background: #11160e; border-radius: 4px; padding: 22px; margin: 26px 0 21px; }
+.review-selection strong { display: block; font-size: 23px; font-weight: 400; margin-top: 8px; }
+.review-selection > span:not(.eyebrow) { font-size: 12px; color: var(--muted); }
+.review-selection .icone { position: absolute; right: 22px; top: 26px; color: var(--muted); }
+.review-note { display: flex; gap: 10px; color: var(--muted); font-size: 12px; line-height: 1.8; }
+.review-note .icone { margin-top: 3px; }
+.review-body .ballot-action { justify-content: space-between; margin-top: 30px; }
+.review-body .primary-button { width: auto; }
+@media (max-width: 760px) {
+  .voting-page { max-width: 540px; padding-top: 16px; }
+  .voting-steps { margin: 30px 0 36px; gap: 12px; }
+  .ballot-body h2 { font-size: 40px; }
+}
+@media (max-width: 560px) {
+  .voting-page { padding-top: 12px; padding-bottom: 32px; }
+  .voting-steps { gap: 9px; margin-top: 28px; margin-bottom: 31px; }
+  .voting-steps li { gap: 6px; font-size: 10px; }
+  .step-connector { margin-left: 4px; }
+  .ballot-topline { margin-bottom: 17px; }
+  .ballot-body h2 { font-size: clamp(33px, 9vw, 40px); }
+  .ballot-options { margin-top: 25px; }
+  .ballot-option { min-height: 59px; padding: 15px 17px; }
+  .review-body .ballot-action { flex-direction: column-reverse; align-items: stretch; gap: 8px; }
+  .review-body .primary-button { width: 100%; }
+  .text-button { text-align: center; }
+}
+.bastidores-rodape { text-align: center; margin-top: 20px; }

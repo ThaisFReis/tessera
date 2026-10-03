@@ -1,25 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import type { Passo } from "../rede";
+import { anotar, type Anotar, type Origem } from "../diario";
 
-/** O diário: cada passo que a página dá, em ordem. */
-export function useDiario() {
-  const [passos, setPassos] = useState<Passo[]>([]);
-  const diario = useRef((p: Passo) => setPassos((v) => [...v, p])).current;
-  return { passos, diario, limpar: () => setPassos([]) };
-}
-
-export function Diario({ passos }: { passos: Passo[] }) {
-  if (!passos.length) return null;
-  return (
-    <section>
-      <h3>o que está acontecendo</h3>
-      <pre>
-        {passos
-          .map((p) => `${{ cmd: "$", val: " ", ok: "✓", x: "✗", nota: "//" }[p.tipo]} ${p.txt}`)
-          .join("\n")}
-      </pre>
-    </section>
-  );
+/**
+ * O diário de uma página.
+ *
+ * Ele não mora mais aqui dentro: escreve na loja compartilhada de
+ * `src/diario.ts`, que atravessa janelas. A página só diz de onde o passo veio
+ * — quem lê é `/bastidores`, numa segunda janela, que é o que o vídeo precisa.
+ */
+export function useDiario(origem: Origem, proposta?: string): Anotar {
+  const ref = useRef<Anotar>(() => {});
+  ref.current = (p) => anotar({ ...p, t: Date.now(), origem, proposta });
+  return useRef<Anotar>((p) => ref.current(p)).current;
 }
 
 /** Pede o ledger atual uma vez, e de novo a cada 15 s. */
@@ -44,8 +36,4 @@ export function useLedger(ler: () => Promise<number>) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return ledger;
-}
-
-export function Erro({ msg }: { msg: string }) {
-  return msg ? <p>✗ {msg}</p> : null;
 }
