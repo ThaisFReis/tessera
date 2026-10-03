@@ -62,6 +62,19 @@ enum Comando {
         /// de quem é cada cédula não é.
         #[arg(long)]
         anel: bool,
+
+        /// Em quantas seções dividir o eleitorado.
+        ///
+        /// Verificar um anel custa 10.822.850 instruções por membro: com 30
+        /// pessoas num anel só, cada cédula usa 91,4% do teto de CPU de uma
+        /// transação e só uma entra por ledger. Seccionar faz o custo por
+        /// cédula parar de depender do tamanho do eleitorado.
+        ///
+        /// O preço é o conjunto de anonimato, que passa a ser a seção. O
+        /// resultado continua único: o acumulador não sabe de que seção veio
+        /// cada cédula.
+        #[arg(long, default_value_t = 1)]
+        secoes: u32,
         #[arg(long, env = "TESSERA_CONTRATO")]
         contrato: String,
         #[arg(long, default_value = "testnet")]
@@ -115,8 +128,8 @@ enum Comando {
 fn main() {
     let cli = Cli::parse();
     let r = match &cli.comando {
-        Comando::Abrir { proposta, pergunta, opcoes, aptos, mesa, limiar, inicio, prazo, anel, contrato, rede, governanca } =>
-            comandos::abrir(proposta, pergunta, opcoes.as_deref(), aptos, mesa, *limiar, inicio, prazo, *anel, contrato, rede, governanca),
+        Comando::Abrir { proposta, pergunta, opcoes, aptos, mesa, limiar, inicio, prazo, anel, secoes, contrato, rede, governanca } =>
+            comandos::abrir(proposta, pergunta, opcoes.as_deref(), aptos, mesa, *limiar, inicio, prazo, *anel, *secoes, contrato, rede, governanca),
         Comando::Cedula { proposta, identidade } => comandos::mostrar_cedula(proposta, identidade),
         Comando::Votar { proposta, opcao, identidade } => comandos::votar(proposta, opcao, identidade),
         Comando::Queimar { identidade } => comandos::queimar(identidade),

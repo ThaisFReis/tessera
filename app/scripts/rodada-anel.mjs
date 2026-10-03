@@ -38,7 +38,7 @@ const HORIZON = "https://horizon-testnet.stellar.org";
 const FRIENDBOT = "https://friendbot.stellar.org";
 const PASSPHRASE = Networks.TESTNET;
 const CONTRATO = process.env.TESSERA_CONTRATO ??
-  "CBL7Z4AFMDPPJEP7YWFXLCUGRLO5VF7XAONPIW26CURO3ETCGSRV565X";
+  "CB6WIY45JYIR6EN6NC3WOAEOHYSKMXHKPDEXCHNY3O4C2O2RJ4RBQIJ6";
 
 const ELEITORADO = 10;
 const COMPARECEM = 7;
@@ -153,7 +153,8 @@ async function main() {
 
   const enderecos = membros.map((m) => xdrDe(m.publicKey()));
   const pesos = membros.map(() => 1);
-  const raiz = wasm.raiz_de_aptos(enderecos, pesos);
+  const id = bytesHex(Keypair.random().rawPublicKey().subarray(0, 32));
+  const raiz = wasm.raiz_de_aptos(id, enderecos, pesos, 1);
   diz(`raiz de aptos = ${raiz.slice(0, 16)}…${raiz.slice(-8)}`);
 
   titulo("abrir, com o caderno separado da urna");
@@ -161,7 +162,6 @@ async function main() {
   // O comparecimento precisa de folga: são 7 transações, ~6 s de ledger cada.
   const abreEm = agora + 90;
   const fechaEm = abreEm + 200;
-  const id = bytesHex(Keypair.random().rawPublicKey().subarray(0, 32));
   const mesa = [];
   for (let i = 0; i < 5; i++) mesa.push((await nascer()).publicKey());
 
@@ -176,6 +176,7 @@ async function main() {
     u32(abreEm),
     u32(fechaEm),
     xdr.ScVal.scvBool(true),
+    u32(1),
   ]);
   diz(`proposta ${id.slice(0, 12)}…`);
   diz(`comparecimento até o ledger ${abreEm} · votação até ${fechaEm}`);
@@ -191,10 +192,10 @@ async function main() {
   for (let i = 0; i < COMPARECEM; i++) {
     const k = wasm.nova_chave_de_anel();
     chaves.push(k);
-    const c = wasm.caminho_de(enderecos, pesos, i);
+    const c = wasm.caminho_de(id, enderecos, pesos, 1, i);
     const r = await enviar(membros[i], "comparecer", [
       bN(id), addr(membros[i].publicKey()), bN(k.publica),
-      vec(c.irmaos.map(bN)), u32(c.indice),
+      vec(c.irmaos.map(bN)), u32(c.indice), u32(c.secao),
     ]);
     diz(`${membros[i].publicKey().slice(0, 8)}…  compareceu · anel com ${i + 1}`);
     if (i === 0) diz(`   cpu ${r.cpu} · taxa ${r.taxa} stroops`);
@@ -211,7 +212,7 @@ async function main() {
     await dorme(20000);
   }
 
-  const anel = (await ler("anel", bN(id))).map(bytesHex);
+  const anel = (await ler("anel", bN(id), u32(0))).map(bytesHex);
   diz(`anel congelado com ${anel.length} chaves`);
 
   titulo("a urna · cada cédula de uma chave de uso único");
@@ -225,7 +226,7 @@ async function main() {
     const par = await nascer();
     efemeras.push(par.publicKey());
     const r = await enviar(par, "votar_anonimo", [
-      bN(id), vec(anel.map(bN)), bN(c.imagem), fr(c.c0), vec(c.z.map(fr)),
+      bN(id), u32(0), vec(anel.map(bN)), bN(c.imagem), fr(c.c0), vec(c.z.map(fr)),
       vec(c.cedula.compromissos.map(bN)),
       vec(c.cedula.provas.map(provaCds)),
       vec(c.cedula.provas_soma.map(provaSoma)),
@@ -253,7 +254,7 @@ async function main() {
   const par = await nascer();
   try {
     await enviar(par, "votar_anonimo", [
-      bN(id), vec(anel.map(bN)), bN(repetida.imagem), fr(repetida.c0), vec(repetida.z.map(fr)),
+      bN(id), u32(0), vec(anel.map(bN)), bN(repetida.imagem), fr(repetida.c0), vec(repetida.z.map(fr)),
       vec(repetida.cedula.compromissos.map(bN)),
       vec(repetida.cedula.provas.map(provaCds)),
       vec(repetida.cedula.provas_soma.map(provaSoma)),

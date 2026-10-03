@@ -12,7 +12,7 @@ type Etapa = "escolha" | "revisao" | "enviando" | "concluido";
 
 const propostaDemo: PropostaRede = {
   perguntas: [{ opcoes: 3, confidencial: true }], raiz_aptos: new Uint8Array(),
-  mesa: [], limiar: 0, abre_em: 0, fecha_em: Number.MAX_SAFE_INTEGER, anel: true,
+  mesa: [], limiar: 0, abre_em: 0, fecha_em: Number.MAX_SAFE_INTEGER, anel: true, secoes: 1,
 };
 const opcoesDemo = [
   { titulo: "Aprovar", descricao: "Sou a favor da proposta." },
@@ -61,7 +61,8 @@ function Urna({ id, demo }: { id: string; demo: boolean }) {
         if (!/^[a-fA-F0-9]{64}$/.test(id)) throw new Error("O endereço desta votação é inválido. Abra uma votação pela lista.");
         const [prop, l] = await Promise.all([lerProposta(id), ledgerAtual()]);
         if (!prop) throw new Error("Esta votação não foi encontrada.");
-        const membros = prop.anel ? await lerAnel(id) : [];
+        // O anel que importa é o da MINHA seção — não o da votação inteira.
+        const membros = prop.anel ? await lerAnel(id, guardada?.secao ?? 0) : [];
         if (vivo) { setP(prop); setAnel(membros); setLedger(l); }
       } catch (e) {
         if (vivo) setFalha(String((e as Error).message ?? e));
@@ -111,7 +112,7 @@ function Urna({ id, demo }: { id: string; demo: boolean }) {
         setProgresso(1);
         const efemera = await CarteiraEfemera.nascer();
         setProgresso(2);
-        const hash = await votarAnonimo(efemera, id, anel, c.imagem, c.c0, c.z, c.cedula.compromissos, c.cedula.provas, c.cedula.provas_soma, c.cedula.escolhas, diario);
+        const hash = await votarAnonimo(efemera, id, guardada.secao, anel, c.imagem, c.c0, c.z, c.cedula.compromissos, c.cedula.provas, c.cedula.provas_soma, c.cedula.escolhas, diario);
         if (!montada.current) return;
         setTx(hash);
       }

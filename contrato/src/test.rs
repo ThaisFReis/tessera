@@ -98,6 +98,7 @@ fn montar_janela(
         .map(|a| merkle::Apto {
             endereco: bytes_de(&a.clone().to_xdr(&env)),
             peso: 1,
+            secao: 0,
         })
         .collect();
     let arvore = merkle::Arvore::montar(&folhas).unwrap();
@@ -124,6 +125,7 @@ fn montar_janela(
         &abre_em,
         &fecha_em,
         &false,
+    &1u32,
     );
 
     let h = ponto::de_hex(&{
@@ -773,6 +775,7 @@ fn a_janela_precisa_ter_duracao() {
             &Address::generate(&c.env), &outra, &perg,
             &BytesN::from_array(&c.env, &c.arvore.raiz()), &mesa_sdk,
             &3u32, &300u32, &300u32, &false,
+        &1u32,
         ),
         Err(Ok(Erro::PrazoNoPassado))
     );
@@ -844,28 +847,28 @@ fn abrir_recusa_configuracao_invalida() {
     let ok = cedula(&[(2, true)]);
 
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&[(1, true)]), &raiz, &mesa, &2u32, &0u32, &1000u32, &false),
+        cliente.try_abrir(&gov, &id, &cedula(&[(1, true)]), &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32),
         Err(Ok(Erro::OpcoesForaDaFaixa))
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&[(17, true)]), &raiz, &mesa, &2u32, &0u32, &1000u32, &false),
+        cliente.try_abrir(&gov, &id, &cedula(&[(17, true)]), &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32),
         Err(Ok(Erro::OpcoesForaDaFaixa))
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&[]), &raiz, &mesa, &2u32, &0u32, &1000u32, &false),
+        cliente.try_abrir(&gov, &id, &cedula(&[]), &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
     // Nove perguntas passam de MAX_PERGUNTAS.
     let nove: Vetor<(u32, bool)> = (0..9).map(|_| (2u32, false)).collect();
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&nove), &raiz, &mesa, &2u32, &0u32, &1000u32, &false),
+        cliente.try_abrir(&gov, &id, &cedula(&nove), &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
     // Cada pergunta cabe, mas o total confidencial passa de MAX_OPCOES — e é
     // o total que o orçamento de CPU limita.
     let gordas: Vetor<(u32, bool)> = (0..3).map(|_| (16u32, true)).collect();
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&gordas), &raiz, &mesa, &2u32, &0u32, &1000u32, &false),
+        cliente.try_abrir(&gov, &id, &cedula(&gordas), &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
     // As mesmas 48 opções, mas públicas, não custam disjuntiva nenhuma.
@@ -880,20 +883,21 @@ fn abrir_recusa_configuracao_invalida() {
             &2u32,
             &0u32,
             &1000u32,
-            &false
+            &false,
+            &1u32
         )
         .is_ok());
 
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &4u32, &0u32, &1000u32, &false),
+        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &4u32, &0u32, &1000u32, &false, &1u32),
         Err(Ok(Erro::LimiarInvalido))
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &0u32, &0u32, &1000u32, &false),
+        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &0u32, &0u32, &1000u32, &false, &1u32),
         Err(Ok(Erro::LimiarInvalido))
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &5u32, &false),
+        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &5u32, &false, &1u32),
         Err(Ok(Erro::PrazoNoPassado))
     );
 
@@ -902,13 +906,13 @@ fn abrir_recusa_configuracao_invalida() {
     repetida.push_back(m.clone());
     repetida.push_back(m);
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &repetida, &2u32, &0u32, &1000u32, &false),
+        cliente.try_abrir(&gov, &id, &ok, &raiz, &repetida, &2u32, &0u32, &1000u32, &false, &1u32),
         Err(Ok(Erro::MembroRepetido))
     );
 
-    cliente.abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32, &false);
+    cliente.abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32);
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32, &false),
+        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32),
         Err(Ok(Erro::PropostaJaExiste))
     );
 }
@@ -1421,7 +1425,7 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
     let aptos: Vetor<Address> = (0..10).map(|_| Address::generate(&env)).collect();
     let folhas: Vetor<merkle::Apto> = aptos
         .iter()
-        .map(|a| merkle::Apto { endereco: bytes_de(&a.clone().to_xdr(&env)), peso: 1 })
+        .map(|a| merkle::Apto { endereco: bytes_de(&a.clone().to_xdr(&env)), peso: 1, secao: 0 })
         .collect();
     let arvore = merkle::Arvore::montar(&folhas).unwrap();
 
@@ -1437,6 +1441,7 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
         &Address::generate(&env), &proposta, &perg,
         &BytesN::from_array(&env, &arvore.raiz()), &mesa_sdk,
         &3u32, &4_989_990u32, &4_990_190u32, &true,
+    &1u32,
     );
 
     let g = pedersen::gerador();
@@ -1457,7 +1462,7 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
             }
             (c, p.indice)
         };
-        let tamanho = cliente.comparecer(&proposta, &aptos[i], &g1(&env, &pk), &caminho, &indice);
+        let tamanho = cliente.comparecer(&proposta, &aptos[i], &g1(&env, &pk), &caminho, &indice, &0u32);
         assert_eq!(tamanho, i as u32 + 1, "o anel nao cresceu com o comparecimento");
         anel_ark.push(pk);
     }
@@ -1493,7 +1498,7 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
     };
     let atrasado = anel::chave_publica(&g, &pedersen::acaso_fr().unwrap());
     assert_eq!(
-        cliente.try_comparecer(&proposta, &aptos[8], &g1(&env, &atrasado), &caminho, &indice),
+        cliente.try_comparecer(&proposta, &aptos[8], &g1(&env, &atrasado), &caminho, &indice, &0u32),
         Err(Ok(Erro::ComparecimentoEncerrado))
     );
 
@@ -1550,14 +1555,14 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
 
     for i in 0..COMPARECERAM {
         let (a, img, c0, z, cs, pr, psm, esc) = cedula(i, (i % 2) as u32);
-        cliente.votar_anonimo(&proposta, &a, &img, &c0, &z, &cs, &pr, &psm, &esc);
+        cliente.votar_anonimo(&proposta, &0u32, &a, &img, &c0, &z, &cs, &pr, &psm, &esc);
     }
 
     // A mesma pessoa de novo: a imagem colide, e o contrato recusa **sem saber
     // de quem é**.
     let (a, img, c0, z, cs, pr, psm, esc) = cedula(3, 1);
     assert_eq!(
-        cliente.try_votar_anonimo(&proposta, &a, &img, &c0, &z, &cs, &pr, &psm, &esc),
+        cliente.try_votar_anonimo(&proposta, &0u32, &a, &img, &c0, &z, &cs, &pr, &psm, &esc),
         Err(Ok(Erro::ImagemJaUsada))
     );
 
@@ -1612,7 +1617,7 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
     let aptos: Vetor<Address> = (0..3).map(|_| Address::generate(&env)).collect();
     let folhas: Vetor<merkle::Apto> = aptos
         .iter()
-        .map(|a| merkle::Apto { endereco: bytes_de(&a.clone().to_xdr(&env)), peso: 1 })
+        .map(|a| merkle::Apto { endereco: bytes_de(&a.clone().to_xdr(&env)), peso: 1, secao: 0 })
         .collect();
     let arvore = merkle::Arvore::montar(&folhas).unwrap();
     let mut mesa_sdk = Vec::new(&env);
@@ -1631,6 +1636,7 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
         &Address::generate(&env), &proposta, &perg,
         &BytesN::from_array(&env, &arvore.raiz()), &mesa_sdk,
         &3u32, &4_989_990u32, &4_990_190u32, &true,
+    &1u32,
     );
 
     let g = pedersen::gerador();
@@ -1646,7 +1652,7 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
         for s in &c.irmaos {
             irmaos.push_back(BytesN::from_array(&env, s));
         }
-        cliente.comparecer(&proposta, &aptos[i], &g1(&env, pk), &irmaos, &c.indice);
+        cliente.comparecer(&proposta, &aptos[i], &g1(&env, pk), &irmaos, &c.indice, &0u32);
     }
     env.ledger().set_sequence_number(4_990_000);
 
@@ -1728,7 +1734,7 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
     }
 
     cliente.votar_anonimo(
-        &proposta, &anel_sdk, &g1(&env, &s.imagem), &escalar(&env, &s.c0), &z_sdk,
+        &proposta, &0u32, &anel_sdk, &g1(&env, &s.imagem), &escalar(&env, &s.c0), &z_sdk,
         &compr_sdk, &provas_sdk, &soma_sdk, &esc_sdk,
     );
 
@@ -1782,7 +1788,7 @@ fn ate_quantas_pessoas_cabe_um_anel() {
         let aptos: Vetor<Address> = (0..n).map(|_| Address::generate(&env)).collect();
         let folhas: Vetor<merkle::Apto> = aptos
             .iter()
-            .map(|a| merkle::Apto { endereco: bytes_de(&a.clone().to_xdr(&env)), peso: 1 })
+            .map(|a| merkle::Apto { endereco: bytes_de(&a.clone().to_xdr(&env)), peso: 1, secao: 0 })
             .collect();
         let arvore = merkle::Arvore::montar(&folhas).unwrap();
 
@@ -1796,6 +1802,7 @@ fn ate_quantas_pessoas_cabe_um_anel() {
             &Address::generate(&env), &proposta, &perg,
             &BytesN::from_array(&env, &arvore.raiz()), &mesa_sdk,
             &1u32, &4_989_990u32, &4_990_190u32, &true,
+        &1u32,
         );
 
         let g = pedersen::gerador();
@@ -1811,7 +1818,7 @@ fn ate_quantas_pessoas_cabe_um_anel() {
             for irmao in &p.irmaos {
                 c.push_back(BytesN::from_array(&env, irmao));
             }
-            cliente.comparecer(&proposta, &aptos[i], &g1(&env, &pk), &c, &p.indice);
+            cliente.comparecer(&proposta, &aptos[i], &g1(&env, &pk), &c, &p.indice, &0u32);
             anel_ark.push(pk);
         }
         let mut anel_sdk: Vec<Bls12381G1Affine> = Vec::new(&env);
@@ -1869,7 +1876,7 @@ fn ate_quantas_pessoas_cabe_um_anel() {
 
         let custo = cpu(&env, || {
             cliente.votar_anonimo(
-                &proposta, &anel_sdk, &imagem, &c0, &z,
+                &proposta, &0u32, &anel_sdk, &imagem, &c0, &z,
                 &compromissos, &provas, &provas_soma, &escolhas,
             );
         });
@@ -1894,4 +1901,206 @@ fn ate_quantas_pessoas_cabe_um_anel() {
         }
         anterior = custo;
     }
+}
+
+/// **Trinta votantes, três seções, e o custo de uma cédula de dez.**
+///
+/// É a razão de as seções existirem. Verificar um anel custa 10.822.850
+/// instruções por membro, então trinta pessoas num anel só fazem cada cédula
+/// usar 91,4% do teto de CPU de uma transação — e só uma entra por ledger.
+/// Medido na testnet: 18 de 30 cédulas em 646 s, o resto expirou.
+///
+/// Com três seções de dez, cada cédula custa o de um anel de dez e a conta para
+/// de depender do tamanho do eleitorado. O que se paga é o conjunto de
+/// anonimato, que passa a ser a seção.
+///
+/// O que este teste prende, além do custo:
+///
+///   1. a divisão sai da lista, não de quem organiza;
+///   2. comparecer na seção errada não fecha o caminho de Merkle;
+///   3. uma cédula assinada com o anel de uma seção é recusada em outra;
+///   4. **o resultado continua único** — o acumulador é por proposta e não
+///      sabe de que seção veio cada cédula.
+#[test]
+fn trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez() {
+    use tessera_core::anel;
+
+    const N: usize = 30;
+    const SECOES: u32 = 3;
+
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(4_989_900);
+    let id = env.register(Tessera, ());
+    let cliente = TesseraClient::new(&env, &id);
+
+    let proposta: BytesN<32> = BytesN::from_array(&env, &[11u8; 32]);
+    let aptos: Vetor<Address> = (0..N).map(|_| Address::generate(&env)).collect();
+    let xdrs: Vetor<Vetor<u8>> = aptos.iter().map(|a| bytes_de(&a.clone().to_xdr(&env))).collect();
+
+    // A divisão vem da lista. Quem organiza não escolhe quem cai com quem.
+    let divisao = merkle::dividir(&proposta.to_array(), &xdrs, SECOES);
+    let folhas: Vetor<merkle::Apto> = xdrs
+        .iter()
+        .zip(&divisao)
+        .map(|(e, s)| merkle::Apto { endereco: e.clone(), peso: 1, secao: *s })
+        .collect();
+    let arvore = merkle::Arvore::montar(&folhas).unwrap();
+
+    let mut mesa_sdk = Vec::new(&env);
+    mesa_sdk.push_back(Address::generate(&env));
+    let mut perg = Vec::new(&env);
+    perg.push_back(Pergunta { opcoes: 2, confidencial: true });
+
+    cliente.abrir(
+        &Address::generate(&env), &proposta, &perg,
+        &BytesN::from_array(&env, &arvore.raiz()), &mesa_sdk,
+        &1u32, &4_989_990u32, &4_990_190u32, &true, &SECOES,
+    );
+
+    let g = pedersen::gerador();
+    let h = ponto::desserializar(&cliente.gerador_h().to_array()).unwrap();
+    let hp = ponto::desserializar(&cripto::calcular_hp(&env, &proposta).to_array()).unwrap();
+
+    let caminho_de = |i: usize| {
+        let p = arvore.caminho(i).unwrap();
+        let mut c = Vec::new(&env);
+        for irmao in &p.irmaos {
+            c.push_back(BytesN::from_array(&env, irmao));
+        }
+        (c, p.indice)
+    };
+
+    // ---- a seção está presa na folha ----
+    let (c0_, i0_) = caminho_de(0);
+    let outra = (divisao[0] + 1) % SECOES;
+    assert_eq!(
+        cliente.try_comparecer(
+            &proposta, &aptos[0],
+            &g1(&env, &anel::chave_publica(&g, &pedersen::acaso_fr().unwrap())),
+            &c0_, &i0_, &outra,
+        ),
+        Err(Ok(Erro::NaoEstaNaListaDeAptos)),
+        "deu para escolher a seção: quem vota pegaria a menor"
+    );
+
+    // ---- o caderno, seção por seção ----
+    let xs: Vetor<ArkFr> = (0..N).map(|_| pedersen::acaso_fr().unwrap()).collect();
+    let mut aneis: Vetor<Vetor<ArkG1>> = (0..SECOES).map(|_| Vetor::new()).collect();
+    for i in 0..N {
+        let pk = anel::chave_publica(&g, &xs[i]);
+        let (c, idx) = caminho_de(i);
+        cliente.comparecer(&proposta, &aptos[i], &g1(&env, &pk), &c, &idx, &divisao[i]);
+        aneis[divisao[i] as usize].push(pk);
+    }
+    for s in 0..SECOES {
+        assert_eq!(
+            aneis[s as usize].len(),
+            N / SECOES as usize,
+            "o rodízio devia deixar as seções do mesmo tamanho"
+        );
+        assert_eq!(cliente.anel(&proposta, &s).len() as usize, aneis[s as usize].len());
+    }
+
+    let aneis_sdk: Vetor<Vec<Bls12381G1Affine>> = aneis
+        .iter()
+        .map(|a| {
+            let mut v = Vec::new(&env);
+            for p in a {
+                v.push_back(g1(&env, p));
+            }
+            v
+        })
+        .collect();
+
+    env.ledger().set_sequence_number(4_990_000);
+
+    // ---- a urna ----
+    let cedula = |i: usize, escolha: u32| {
+        let secao = divisao[i] as usize;
+        let img = anel::imagem(&hp, &xs[i]);
+        let ident: Vetor<u8> = ponto::serializar(&img).to_vec();
+        let rs: Vetor<ArkFr> = (0..2).map(|_| pedersen::acaso_fr().unwrap()).collect();
+        let cs: Vetor<ArkG1> = (0..2)
+            .map(|j| {
+                let v = if j == escolha { 1u64 } else { 0 };
+                pedersen::comprometer(&g, &h, &pedersen::escalar(v), &rs[j as usize])
+            })
+            .collect();
+        let ctx_de = |opcao: u32| {
+            let mut v: Vetor<u8> = proposta.to_array().to_vec();
+            v.extend(ident.iter().copied());
+            v.extend(0u32.to_be_bytes());
+            v.extend(opcao.to_be_bytes());
+            v
+        };
+        let mut compromissos = Vec::new(&env);
+        let mut provas = Vec::new(&env);
+        for j in 0..2u32 {
+            let v = if j == escolha { 1u64 } else { 0 };
+            let p = cds::provar(&ctx_de(j), &g, &h, &cs[j as usize], v, &rs[j as usize]).unwrap();
+            compromissos.push_back(g1(&env, &cs[j as usize]));
+            provas.push_back(ProvaCds {
+                a0: g1(&env, &p.a0), a1: g1(&env, &p.a1),
+                e0: escalar(&env, &p.e0), z0: escalar(&env, &p.z0),
+                e1: escalar(&env, &p.e1), z1: escalar(&env, &p.z1),
+            });
+        }
+        let rho = rs.iter().fold(ArkFr::from(0u64), |a, r| a + r);
+        let d = soma::alvo(&g, &cs, 1);
+        let ps = soma::provar(&ctx_de(u32::MAX), &h, &d, &rho).unwrap();
+        let mut provas_soma = Vec::new(&env);
+        provas_soma.push_back(ProvaSoma { a: g1(&env, &ps.a), z: escalar(&env, &ps.z) });
+        let escolhas: Vec<u32> = Vec::new(&env);
+
+        let msg = cripto::mensagem_cedula(&env, &proposta, &compromissos, &escolhas);
+        let dentro = aneis[secao].iter().position(|p| *p == anel::chave_publica(&g, &xs[i])).unwrap();
+        let s = anel::assinar(&bytes_de(&msg), &g, &hp, &aneis[secao], dentro, &xs[i]).unwrap();
+        let mut z = Vec::new(&env);
+        for zi in &s.z {
+            z.push_back(escalar(&env, zi));
+        }
+        (divisao[i], aneis_sdk[secao].clone(), g1(&env, &s.imagem), escalar(&env, &s.c0), z,
+         compromissos, provas, provas_soma, escolhas)
+    };
+
+    let mut custo_cedula = 0u64;
+    for i in 0..N {
+        let (sec, a, img, c0, z, cs, pr, psm, esc) = cedula(i, (i % 2) as u32);
+        let c = cpu(&env, || {
+            cliente.votar_anonimo(&proposta, &sec, &a, &img, &c0, &z, &cs, &pr, &psm, &esc);
+        });
+        if i == 0 {
+            custo_cedula = c;
+        }
+    }
+
+    std::println!("\n== TRINTA EM TRES SECOES ==");
+    std::println!("  cedula de anel {}: {} instrucoes, {:.1}% do teto",
+        N / SECOES as usize, custo_cedula, 100.0 * custo_cedula as f64 / TETO as f64);
+
+    // O ganho inteiro: trinta votantes, mas o preço de um anel de dez.
+    assert!(
+        custo_cedula < TETO / 2,
+        "a cédula de uma seção de 10 devia caber folgado: {} de {}",
+        custo_cedula, TETO
+    );
+
+    // ---- o anel de uma seção não serve em outra ----
+    let (sec, _a, img, c0, z, cs, pr, psm, esc) = cedula(0, 1);
+    let vizinha = (sec + 1) % SECOES;
+    assert_eq!(
+        cliente.try_votar_anonimo(
+            &proposta, &vizinha, &aneis_sdk[sec as usize], &img, &c0, &z, &cs, &pr, &psm, &esc,
+        ),
+        Err(Ok(Erro::AnelInvalido)),
+        "uma cédula migrou de seção, e o anel de uma seção não prova nada na outra"
+    );
+
+    // ---- e o resultado é um só ----
+    let (conf, _publ) = cliente.comparecimento(&proposta);
+    assert_eq!(
+        conf, N as u32,
+        "o acumulador é por proposta: as três seções somam num resultado só"
+    );
 }

@@ -72,6 +72,12 @@ pub struct Verificacao {
     pub agregado: bool,
 }
 
+
+/// Propostas gravadas antes das seções existirem tinham um anel só.
+fn uma_secao() -> u32 {
+    1
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Estado {
     pub proposta: String,
@@ -102,6 +108,11 @@ pub struct Estado {
     /// vez de num arquivo ao lado do estado.
     #[serde(default)]
     pub anel: bool,
+    /// Em quantas seções o eleitorado foi dividido. `1` quando não há seções.
+    /// Precisa ficar gravado: sem ele, `verificar` recalcula a raiz com outra
+    /// divisão e acusa divergência onde não há.
+    #[serde(default = "uma_secao")]
+    pub secoes: u32,
     pub prazo_ledger: u64,
     pub abertura_tx: String,
     pub votos: Vec<Voto>,

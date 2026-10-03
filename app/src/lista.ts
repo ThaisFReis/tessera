@@ -25,7 +25,12 @@ export function lerLista(proposta: string): string[] | null {
 /** A chave de anel de quem compareceu. Perder é perder o voto. */
 const chaveAnel = (proposta: string) => `tessera:anel:${proposta}`;
 
-export type ChaveDeAnel = { secreta: string; publica: string };
+export type ChaveDeAnel = {
+  secreta: string;
+  publica: string;
+  /** A seção que a lista deu a esta pessoa. O anel de votar é o dela. */
+  secao: number;
+};
 
 /**
  * A pública vai junto porque é ela que acha o índice do ramo dentro do anel na

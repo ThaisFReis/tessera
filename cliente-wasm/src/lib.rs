@@ -118,46 +118,87 @@ pub struct ChaveDeAnel {
 pub struct CaminhoJs {
     pub irmaos: Vec<String>,
     pub indice: u32,
+    /// A seção que a lista deu a esta pessoa. Vai junto para o `comparecer`.
+    pub secao: u32,
 }
 
 // ---------- a árvore de aptos ----------
 
+/// A seção de cada apto, na ordem da lista.
+///
+/// Derivada, não escolhida: quem organiza não decide quem se esconde atrás de
+/// quem. Qualquer pessoa com a lista recalcula isto e confere a raiz.
 #[wasm_bindgen]
-pub fn raiz_de_aptos(enderecos_xdr: Vec<String>, pesos: Vec<u32>) -> Result<String, JsValue> {
-    Ok(hex(&arvore(&enderecos_xdr, &pesos)?.raiz()))
+pub fn secoes_de(
+    proposta_hex: String,
+    enderecos_xdr: Vec<String>,
+    secoes: u32,
+) -> Result<Vec<u32>, JsValue> {
+    let es = enderecos(&enderecos_xdr)?;
+    Ok(merkle::dividir(&de_hex(&proposta_hex)?, &es, secoes))
+}
+
+#[wasm_bindgen]
+pub fn raiz_de_aptos(
+    proposta_hex: String,
+    enderecos_xdr: Vec<String>,
+    pesos: Vec<u32>,
+    secoes: u32,
+) -> Result<String, JsValue> {
+    Ok(hex(&arvore(&proposta_hex, &enderecos_xdr, &pesos, secoes)?.raiz()))
 }
 
 #[wasm_bindgen]
 pub fn caminho_de(
+    proposta_hex: String,
     enderecos_xdr: Vec<String>,
     pesos: Vec<u32>,
+    secoes: u32,
     indice: usize,
 ) -> Result<JsValue, JsValue> {
-    let a = arvore(&enderecos_xdr, &pesos)?;
+    let a = arvore(&proposta_hex, &enderecos_xdr, &pesos, secoes)?;
     let c = a
         .caminho(indice)
         .map_err(|e| JsValue::from_str(&format!("caminho: {:?}", e)))?;
+    let es = enderecos(&enderecos_xdr)?;
+    let d = merkle::dividir(&de_hex(&proposta_hex)?, &es, secoes);
     let js = CaminhoJs {
         irmaos: c.irmaos.iter().map(|s| hex(s)).collect(),
         indice: c.indice,
+        secao: d[indice],
     };
     serde_wasm_bindgen::to_value(&js).map_err(Into::into)
 }
 
-fn arvore(enderecos_xdr: &[String], pesos: &[u32]) -> Result<merkle::Arvore, JsValue> {
+fn enderecos(xdr: &[String]) -> Result<Vec<Vec<u8>>, JsValue> {
+    xdr.iter().map(|e| de_hex(e)).collect()
+}
+
+/// A raiz e o caminho saem **da mesma função**, de propósito: a divisão é
+/// calculada aqui dentro, uma vez, a partir dos mesmos dados. Se o chamador
+/// pudesse passar as seções por fora, uma raiz montada com uma divisão e um
+/// caminho montado com outra dariam `NaoEstaNaListaDeAptos` sem dizer por quê.
+fn arvore(
+    proposta_hex: &str,
+    enderecos_xdr: &[String],
+    pesos: &[u32],
+    secoes: u32,
+) -> Result<merkle::Arvore, JsValue> {
     if enderecos_xdr.len() != pesos.len() {
         return Err(JsValue::from_str("endereços e pesos de tamanhos diferentes"));
     }
-    let folhas: Vec<merkle::Apto> = enderecos_xdr
-        .iter()
+    let es = enderecos(enderecos_xdr)?;
+    let d = merkle::dividir(&de_hex(proposta_hex)?, &es, secoes);
+    let folhas: Vec<merkle::Apto> = es
+        .into_iter()
         .zip(pesos)
-        .map(|(e, p)| {
-            Ok(merkle::Apto {
-                endereco: de_hex(e)?,
-                peso: *p,
-            })
+        .zip(&d)
+        .map(|((endereco, p), secao)| merkle::Apto {
+            endereco,
+            peso: *p,
+            secao: *secao,
         })
-        .collect::<Result<_, JsValue>>()?;
+        .collect();
     merkle::Arvore::montar(&folhas).map_err(|e| JsValue::from_str(&format!("árvore: {:?}", e)))
 }
 

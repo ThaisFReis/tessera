@@ -1,10 +1,15 @@
 //! Árvore de Merkle da lista de aptos, e o caminho que quem vota apresenta.
 //!
-//! A folha é `H(0x00 ‖ endereço ‖ peso_be)`, onde `endereço` são os bytes XDR
+//! A folha é `H(0x00 ‖ endereço ‖ peso_be ‖ secao_be)`, onde `endereço` são os bytes XDR
 //! do `Address` — exatamente o que o contrato tem em mãos quando recebe a
 //! chamada, e o que identifica sem ambiguidade uma conta ou um contrato. O
-//! peso ocupa os últimos 4 bytes, então o comprimento variável do endereço não
-//! cria ambiguidade.
+//! peso e a seção ocupam os últimos 8 bytes, então o comprimento variável do
+//! endereço não cria ambiguidade.
+//!
+//! **A seção está na folha de propósito.** Ela dimensiona o anel de quem vota
+//! em sigilo, e se fosse só um argumento da chamada o votante escolheria a sua
+//! — pegaria a menor, ou aquela em que consegue adivinhar melhor os outros.
+//! Presa na folha, a prova de aptidão só fecha na seção certa.
 //!
 //! A governança integradora monta a árvore na
 //! data de corte e passa só a **raiz** para `abrir()`. Quem vota apresenta o
@@ -35,6 +40,7 @@ pub type Hash = [u8; 32];
 const DOM_FOLHA: u8 = 0x00;
 const DOM_NO: u8 = 0x01;
 const DOM_VAZIO: u8 = 0x02;
+const DOM_SECAO: u8 = 0x03;
 
 #[derive(Debug, PartialEq)]
 pub enum Erro {
@@ -51,15 +57,60 @@ pub struct Apto {
     /// Peso, ou identificador de faixa. Conferido contra a folha, nunca
     /// aceito do que quem vota afirma.
     pub peso: u32,
+    /// Em que seção esta pessoa vota. `0` quando a votação não tem seções.
+    /// Como o peso: conferido contra a folha, nunca aceito da chamada.
+    pub secao: u32,
 }
 
-/// `H(0x00 ‖ endereço ‖ peso_be)`.
+/// `H(0x00 ‖ endereço ‖ peso_be ‖ secao_be)`.
 pub fn folha(a: &Apto) -> Hash {
     let mut h = Sha256::new();
     h.update([DOM_FOLHA]);
     h.update(&a.endereco);
     h.update(a.peso.to_be_bytes());
+    h.update(a.secao.to_be_bytes());
     h.finalize().into()
+}
+
+/// A divisão em seções, **derivável da lista por qualquer um**.
+///
+/// Um anel só esconde dentro do conjunto que publica, e o custo de verificá-lo
+/// cresce com o tamanho: por isso as seções existem. Mas quem as monta decide
+/// quem se esconde atrás de quem, e um organizador de má-fé poria o dissidente
+/// numa seção sozinho — anel de um, voto ligado à pessoa, sem precisar de
+/// conluio nenhum.
+///
+/// Então ele não escolhe. A ordem vem de `H(0x03 ‖ proposta ‖ endereço)` e as
+/// seções são distribuídas em rodízio sobre essa ordem, o que as deixa do mesmo
+/// tamanho a menos de um. Qualquer pessoa com a lista recalcula e confere.
+///
+/// O que ele ainda pode fazer é moer o `id` da proposta procurando um sorteio
+/// que lhe agrade. Com seções de tamanho igual isso não produz uma seção de um,
+/// que é o ataque que importa — mas é um limite, e está declarado.
+pub fn dividir(proposta: &[u8], enderecos: &[Vec<u8>], secoes: u32) -> Vec<u32> {
+    let n = enderecos.len();
+    if secoes <= 1 || n == 0 {
+        return vec![0; n];
+    }
+    let mut ordem: Vec<(Hash, usize)> = enderecos
+        .iter()
+        .enumerate()
+        .map(|(i, e)| {
+            let mut h = Sha256::new();
+            h.update([DOM_SECAO]);
+            h.update(proposta);
+            h.update(e);
+            (h.finalize().into(), i)
+        })
+        .collect();
+    // O índice entra no critério para que listas com endereços repetidos não
+    // dependam da estabilidade do `sort`.
+    ordem.sort_unstable();
+    let mut secao = vec![0u32; n];
+    for (k, (_, i)) in ordem.iter().enumerate() {
+        secao[*i] = (k % secoes as usize) as u32;
+    }
+    secao
 }
 
 /// `H(0x01 ‖ esquerda ‖ direita)`.
@@ -186,9 +237,77 @@ mod testes {
     fn lista(n: usize) -> Vec<Apto> {
         (0..n)
             .map(|i| {
-                Apto { endereco: (i as u64).to_be_bytes().to_vec(), peso: 1 }
+                Apto { endereco: (i as u64).to_be_bytes().to_vec(), peso: 1, secao: 0 }
             })
             .collect()
+    }
+
+    fn enderecos(n: usize) -> Vec<Vec<u8>> {
+        (0..n).map(|i| (i as u64).to_be_bytes().to_vec()).collect()
+    }
+
+    #[test]
+    fn a_divisao_e_equilibrada_e_ninguem_fica_sozinho() {
+        for (n, secoes) in [(30usize, 3u32), (30, 2), (10, 3), (7, 2), (100, 5)] {
+            let d = dividir(b"proposta", &enderecos(n), secoes);
+            let mut contagem = vec![0usize; secoes as usize];
+            for s in &d {
+                contagem[*s as usize] += 1;
+            }
+            let menor = *contagem.iter().min().unwrap();
+            let maior = *contagem.iter().max().unwrap();
+            assert!(
+                maior - menor <= 1,
+                "{} em {} seções: {:?} — rodízio devia equilibrar",
+                n, secoes, contagem
+            );
+            assert_eq!(menor, n / secoes as usize);
+        }
+    }
+
+    /// O ataque que a divisão derivável existe para impedir: se o organizador
+    /// escolhesse, poria o alvo numa seção sozinho e leria o voto dele.
+    #[test]
+    fn a_divisao_nao_depende_da_ordem_em_que_a_lista_chega() {
+        let es = enderecos(20);
+        let d1 = dividir(b"proposta", &es, 4);
+        let mut invertida = es.clone();
+        invertida.reverse();
+        let d2 = dividir(b"proposta", &invertida, 4);
+        for (i, e) in es.iter().enumerate() {
+            let j = invertida.iter().position(|x| x == e).unwrap();
+            assert_eq!(
+                d1[i], d2[j],
+                "quem organiza mudou a seção de alguém só reordenando a lista"
+            );
+        }
+    }
+
+    #[test]
+    fn a_divisao_muda_com_a_proposta() {
+        let es = enderecos(20);
+        assert_ne!(
+            dividir(b"uma", &es, 4),
+            dividir(b"outra", &es, 4),
+            "duas votações dariam sempre os mesmos vizinhos"
+        );
+    }
+
+    #[test]
+    fn sem_secoes_todo_mundo_fica_na_zero() {
+        assert_eq!(dividir(b"p", &enderecos(5), 1), vec![0; 5]);
+        assert_eq!(dividir(b"p", &enderecos(5), 0), vec![0; 5]);
+    }
+
+    #[test]
+    fn a_secao_esta_presa_na_folha() {
+        let a = Apto { endereco: vec![7u8; 32], peso: 1, secao: 0 };
+        let b = Apto { secao: 1, ..a.clone() };
+        assert_ne!(
+            folha(&a),
+            folha(&b),
+            "trocar de seção não mudou a folha: o votante escolheria a sua"
+        );
     }
 
     #[test]
@@ -210,7 +329,7 @@ mod testes {
         let aptos = lista(16);
         let arv = Arvore::montar(&aptos).unwrap();
         let raiz = arv.raiz();
-        let intruso = Apto { endereco: vec![0xEE; 32], peso: 1 };
+        let intruso = Apto { endereco: vec![0xEE; 32], peso: 1, secao: 0 };
         for i in 0..16 {
             let c = arv.caminho(i).unwrap();
             assert!(!verificar(&intruso, &c, &raiz), "intruso passou no caminho {}", i);
@@ -229,9 +348,9 @@ mod testes {
         let (raiz, c) = (arv.raiz(), arv.caminho(3).unwrap());
 
         assert!(verificar(&aptos[3], &c, &raiz));
-        let mentindo = Apto { endereco: aptos[3].endereco.clone(), peso: 1000 };
+        let mentindo = Apto { endereco: aptos[3].endereco.clone(), peso: 1000, secao: 0 };
         assert!(!verificar(&mentindo, &c, &raiz), "peso inflado foi aceito");
-        let menos = Apto { endereco: aptos[3].endereco.clone(), peso: 0 };
+        let menos = Apto { endereco: aptos[3].endereco.clone(), peso: 0, secao: 0 };
         assert!(!verificar(&menos, &c, &raiz));
     }
 
@@ -281,7 +400,7 @@ mod testes {
     /// nem a folha-vazia pode ser reivindicada por alguém.
     #[test]
     fn dominios_nao_colidem() {
-        let a = Apto { endereco: vec![7u8; 32], peso: 3 };
+        let a = Apto { endereco: vec![7u8; 32], peso: 3, secao: 0 };
         let f = folha(&a);
         assert_ne!(f, no(&f, &f));
         assert_ne!(f, vazio());
@@ -360,7 +479,7 @@ mod vetor {
                 let mut e = vec![0u8; 32];
                 e[..8].copy_from_slice(&(i as u64).to_be_bytes());
                 e[31] = 0xA7;
-                Apto { endereco: e, peso: 1 }
+                Apto { endereco: e, peso: 1, secao: 0 }
             })
             .collect()
     }

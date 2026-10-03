@@ -31,7 +31,7 @@ const HORIZON = "https://horizon-testnet.stellar.org";
 const FRIENDBOT = "https://friendbot.stellar.org";
 const PASSPHRASE = Networks.TESTNET;
 const CONTRATO = process.env.TESSERA_CONTRATO ??
-  "CBL7Z4AFMDPPJEP7YWFXLCUGRLO5VF7XAONPIW26CURO3ETCGSRV565X";
+  "CB6WIY45JYIR6EN6NC3WOAEOHYSKMXHKPDEXCHNY3O4C2O2RJ4RBQIJ6";
 
 const N = Number(process.env.N ?? 15);
 /** Bytes a mais de escrita declarada. 96 por membro do anel, com sobra. */

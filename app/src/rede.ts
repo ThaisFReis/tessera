@@ -18,7 +18,7 @@ export const REDE = {
   horizon: "https://horizon-testnet.stellar.org",
   friendbot: "https://friendbot.stellar.org",
   passphrase: Networks.TESTNET,
-  contrato: "CBL7Z4AFMDPPJEP7YWFXLCUGRLO5VF7XAONPIW26CURO3ETCGSRV565X",
+  contrato: "CB6WIY45JYIR6EN6NC3WOAEOHYSKMXHKPDEXCHNY3O4C2O2RJ4RBQIJ6",
   explorer: "https://stellar.expert/explorer/testnet",
 };
 
@@ -182,13 +182,14 @@ export type PropostaRede = {
   abre_em: number;
   fecha_em: number;
   anel: boolean;
+  secoes: number;
 };
 
 export const lerProposta = (id: string) =>
   ler("proposta", bytesN(id)) as Promise<PropostaRede | null>;
 
-export const lerAnel = async (id: string): Promise<string[]> =>
-  ((await ler("anel", bytesN(id))) as Uint8Array[]).map(bytesParaHex);
+export const lerAnel = async (id: string, secao: number): Promise<string[]> =>
+  ((await ler("anel", bytesN(id), u32(secao))) as Uint8Array[]).map(bytesParaHex);
 
 export const lerHp = async (id: string): Promise<string> =>
   bytesParaHex((await ler("hp", bytesN(id))) as Uint8Array);
@@ -439,6 +440,7 @@ export const abrir = (
   abre_em: number,
   fecha_em: number,
   anel: boolean,
+  secoes: number,
   d?: Diario,
 ) =>
   enviar(
@@ -461,10 +463,12 @@ export const abrir = (
       u32(abre_em),
       u32(fecha_em),
       xdr.ScVal.scvBool(anel),
+      u32(secoes),
     ],
     d,
     `proposta ${id.slice(0, 8)}… · ${perguntas.length} pergunta${perguntas.length === 1 ? "" : "s"} · ` +
-      `mesa ${limiar} de ${mesa.length} · ${anel ? "caderno separado da urna" : "voto identificado"}`,
+      `mesa ${limiar} de ${mesa.length} · ${anel ? "caderno separado da urna" : "voto identificado"}` +
+      (secoes > 1 ? ` · ${secoes} seções` : ""),
   );
 
 /** O caderno: identificado, e é o único ato em que o nome da pessoa aparece. */
@@ -474,6 +478,7 @@ export const comparecer = (
   chaveAnel: string,
   caminho: string[],
   indice: number,
+  secao: number,
   d?: Diario,
   /** O tamanho do eleitorado: é o teto do anel, e dimensiona a folga. */
   aptos = 40,
@@ -481,9 +486,9 @@ export const comparecer = (
   enviar(
     c,
     "comparecer",
-    [bytesN(id), endereco(c.endereco()), ponto(chaveAnel), vetor(caminho.map(bytesN)), u32(indice)],
+    [bytesN(id), endereco(c.endereco()), ponto(chaveAnel), vetor(caminho.map(bytesN)), u32(indice), u32(secao)],
     d,
-    `proposta ${id.slice(0, 8)}… · folha ${indice} · caminho com ${caminho.length} irmão${caminho.length === 1 ? "" : "s"}`,
+    `proposta ${id.slice(0, 8)}… · seção ${secao} · folha ${indice} · caminho com ${caminho.length} irmão${caminho.length === 1 ? "" : "s"}`,
     folgaDoCaderno(aptos),
   );
 
@@ -497,6 +502,7 @@ export const comparecer = (
 export function votarAnonimo(
   c: Carteira,
   id: string,
+  secao: number,
   anel: string[],
   imagem: string,
   c0: string,
@@ -519,6 +525,7 @@ export function votarAnonimo(
     "votar_anonimo",
     [
       bytesN(id),
+      u32(secao),
       vetor(anel.map(ponto)),
       ponto(imagem),
       escalar(c0),
@@ -559,6 +566,6 @@ export function votarAnonimo(
       vetor(escolhas.map(u32)),
     ],
     d,
-    `proposta ${id.slice(0, 8)}… · anel com ${anel.length} · ${compromissos.length} compromisso${compromissos.length === 1 ? "" : "s"}`,
+    `proposta ${id.slice(0, 8)}… · seção ${secao} · anel com ${anel.length} · ${compromissos.length} compromisso${compromissos.length === 1 ? "" : "s"}`,
   );
 }

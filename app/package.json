@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "wasm": "cd ../cliente-wasm && wasm-pack build --release --target web --out-dir pacote"
+    "wasm": "cd ../cliente-wasm && wasm-pack build --release --target web --out-dir pacote && wasm-pack build --release --target nodejs --out-dir pacote-node && cd ../app && pnpm install --force"
   },
   "dependencies": {
     "@stellar/stellar-sdk": "^14.0.0",

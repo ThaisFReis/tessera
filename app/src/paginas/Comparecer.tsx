@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CarteiraLocal } from "../carteira";
 import { guardarChaveDeAnel, guardarLista, lerLista } from "../lista";
-import { comparecer, enderecoXdr } from "../rede";
+import { comparecer, enderecoXdr, lerProposta } from "../rede";
 import { carregar } from "../wasm";
 import { Aviso, Icone, LinkBastidores, Passos, Trilha } from "../ui";
 import { useDiario } from "./comum";
@@ -45,20 +45,29 @@ export default function Comparecer() {
         );
       }
 
+      // As seções vêm do contrato, não de um palpite: montar o caminho com uma
+      // divisão diferente da que gerou a raiz devolve `NaoEstaNaListaDeAptos`,
+      // que não diz por quê.
+      const prop = await lerProposta(id);
+      if (!prop) throw new Error("Esta votação não foi encontrada.");
       const xdrs = lista.map(enderecoXdr);
-      const caminho = w.caminho_de(xdrs, new Uint32Array(lista.length).fill(1), indice) as {
+      const caminho = w.caminho_de(id, xdrs, new Uint32Array(lista.length).fill(1), prop.secoes, indice) as {
         irmaos: string[];
         indice: number;
+        secao: number;
       };
       diario({ tipo: "val", txt: `caminho de Merkle com ${caminho.irmaos.length} irmão${caminho.irmaos.length === 1 ? "" : "s"}` });
+      if (prop.secoes > 1) {
+        diario({ tipo: "val", txt: `seção ${caminho.secao} de ${prop.secoes} — sorteada pela lista` });
+      }
 
       setProgresso(1);
-      const chave = w.nova_chave_de_anel() as { secreta: string; publica: string };
+      const chave = { ...(w.nova_chave_de_anel() as { secreta: string; publica: string }), secao: caminho.secao };
       diario({ tipo: "nota", txt: "a chave secreta do anel fica nesta aba, e só aqui" });
       diario({ tipo: "val", txt: `chave pública = ${chave.publica.slice(0, 24)}…` });
 
       setProgresso(2);
-      await comparecer(c, id, chave.publica, caminho.irmaos, caminho.indice, diario, lista.length);
+      await comparecer(c, id, chave.publica, caminho.irmaos, caminho.indice, caminho.secao, diario, lista.length);
       // Sem ela não há voto depois. Perder esta aba é perder o voto.
       guardarChaveDeAnel(id, chave);
       ir(`/votacao/${id}`);

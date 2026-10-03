@@ -25,7 +25,7 @@ function Fato({ rotulo, children }: { rotulo: string; children: React.ReactNode 
 export default function Votacao() {
   const { id = "" } = useParams();
   const [p, setP] = useState<PropostaRede | null>(null);
-  const [anel, setAnel] = useState<string[]>([]);
+  const [anel, setAnel] = useState<number[]>([]);
   const [cedulas, setCedulas] = useState(0);
   const [ledger, setLedger] = useState(0);
   const [falha, setFalha] = useState("");
@@ -38,7 +38,14 @@ export default function Votacao() {
         if (!vivo) return;
         setP(prop);
         setLedger(l);
-        if (prop?.anel) setAnel(await lerAnel(id));
+        if (prop?.anel) {
+          // Uma leitura por seção: o anel de cada uma é uma entrada própria, e
+          // é isso que faz o custo da cédula parar de crescer com a votação.
+          const por = await Promise.all(
+            Array.from({ length: prop.secoes }, (_, s) => lerAnel(id, s)),
+          );
+          if (vivo) setAnel(por.map((a) => a.length));
+        }
         const [conf] = await lerComparecimento(id);
         if (vivo) setCedulas(conf);
       } catch (e) {
@@ -124,9 +131,12 @@ export default function Votacao() {
                 : `${p.limiar} de ${p.mesa.length}, em conluio`}
           </Fato>
           {p.anel && (
-            <Fato rotulo="anel">
-              {anel.length} {anel.length === 1 ? "pessoa compareceu" : "pessoas compareceram"}
-              {anel.length === 1 && " — um anel de um não esconde ninguém"}
+            <Fato rotulo={p.secoes > 1 ? "seções" : "anel"}>
+              {p.secoes > 1
+                ? `${anel.reduce((a, b) => a + b, 0)} em ${p.secoes} seções: ${anel.join(", ")} — ` +
+                  "o anel de cada cédula é o da seção de quem assina, e é por isso que o custo não cresce com a votação"
+                : `${anel[0] ?? 0} ${anel[0] === 1 ? "pessoa compareceu" : "pessoas compareceram"}` +
+                  (anel[0] === 1 ? " — um anel de um não esconde ninguém" : "")}
             </Fato>
           )}
           <Fato rotulo="cédulas na urna">{cedulas}</Fato>

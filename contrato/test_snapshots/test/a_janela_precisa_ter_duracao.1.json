@@ -46,7 +46,7 @@
                   ]
                 },
                 {
-                  "bytes": "f60920346a1899ace750e2833aefb11eaa3f8e2ab38eb15af6dba2e1f94d7dc5"
+                  "bytes": "941973897281fde482a391ac56f12d9d7233bea569e15f6e72ce65628f58611c"
                 },
                 {
                   "vec": [
@@ -78,6 +78,9 @@
                 },
                 {
                   "bool": false
+                },
+                {
+                  "u32": 1
                 }
               ]
             }
@@ -309,7 +312,15 @@
                       "symbol": "raiz_aptos"
                     },
                     "val": {
-                      "bytes": "f60920346a1899ace750e2833aefb11eaa3f8e2ab38eb15af6dba2e1f94d7dc5"
+                      "bytes": "941973897281fde482a391ac56f12d9d7233bea569e15f6e72ce65628f58611c"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "secoes"
+                    },
+                    "val": {
+                      "u32": 1
                     }
                   }
                 ]

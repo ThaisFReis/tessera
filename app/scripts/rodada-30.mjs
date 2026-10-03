@@ -60,7 +60,7 @@ const HORIZON = "https://horizon-testnet.stellar.org";
 const FRIENDBOT = "https://friendbot.stellar.org";
 const PASSPHRASE = Networks.TESTNET;
 const CONTRATO = process.env.TESSERA_CONTRATO ??
-  "CBL7Z4AFMDPPJEP7YWFXLCUGRLO5VF7XAONPIW26CURO3ETCGSRV565X";
+  "CB6WIY45JYIR6EN6NC3WOAEOHYSKMXHKPDEXCHNY3O4C2O2RJ4RBQIJ6";
 
 const N = Number(process.env.N ?? 30);
 const OPCOES = 2;
@@ -72,6 +72,8 @@ const TAXA_INCLUSAO = Number(process.env.TAXA_INCLUSAO ?? 1_000_000);
 // Espaço de escrita declarado além do que a simulação pediu, para o anel que
 // ainda vai crescer. Medido: 1 de 15 sem isto, 15 de 15 num ledger só com.
 const FOLGA = Number(process.env.FOLGA ?? 96 * 40 + 1024);
+/** Em quantas seções dividir. 1 reproduz o anel único. */
+const SECOES = Number(process.env.SECOES ?? 1);
 
 const servidor = new rpc.Server(RPC);
 const contrato = new Contract(CONTRATO);
@@ -207,7 +209,7 @@ function resumo(rotulo, rs) {
 }
 
 async function main() {
-  console.log(`\nTESSERA · ${N} votantes ao mesmo tempo, num anel só`);
+  console.log(`\nTESSERA · ${N} votantes ao mesmo tempo, em ${SECOES} ${SECOES === 1 ? "anel" : "seções"}`);
   console.log("─".repeat(70));
   console.log(`  contrato ... ${CONTRATO}`);
 
@@ -218,15 +220,21 @@ async function main() {
 
   const enderecos = membros.map((m) => xdrDe(m.publicKey()));
   const pesos = membros.map(() => 1);
-  const raiz = wasm.raiz_de_aptos(enderecos, pesos);
+  // O id nasce antes da raiz: a divisão em seções é derivada dele.
+  const id = bytesHex(Keypair.random().rawPublicKey().subarray(0, 32));
+  const raiz = wasm.raiz_de_aptos(id, enderecos, pesos, SECOES);
+  const divisao = Array.from(wasm.secoes_de(id, enderecos, SECOES));
   diz(`raiz de aptos = ${raiz.slice(0, 16)}…`);
+  if (SECOES > 1) {
+    const tam = Array.from({ length: SECOES }, (_, s) => divisao.filter((x) => x === s).length);
+    diz(`${SECOES} seções de ${tam.join(", ")} — sorteadas pela lista, não escolhidas`);
+  }
 
   titulo("abrir");
   const agora = await ledgerAtual();
   // Com retentativa cada rodada custa um ledger, então a janela cresce com N.
   const abreEm = agora + 40 + (RETENTATIVAS ? 3 * N : 10);
   const fechaEm = abreEm + 300;
-  const id = bytesHex(Keypair.random().rawPublicKey().subarray(0, 32));
   const mesa = [(await nascer()).publicKey()];
 
   const r1 = await tentar(membros[0], "abrir", [
@@ -234,7 +242,7 @@ async function main() {
     vec([nativeToScVal({ opcoes: OPCOES, confidencial: true },
       { type: { opcoes: ["symbol", "u32"], confidencial: ["symbol", "bool"] } })]),
     bN(raiz), vec(mesa.map(addr)), u32(1), u32(abreEm), u32(fechaEm),
-    xdr.ScVal.scvBool(true),
+    xdr.ScVal.scvBool(true), u32(SECOES),
   ]);
   if (!r1.ok) throw new Error(`abrir falhou — ${r1.fase}: ${r1.erro}`);
   diz(`proposta ${id.slice(0, 12)}… · comparecimento até ${abreEm} · votação até ${fechaEm}`);
@@ -250,9 +258,9 @@ async function main() {
   }
   const tentativas = new Array(N).fill(1);
   const rc = await Promise.all(membros.map(async (m, i) => {
-    const c = wasm.caminho_de(enderecos, pesos, i);
+    const c = wasm.caminho_de(id, enderecos, pesos, SECOES, i);
     const args = [bN(id), addr(m.publicKey()), bN(chaves[i].publica),
-                  vec(c.irmaos.map(bN)), u32(c.indice)];
+                  vec(c.irmaos.map(bN)), u32(c.indice), u32(c.secao)];
     let r = await tentar(m, "comparecer", args, TAXA_INCLUSAO, FOLGA);
     for (let t = 0; !r.ok && t < RETENTATIVAS; t++) {
       // `JaCompareceu` significa que uma tentativa anterior entrou: não insiste.
@@ -278,25 +286,32 @@ async function main() {
   }
   process.stdout.write("\r" + " ".repeat(40) + "\r");
 
-  const anel = (await ler("anel", bN(id))).map(bytesHex);
-  diz(`anel congelado com ${anel.length} chaves`);
-  if (anel.length !== comparec.length) {
-    diz(`  ⚠ ${comparec.length} comparecimentos aceitos mas ${anel.length} no anel — houve escrita perdida`);
+  const aneis = [];
+  for (let s = 0; s < SECOES; s++) {
+    aneis.push((await ler("anel", bN(id), u32(s))).map(bytesHex));
+  }
+  diz(`anéis congelados: ${aneis.map((a) => a.length).join(", ")}`);
+  const noCaderno = aneis.reduce((a, b) => a + b.length, 0);
+  if (noCaderno !== comparec.length) {
+    diz(`  ⚠ ${comparec.length} comparecimentos aceitos mas ${noCaderno} nos anéis — houve escrita perdida`);
   }
 
-  titulo(`a urna · ${anel.length} cédulas disparadas de uma vez`);
+  titulo(`a urna · ${noCaderno} cédulas disparadas de uma vez`);
   diz("todas escrevem nos MESMOS dois acumuladores e no mesmo contador");
-  const indices = chaves.map((_, i) => i).filter((i) => anel.includes(chaves[i].publica));
+  const indices = chaves
+    .map((_, i) => i)
+    .filter((i) => aneis[divisao[i]].includes(chaves[i].publica));
   const efemeras = await nascerVarios(indices.length);
   const t0 = Date.now();
   const rv = await Promise.all(indices.map(async (idx, k) => {
-    const i = anel.indexOf(chaves[idx].publica);
+    const meu = aneis[divisao[idx]];
+    const i = meu.indexOf(chaves[idx].publica);
     const c = wasm.cedula_anonima(
-      id, hp, h, anel, i, chaves[idx].secreta,
+      id, hp, h, meu, i, chaves[idx].secreta,
       [{ opcoes: OPCOES, confidencial: true }], [k % OPCOES],
     );
     const argsVoto = [
-      bN(id), vec(anel.map(bN)), bN(c.imagem), fr(c.c0), vec(c.z.map(fr)),
+      bN(id), u32(divisao[idx]), vec(meu.map(bN)), bN(c.imagem), fr(c.c0), vec(c.z.map(fr)),
       vec(c.cedula.compromissos.map(bN)),
       vec(c.cedula.provas.map((p) => nativeToScVal(
         { a0: hexBytes(p.a0), a1: hexBytes(p.a1), e0: BigInt("0x" + p.e0),
@@ -321,7 +336,7 @@ async function main() {
   titulo("o que o ledger sabe");
   const [conf] = await ler("comparecimento", bN(id));
   diz(`cédulas na urna ... ${conf}`);
-  diz(`no caderno ........ ${anel.length} de ${N}`);
+  diz(`no caderno ........ ${noCaderno} de ${N}, em anéis de ${aneis.map((a) => a.length).join(", ")}`);
   const cruz = efemeras.map((e) => e.publicKey())
     .filter((e) => membros.some((m) => m.publicKey() === e));
   diz(`interseção caderno ∩ urna = ${cruz.length}`);

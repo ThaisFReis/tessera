@@ -101,6 +101,8 @@ pub enum Erro {
     /// A proposta não é de anel, ou é de anel e a chamada identificada foi
     /// usada. Os dois modos não se misturam na mesma proposta.
     ModoErrado = 31,
+    /// Seção fora da faixa `0..secoes`, ou `secoes = 0`.
+    SecaoInvalida = 32,
 }
 
 #[contracttype]
@@ -133,13 +135,15 @@ pub enum Chave {
     /// **O caderno.** Um registro por membro que compareceu, identificado e
     /// público — é dele que sai a lista de quem faltou.
     Compareceu(BytesN<32>, Address),
-    /// As chaves de anel de quem compareceu, na ordem em que chegaram. Cresce
-    /// durante o comparecimento e congela quando a votação abre.
-    Anel(BytesN<32>),
-    /// `sha256` do conjunto, calculado uma vez quando a primeira cédula chega.
-    /// A cédula traz a lista inteira e o contrato compara — 32 bytes de estado
-    /// em vez de `n` pontos relidos a cada voto.
-    DigestoAnel(BytesN<32>),
+    /// As chaves de anel de quem compareceu **naquela seção**, na ordem em que
+    /// chegaram. Cresce durante o comparecimento e congela quando a votação
+    /// abre. Uma entrada por seção: é o que faz o custo da cédula parar de
+    /// depender do tamanho do eleitorado.
+    Anel(BytesN<32>, u32),
+    /// `sha256` do conjunto **daquela seção**, calculado uma vez quando a
+    /// primeira cédula dela chega. A cédula traz a lista inteira e o contrato
+    /// compara — 32 bytes de estado em vez de `n` pontos relidos a cada voto.
+    DigestoAnel(BytesN<32>, u32),
     /// Uma imagem de chave já usada. **Não é um endereço**: é `I = x·Hp`, que
     /// identifica a pessoa dentro desta proposta e em nenhuma outra.
     ImagemUsada(BytesN<32>, BytesN<32>),
@@ -197,6 +201,18 @@ pub struct Proposta {
     /// É o desenho da urna: o caderno diz quem faltou — e voto obrigatório
     /// precisa disso —, a cédula não diz de quem é, e nada liga os dois.
     pub anel: bool,
+    /// Em quantas seções o eleitorado foi dividido. `1` é a votação sem
+    /// seções — um anel só, com todo mundo que compareceu.
+    ///
+    /// A seção existe porque verificar um anel custa 10.822.850 instruções por
+    /// membro: um anel de 30 usa 91,4% do teto de CPU de uma transação, e só
+    /// uma cédula dessas cabe por ledger. Com seções, o custo por cédula para
+    /// de depender do tamanho do eleitorado.
+    ///
+    /// O preço é o conjunto de anonimato: ele passa a ser a seção, não a
+    /// votação inteira. O resultado continua único — o acumulador é por
+    /// proposta e não sabe de que seção veio cada cédula.
+    pub secoes: u32,
 }
 
 /// Prova disjuntiva de Cramer–Damgård–Schoenmakers: `v ∈ {0,1}`.

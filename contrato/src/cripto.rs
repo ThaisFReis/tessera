@@ -233,9 +233,13 @@ pub fn verificar_soma(
 
 /// Confere o caminho de Merkle da lista de aptos.
 ///
-/// A folha é **recalculada** a partir do endereço e do peso que chegaram na
-/// chamada. Peso inflado produz outra folha e o caminho não fecha — essa é a
-/// defesa inteira contra peso falso (SPEC §6.4).
+/// A folha é **recalculada** a partir do endereço, do peso e da seção que
+/// chegaram na chamada. Peso inflado produz outra folha e o caminho não fecha —
+/// essa é a defesa inteira contra peso falso (SPEC §6.4).
+///
+/// A seção entra pela mesma razão: se fosse só um argumento, o votante
+/// escolheria a sua, e pegaria a menor ou aquela em que adivinha melhor os
+/// vizinhos. Presa na folha, a prova só fecha na seção que a lista lhe deu.
 ///
 /// Separação de domínio entre folha (`0x00`) e nó (`0x01`): sem ela, uma folha
 /// de 64 bytes bem escolhida seria apresentada como nó interno.
@@ -245,6 +249,7 @@ pub fn verificar_aptidao(
     env: &Env,
     votante: &Address,
     peso: u32,
+    secao: u32,
     indice: u32,
     irmaos: &Vec<BytesN<32>>,
     raiz: &BytesN<32>,
@@ -252,6 +257,7 @@ pub fn verificar_aptidao(
     let mut buf = Bytes::from_slice(env, &[DOM_FOLHA]);
     buf.append(&votante.clone().to_xdr(env));
     buf.extend_from_array(&peso.to_be_bytes());
+    buf.extend_from_array(&secao.to_be_bytes());
     let mut atual = env.crypto().sha256(&buf).to_bytes();
 
     let mut i = indice;

@@ -16,6 +16,7 @@ export default function Abrir() {
   const [anel, setAnel] = useState(true);
   const [mesa, setMesa] = useState("");
   const [limiar, setLimiar] = useState(3);
+  const [secoes, setSecoes] = useState(1);
   const [minCaderno, setMinCaderno] = useState(10);
   const [minVoto, setMinVoto] = useState(30);
   const [falha, setFalha] = useState("");
@@ -38,22 +39,34 @@ export default function Abrir() {
       const n = linhas(opcoes).length;
       if (n < 2) throw new Error("a pergunta precisa de ao menos duas opções");
 
+      if (secoes < 1 || secoes > lista.length) {
+        throw new Error(`as seções têm de estar entre 1 e ${lista.length}`);
+      }
+
       const w = await carregar();
       const c = await CarteiraLocal.abrir();
       diario({ tipo: "val", txt: `organizador = ${c.endereco()}` });
 
+      // O identificador nasce antes da raiz, e não é detalhe: a divisão em
+      // seções é derivada dele, então a raiz depende dele.
+      const id = crypto.getRandomValues(new Uint8Array(32));
+      const proposta = Array.from(id, (b) => b.toString(16).padStart(2, "0")).join("");
+
       const xdrs = lista.map(enderecoXdr);
-      const raiz = w.raiz_de_aptos(xdrs, new Uint32Array(lista.length).fill(1));
+      const pesos = new Uint32Array(lista.length).fill(1);
+      const raiz = w.raiz_de_aptos(proposta, xdrs, pesos, secoes);
       diario({ tipo: "val", txt: `raiz de aptos = ${raiz}` });
       diario({ tipo: "nota", txt: "32 bytes vão para o contrato. A lista não vai." });
+      if (secoes > 1) {
+        const d = Array.from(w.secoes_de(proposta, xdrs, secoes) as Uint32Array);
+        const tam = Array.from({ length: secoes }, (_, s) => d.filter((x) => x === s).length);
+        diario({ tipo: "nota", txt: `seções de ${tam.join(", ")} — sorteadas pela lista, não escolhidas` });
+      }
 
       const agora = await ledgerAtual();
       // Ledger da testnet ≈ 6 s.
       const abre = agora + Math.round((minCaderno * 60) / 6);
       const fecha = abre + Math.round((minVoto * 60) / 6);
-      const id = crypto.getRandomValues(new Uint8Array(32));
-      const proposta = Array.from(id, (b) => b.toString(16).padStart(2, "0")).join("");
-
       const membros = linhas(mesa);
       if (!membros.length) throw new Error("o contrato exige ao menos um membro de mesa");
       if (limiar < 1 || limiar > membros.length) {
@@ -62,7 +75,7 @@ export default function Abrir() {
       setProgresso(1);
       await abrir(
         c, proposta, [{ opcoes: n, confidencial: true }], raiz, membros,
-        limiar, abre, fecha, anel, diario,
+        limiar, abre, fecha, anel, secoes, diario,
       );
       setProgresso(2);
 
@@ -125,6 +138,36 @@ export default function Abrir() {
           </span>
         </label>
       </section>
+
+      {anel && (
+        <section>
+          <h2>AS SEÇÕES</h2>
+          <label className="campo campo-estreito">
+            <span className="eyebrow">QUANTAS</span>
+            <input
+              type="number"
+              value={secoes}
+              min={1}
+              onChange={(e) => setSecoes(Number(e.target.value))}
+            />
+          </label>
+          <p>
+            Verificar um anel custa <strong>10.822.850 instruções por membro</strong>. Com 30
+            pessoas num anel só, cada cédula usa 91,4% do teto de CPU de uma transação e só uma
+            entra por ledger — medido: 18 de 30 cédulas em 646 s, o resto expirou. Em três seções
+            de dez, a mesma cédula custa 37,2% e três entram por ledger.
+          </p>
+          <p>
+            <strong>Você não escolhe quem fica com quem.</strong> A divisão é sorteada a partir da
+            lista e do identificador da votação, e qualquer pessoa com a lista recalcula e confere.
+            Se o organizador escolhesse, poria um dissidente numa seção sozinho e leria o voto dele.
+          </p>
+          <p>
+            O preço é o conjunto de anonimato: ele passa a ser a sua seção, não a votação inteira.
+            O resultado continua único — o acumulador não sabe de que seção veio cada cédula.
+          </p>
+        </section>
+      )}
 
       <section>
         <h2>A MESA</h2>

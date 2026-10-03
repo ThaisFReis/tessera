@@ -191,6 +191,22 @@ fn ler_pergunta(spec: &str) -> Result<PerguntaEstado, String> {
 }
 
 #[allow(clippy::too_many_arguments)]
+/// As folhas da lista, com a seção presa em cada uma.
+///
+/// A divisão vem de `merkle::dividir`, derivável da lista por qualquer um — o
+/// mesmo cálculo que o dapp faz. Montar a raiz com uma divisão e o caminho com
+/// outra devolve `NaoEstaNaListaDeAptos`, que não diz por quê; por isso as três
+/// chamadas da CLI passam por aqui.
+fn folhas_de(proposta: &[u8], aptos: &[String], secoes: u32) -> Result<Vec<merkle::Apto>, String> {
+    let es: Vec<Vec<u8>> = aptos.iter().map(|a| cedula::xdr(a)).collect::<Result<_, _>>()?;
+    let d = merkle::dividir(proposta, &es, secoes);
+    Ok(es
+        .into_iter()
+        .zip(&d)
+        .map(|(endereco, secao)| merkle::Apto { endereco, peso: 1, secao: *secao })
+        .collect())
+}
+
 pub fn abrir(
     proposta: &str,
     pergunta: &[String],
@@ -201,6 +217,7 @@ pub fn abrir(
     inicio: &str,
     prazo: &str,
     anel: bool,
+    secoes: u32,
     contrato: &str,
     rede: &str,
     governanca: &str,
@@ -269,10 +286,7 @@ pub fn abrir(
 
     // A árvore: folhas H(0x00 ‖ addr_xdr ‖ peso), na ORDEM da lista. A ordem é
     // o documento — a raiz muda se ela mudar.
-    let folhas: Vec<merkle::Apto> = enderecos_aptos
-        .iter()
-        .map(|a| cedula::xdr(a).map(|e| merkle::Apto { endereco: e, peso: 1 }))
-        .collect::<Result<_, _>>()?;
+    let folhas = folhas_de(&id32(proposta), &enderecos_aptos, secoes)?;
     let arvore = merkle::Arvore::montar(&folhas).map_err(|e| format!("{:?}", e))?;
     let raiz = arvore.raiz();
 
@@ -344,6 +358,7 @@ pub fn abrir(
                 ("abre_em", abre_em.to_string()),
                 ("fecha_em", fecha_em.to_string()),
                 ("anel", anel.to_string()),
+                ("secoes", secoes.to_string()),
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -379,6 +394,7 @@ pub fn abrir(
         mesa: Mesa { membros: enderecos_mesa.len(), limiar, enderecos: enderecos_mesa, identidades: nomes_mesa },
         inicio_ledger: abre_em,
         anel,
+        secoes,
         prazo_ledger: fecha_em,
         abertura_tx: tx,
         votos: vec![],
@@ -651,11 +667,7 @@ pub fn votar(proposta: &str, opcao: &[String], identidade: &str) -> R {
         return ja_votou(v);
     }
 
-    let folhas: Vec<merkle::Apto> = e
-        .aptos
-        .iter()
-        .map(|a| cedula::xdr(a).map(|x| merkle::Apto { endereco: x, peso: 1 }))
-        .collect::<Result<_, _>>()?;
+    let folhas = folhas_de(&id32(proposta), &e.aptos, e.secoes)?;
     let arvore = merkle::Arvore::montar(&folhas).map_err(|x| format!("{:?}", x))?;
     let caminho = arvore.caminho(indice).map_err(|x| format!("{:?}", x))?;
 
@@ -1189,11 +1201,7 @@ pub fn verificar(proposta: &str) -> R {
     tela::branco();
 
     // 1. a raiz de aptos, recalculada da lista
-    let folhas: Vec<merkle::Apto> = e
-        .aptos
-        .iter()
-        .map(|a| cedula::xdr(a).map(|x| merkle::Apto { endereco: x, peso: 1 }))
-        .collect::<Result<_, _>>()?;
+    let folhas = folhas_de(&id32(proposta), &e.aptos, e.secoes)?;
     let arvore = merkle::Arvore::montar(&folhas).map_err(|x| format!("{:?}", x))?;
     let raiz_local = hex(&arvore.raiz());
     let prop = c

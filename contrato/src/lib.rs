@@ -70,6 +70,7 @@ impl Tessera {
         abre_em: u32,
         fecha_em: u32,
         anel: bool,
+        secoes: u32,
     ) -> Result<(), Erro> {
         governanca.require_auth();
 
@@ -126,14 +127,19 @@ impl Tessera {
             env.storage().instance().set(&Instancia::GeradorH, &h);
         }
 
+        if secoes == 0 || (!anel && secoes != 1) {
+            return Err(Erro::SecaoInvalida);
+        }
         let n_perguntas = perguntas.len();
-        let p = Proposta { perguntas, raiz_aptos, mesa, limiar, abre_em, fecha_em, anel };
+        let p = Proposta { perguntas, raiz_aptos, mesa, limiar, abre_em, fecha_em, anel, secoes };
         if anel {
-            // O anel nasce vazio e cresce com o comparecimento. Sem esta
-            // escrita, o primeiro `comparecer` não teria onde se somar.
-            let k = Chave::Anel(proposta.clone());
-            env.storage().persistent().set(&k, &Vec::<Bls12381G1Affine>::new(&env));
-            guardar_longo(&env, &k);
+            // Um anel por seção, e cada um nasce vazio: sem esta escrita, o
+            // primeiro `comparecer` daquela seção não teria onde se somar.
+            for s in 0..secoes {
+                let k = Chave::Anel(proposta.clone(), s);
+                env.storage().persistent().set(&k, &Vec::<Bls12381G1Affine>::new(&env));
+                guardar_longo(&env, &k);
+            }
         }
         env.storage().persistent().set(&Chave::Proposta(proposta.clone()), &p);
         guardar_longo(&env, &Chave::Proposta(proposta.clone()));
@@ -162,7 +168,7 @@ impl Tessera {
 
         env.events().publish(
             (symbol_short!("abrir"), proposta),
-            (n_perguntas, conf_opcoes, abre_em, fecha_em, limiar, anel),
+            (n_perguntas, conf_opcoes, abre_em, fecha_em, limiar, anel, secoes),
         );
         Ok(())
     }
@@ -226,7 +232,8 @@ impl Tessera {
         {
             return Err(Erro::ArgumentoMalFormado);
         }
-        conferir_aptidao(&env, &p, &votante, peso, indice, &caminho)?;
+        // Sem anel não há seção: a folha é a da seção zero.
+        conferir_aptidao(&env, &p, &votante, peso, 0, indice, &caminho)?;
         marcar_votou(&env, &proposta, &votante)?;
 
         conferir_e_somar(&env, &p, &proposta, &votante.clone().to_xdr(&env), &compromissos,
@@ -260,16 +267,20 @@ impl Tessera {
         chave_anel: Bls12381G1Affine,
         caminho: Vec<BytesN<32>>,
         indice: u32,
+        secao: u32,
     ) -> Result<u32, Erro> {
         votante.require_auth();
         let p = abrir_proposta(&env, &proposta)?;
         if !p.anel {
             return Err(Erro::ModoErrado);
         }
+        if secao >= p.secoes {
+            return Err(Erro::SecaoInvalida);
+        }
         if env.ledger().sequence() >= p.abre_em {
             return Err(Erro::ComparecimentoEncerrado);
         }
-        conferir_aptidao(&env, &p, &votante, 1, indice, &caminho)?;
+        conferir_aptidao(&env, &p, &votante, 1, secao, indice, &caminho)?;
 
         let kc = Chave::Compareceu(proposta.clone(), votante.clone());
         if env.storage().persistent().has(&kc) {
@@ -279,7 +290,7 @@ impl Tessera {
         // estes pontos exatos, então a cédula não precisa revalidar os `n`.
         validar(&env, &chave_anel)?;
 
-        let ka = Chave::Anel(proposta.clone());
+        let ka = Chave::Anel(proposta.clone(), secao);
         let mut anel: Vec<Bls12381G1Affine> =
             env.storage().persistent().get(&ka).ok_or(Erro::ModoErrado)?;
         anel.push_back(chave_anel);
@@ -291,7 +302,7 @@ impl Tessera {
         guardar_longo(&env, &kc);
 
         env.events()
-            .publish((symbol_short!("comparec"), proposta, votante), tamanho);
+            .publish((symbol_short!("comparec"), proposta, votante), (secao, tamanho));
         Ok(tamanho)
     }
 
@@ -308,6 +319,7 @@ impl Tessera {
     pub fn votar_anonimo(
         env: Env,
         proposta: BytesN<32>,
+        secao: u32,
         anel: Vec<Bls12381G1Affine>,
         imagem: Bls12381G1Affine,
         c0: Bls12381Fr,
@@ -320,6 +332,9 @@ impl Tessera {
         let p = abrir_proposta(&env, &proposta)?;
         if !p.anel {
             return Err(Erro::ModoErrado);
+        }
+        if secao >= p.secoes {
+            return Err(Erro::SecaoInvalida);
         }
         if env.ledger().sequence() < p.abre_em {
             return Err(Erro::VotacaoAindaNaoComecou);
@@ -341,14 +356,14 @@ impl Tessera {
         // O digesto do conjunto é calculado uma vez, na primeira cédula, e
         // guardado. Daí em diante conferir o anel é comparar 32 bytes em vez de
         // reler `n` pontos do estado.
-        let kd = Chave::DigestoAnel(proposta.clone());
+        let kd = Chave::DigestoAnel(proposta.clone(), secao);
         let registrado: BytesN<32> = match env.storage().persistent().get(&kd) {
             Some(d) => d,
             None => {
                 let congelado: Vec<Bls12381G1Affine> = env
                     .storage()
                     .persistent()
-                    .get(&Chave::Anel(proposta.clone()))
+                    .get(&Chave::Anel(proposta.clone(), secao))
                     .ok_or(Erro::ModoErrado)?;
                 let d = digesto_anel(&env, &congelado);
                 env.storage().persistent().set(&kd, &d);
@@ -358,6 +373,14 @@ impl Tessera {
         };
         if digesto_anel(&env, &anel) != registrado {
             return Err(Erro::AnelInvalido);
+        }
+        // Numa votação sem seções, o anel é quem apareceu, e isso é problema de
+        // quem organizou — a tela avisa. Com seções, **alguém decidiu** quem se
+        // esconde atrás de quem, e uma seção minúscula entregaria o voto de
+        // quem caiu nela. Aqui a recusa vale mais que o aviso: o mesmo princípio
+        // do SPEC §6.6, que prefere falhar a vazar.
+        if p.secoes > 1 && anel.len() < TAU {
+            return Err(Erro::AnonimatoInsuficiente);
         }
 
         validar(&env, &imagem)?;
@@ -689,10 +712,10 @@ impl Tessera {
     /// anonimato dentro de um conjunto conhecido, e o conjunto tem de ser
     /// conhecido. Devolver isto não entrega nada — a ordem é a de chegada ao
     /// caderno, que já é pública.
-    pub fn anel(env: Env, proposta: BytesN<32>) -> Vec<Bls12381G1Affine> {
+    pub fn anel(env: Env, proposta: BytesN<32>, secao: u32) -> Vec<Bls12381G1Affine> {
         env.storage()
             .persistent()
-            .get(&Chave::Anel(proposta))
+            .get(&Chave::Anel(proposta, secao))
             .unwrap_or_else(|| Vec::new(&env))
     }
 
@@ -915,13 +938,14 @@ fn conferir_aptidao(
     p: &Proposta,
     votante: &Address,
     peso: u32,
+    secao: u32,
     indice: u32,
     caminho: &Vec<BytesN<32>>,
 ) -> Result<(), Erro> {
     if peso != 1 {
         return Err(Erro::PesoNaoUnitario);
     }
-    if !verificar_aptidao(env, votante, peso, indice, caminho, &p.raiz_aptos) {
+    if !verificar_aptidao(env, votante, peso, secao, indice, caminho, &p.raiz_aptos) {
         return Err(Erro::NaoEstaNaListaDeAptos);
     }
     Ok(())
