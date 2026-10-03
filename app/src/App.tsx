@@ -1,4 +1,5 @@
 import { Link, NavLink, Route, Routes, useLocation } from "react-router-dom";
+import Inicio from "./paginas/Inicio";
 import Votacoes from "./paginas/Votacoes";
 import Votacao from "./paginas/Votacao";
 import Abrir from "./paginas/Abrir";
@@ -23,7 +24,7 @@ export default function App() {
           Tessera<span className="brand-period">.</span>
         </Link>
         {!participante && <nav aria-label="Navegação principal">
-          <NavLink to="/" end>Votações</NavLink>
+          <NavLink to="/votacoes">Votações</NavLink>
           <NavLink to="/abrir">Organizar</NavLink>
         </nav>}
         <a className="network-tag" href={`${REDE.explorer}/contract/${REDE.contrato}`} target="_blank" rel="noopener noreferrer">
@@ -32,7 +33,8 @@ export default function App() {
       </header>
       <div id="conteudo" className={participante ? "participant-content" : "standard-content"}>
       <Routes>
-        <Route path="/" element={<Votacoes />} />
+        <Route path="/" element={<Inicio />} />
+        <Route path="/votacoes" element={<Votacoes />} />
         <Route path="/votacao/:id" element={<Votacao />} />
         {/* organizador */}
         <Route path="/abrir" element={<Abrir />} />

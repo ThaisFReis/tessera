@@ -1,0 +1,59 @@
+/* A porta de entrada: mais respiro vertical que as rotas de trabalho, e a
+   mesma tipografia. Nada aqui inventa cor nova. */
+.landing { width: 100%; max-width: 1040px; margin: 0 auto; }
+
+.hero { padding: 40px 0 92px; border-bottom: 1px solid var(--line); }
+.hero h1 { font: clamp(52px, 7.4vw, 96px)/1.03 var(--serif); letter-spacing: -2.4px; margin: 20px 0 0; }
+.hero-sub { color: var(--muted); font-size: 15px; line-height: 1.8; margin: 26px 0 0; max-width: 56ch; }
+.hero-acoes { display: flex; gap: 14px; margin-top: 38px; flex-wrap: wrap; }
+.hero-acoes .primary-button, .hero-acoes .secondary-button { width: auto; min-width: 240px; }
+.hero-nota { color: #6f7569; font-size: 12px; line-height: 1.8; margin-top: 20px; }
+.hero-nota a { color: var(--muted); }
+.hero-nota a:hover { color: var(--lime); }
+
+.faixa { padding: 78px 0; border-bottom: 1px solid var(--line); }
+.faixa h2 { font: clamp(34px, 4.2vw, 52px)/1.1 var(--serif); letter-spacing: -1.2px; margin: 16px 0 0; text-wrap: balance; }
+.faixa-sub { color: var(--muted); font-size: 14px; line-height: 1.85; margin: 24px 0 0; max-width: 62ch; }
+.faixa-sub strong { color: var(--paper); font-weight: 500; }
+.faixa-sub code { font: 12px var(--mono); color: var(--lime); }
+.nota-faixa { color: #6f7569; font-size: 12.5px; line-height: 1.85; margin-top: 26px; max-width: 62ch; }
+.nota-faixa strong { color: var(--paper); font-weight: 500; }
+
+.duas, .tres { display: grid; gap: 12px; margin-top: 38px; }
+.duas { grid-template-columns: repeat(2, 1fr); }
+.tres { grid-template-columns: repeat(3, 1fr); }
+.landing .painel { display: flex; flex-direction: column; padding: 26px; }
+.landing .painel h3 { font: 23px/1.22 var(--serif); font-weight: 400; margin: 14px 0 0; white-space: pre-line; }
+.landing .painel p { color: var(--muted); font-size: 13px; line-height: 1.8; margin: 13px 0 0; }
+.landing .painel p strong { color: var(--paper); font-weight: 500; }
+.landing .painel em { color: var(--paper); font-style: normal; }
+.selo { margin-top: auto; padding-top: 20px; font: 9px var(--mono); letter-spacing: 1.1px; color: #b58b6a; }
+
+.equacao { margin-top: 32px; padding: 17px 20px; border-left: 2px solid var(--lime); background: #0d100c; font: 10px/1.9 var(--mono); letter-spacing: 1.1px; color: var(--paper); overflow-wrap: anywhere; }
+.destaque { font: clamp(26px, 3.4vw, 40px)/1.15 var(--serif); margin: 40px 0 0; color: var(--paper); max-width: 18ch; }
+
+.tabela { width: 100%; border-collapse: collapse; margin-top: 34px; }
+.tabela th { text-align: left; padding: 0 0 12px; border-bottom: 1px solid var(--line); font: 9px/1.7 var(--mono); letter-spacing: 1.1px; color: var(--muted); font-weight: 400; }
+.tabela td { padding: 15px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.tabela .num { font: 11.5px var(--mono); text-align: right; }
+.tabela tr:last-child td { border-bottom: 0; }
+
+.fecho { padding: 90px 0 100px; text-align: center; }
+.fecho h2 { font: clamp(36px, 5.4vw, 68px)/1.08 var(--serif); letter-spacing: -1.6px; margin: 0; }
+.fecho-sub { color: var(--muted); font-size: 14px; line-height: 1.85; margin: 22px auto 0; max-width: 48ch; }
+.fecho .hero-acoes { justify-content: center; }
+
+@media (max-width: 900px) {
+  .tres { grid-template-columns: 1fr; }
+  .faixa { padding: 58px 0; }
+}
+@media (max-width: 680px) {
+  .duas { grid-template-columns: 1fr; }
+  .hero { padding: 24px 0 62px; }
+  .hero h1 { letter-spacing: -1.4px; }
+  .hero-acoes { gap: 10px; }
+  .hero-acoes .primary-button, .hero-acoes .secondary-button { width: 100%; min-width: 0; }
+  .fecho { padding: 62px 0 70px; }
+  .landing .painel { padding: 22px; }
+  .tabela td:first-child { font-size: 12px; }
+}

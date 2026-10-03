@@ -53,7 +53,7 @@ export default function Votacao() {
   if (falha) {
     return <main className="pagina"><Estado titulo="Não foi possível ler a proposta." curto>
       <p className="error-message" role="alert">{falha}</p>
-      <Link className="primary-button" to="/">Ver votações <Icone nome="arrow" /></Link>
+      <Link className="primary-button" to="/votacoes">Ver votações <Icone nome="arrow" /></Link>
     </Estado></main>;
   }
   if (!p) return <main className="pagina"><Carregando titulo="Lendo a proposta." /></main>;
