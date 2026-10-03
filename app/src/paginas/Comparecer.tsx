@@ -58,7 +58,7 @@ export default function Comparecer() {
       diario({ tipo: "val", txt: `chave pública = ${chave.publica.slice(0, 24)}…` });
 
       setProgresso(2);
-      await comparecer(c, id, chave.publica, caminho.irmaos, caminho.indice, diario);
+      await comparecer(c, id, chave.publica, caminho.irmaos, caminho.indice, diario, lista.length);
       // Sem ela não há voto depois. Perder esta aba é perder o voto.
       guardarChaveDeAnel(id, chave);
       ir(`/votacao/${id}`);

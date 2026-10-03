@@ -25,10 +25,15 @@
  *
  * O que as rodadas de 2026-10-02 acharam, na testnet:
  *
- *   caderno   uma por ledger, sempre. Com 12 retentativas, 23 de 30 entraram
- *             ao custo de 262 transações — 8,7 queimadas por pessoa. A causa é
- *             `Chave::Anel` crescer: todas simulam contra o anel de agora e
- *             declaram `writeBytes` para ele, e quem aplica depois não cabe.
+ *   caderno   ANTES da folga de escrita: uma por ledger, sempre. Com 12
+ *             retentativas, 23 de 30 entraram ao custo de 262 transações —
+ *             8,7 queimadas por pessoa. A causa é `Chave::Anel` crescer: todas
+ *             simulam contra o anel de agora e declaram `writeBytes` para ele,
+ *             e quem aplica depois não cabe.
+ *             DEPOIS: 30 de 30, zero recusadas, 3 ledgers, 45 transações, com
+ *             15 entrando no mesmo ledger. O footprint é uma declaração, não
+ *             uma medição — declarar espaço para o anel cheio custou 0,1% a
+ *             mais no que de fato é cobrado (3.679.157 contra 3.682.659).
  *
  *   urna      a vazão cai com o tamanho do anel, porque o teto de CPU **por
  *             ledger** (≈500 M, inferido) divide por cédula:
@@ -43,7 +48,7 @@
 
 import { createRequire } from "node:module";
 import {
-  Address, BASE_FEE, Contract, Keypair, Networks,
+  Address, Contract, Keypair, Networks, SorobanDataBuilder,
   TransactionBuilder, nativeToScVal, rpc, scValToNative, xdr,
 } from "@stellar/stellar-sdk";
 
@@ -64,6 +69,9 @@ const RETENTATIVAS = Number(process.env.RETENTATIVAS ?? 0);
 // lance de 100 e de 1.000.000 foi cobrada idênticos 19.690.096 stroops. Os 100
 // do BASE_FEE só servem para perder o leilão quando o ledger está disputado.
 const TAXA_INCLUSAO = Number(process.env.TAXA_INCLUSAO ?? 1_000_000);
+// Espaço de escrita declarado além do que a simulação pediu, para o anel que
+// ainda vai crescer. Medido: 1 de 15 sem isto, 15 de 15 num ledger só com.
+const FOLGA = Number(process.env.FOLGA ?? 96 * 40 + 1024);
 
 const servidor = new rpc.Server(RPC);
 const contrato = new Contract(CONTRATO);
@@ -112,7 +120,7 @@ async function nascerVarios(n, lote = 5) {
 let leitor;
 async function ler(metodo, ...args) {
   const conta = await servidor.getAccount(leitor.publicKey());
-  const tx = new TransactionBuilder(conta, { fee: BASE_FEE, networkPassphrase: PASSPHRASE })
+  const tx = new TransactionBuilder(conta, { fee: "100", networkPassphrase: PASSPHRASE })
     .addOperation(contrato.call(metodo, ...args))
     .setTimeout(30).build();
   const sim = await servidor.simulateTransaction(tx);
@@ -124,7 +132,7 @@ async function ler(metodo, ...args) {
  * Como `enviar` do outro script, mas **não lança**: devolve o que aconteceu.
  * O ponto deste teste é ver as falhas, não parar na primeira.
  */
-async function tentar(par, metodo, args, lance = TAXA_INCLUSAO) {
+async function tentar(par, metodo, args, lance = TAXA_INCLUSAO, folga = 0) {
   const t0 = Date.now();
   try {
     const conta = await servidor.getAccount(par.publicKey());
@@ -136,7 +144,18 @@ async function tentar(par, metodo, args, lance = TAXA_INCLUSAO) {
       return { ok: false, fase: "simulação", erro: sim.error.split("\n")[0] };
     }
     const cpu = Number(sim.cost?.cpuInsns ?? 0);
-    const pronta = rpc.assembleTransaction(bruta, sim).build();
+    let pronta = rpc.assembleTransaction(bruta, sim).build();
+    if (folga > 0) {
+      const dados = new SorobanDataBuilder(
+        pronta.toEnvelope().v1().tx().ext().sorobanData().toXDR("base64"),
+      );
+      const r = dados.build().resources();
+      dados.setResources(r.instructions(), r.diskReadBytes(), r.writeBytes() + folga);
+      pronta = TransactionBuilder.cloneFrom(pronta, {
+        fee: (BigInt(pronta.fee) + BigInt(folga) * 400n).toString(),
+        sorobanData: dados.build(),
+      }).build();
+    }
     pronta.sign(par);
     const envio = await servidor.sendTransaction(pronta);
     if (envio.status === "ERROR") {
@@ -234,13 +253,13 @@ async function main() {
     const c = wasm.caminho_de(enderecos, pesos, i);
     const args = [bN(id), addr(m.publicKey()), bN(chaves[i].publica),
                   vec(c.irmaos.map(bN)), u32(c.indice)];
-    let r = await tentar(m, "comparecer", args);
+    let r = await tentar(m, "comparecer", args, TAXA_INCLUSAO, FOLGA);
     for (let t = 0; !r.ok && t < RETENTATIVAS; t++) {
       // `JaCompareceu` significa que uma tentativa anterior entrou: não insiste.
       if (String(r.erro).includes("#28")) break;
       await dorme(1000 + Math.floor(Math.random() * 4000));
       tentativas[i]++;
-      r = await tentar(m, "comparecer", args);
+      r = await tentar(m, "comparecer", args, TAXA_INCLUSAO, FOLGA);
     }
     return r;
   }));

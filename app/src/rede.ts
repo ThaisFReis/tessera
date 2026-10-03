@@ -6,6 +6,7 @@ import {
   BASE_FEE,
   rpc,
   xdr,
+  SorobanDataBuilder,
   scValToNative,
   nativeToScVal,
 } from "@stellar/stellar-sdk";
@@ -36,6 +37,28 @@ export const REDE = {
 const TAXA_INCLUSAO = 1_000_000;
 /** Quantas vezes insistir, multiplicando o lance por 4 a cada vez. */
 const LANCES = 3;
+
+/**
+ * Stroops a declarar por byte de escrita a mais. O excedente volta: medido, a
+ * mesma chamada custou 3.679.157 sem folga e 3.682.659 com — 0,1% de
+ * diferença no que sai da conta, contra 1 de 15 virando 15 de 15.
+ */
+const STROOPS_POR_BYTE = 400n;
+
+/**
+ * Espaço de escrita a declarar além do que a simulação pediu.
+ *
+ * `comparecer()` faz read-modify-write em `Chave::Anel`, uma entrada que cresce
+ * 96 bytes por pessoa. A simulação declara `writeBytes` para o anel **de
+ * agora** — e quem aplicar depois precisa gravar um anel maior do que declarou.
+ * Com duas pessoas comparecendo no mesmo instante, uma passa e a outra é
+ * recusada com `txFailed`, sem dizer por quê.
+ *
+ * O footprint é uma declaração, não uma medição: declarar espaço para o anel
+ * cheio desde a primeira faz a declaração continuar válida. Medido na testnet,
+ * 15 comparecimentos simultâneos: 1 de 15 sem isto, 15 de 15 num ledger só com.
+ */
+const folgaDoCaderno = (aptos: number) => 96 * Math.max(aptos, 1) + 1024;
 
 const servidor = new rpc.Server(REDE.rpc);
 const contrato = new Contract(REDE.contrato);
@@ -285,13 +308,14 @@ async function enviar(
   args: xdr.ScVal[],
   diario?: Diario,
   resumo?: string,
+  folga = 0,
 ): Promise<string> {
   diario?.({ tipo: "cmd", txt: `${metodo}()` });
   if (resumo) diario?.({ tipo: "val", txt: resumo });
 
   for (let lance = 0; ; lance++) {
     try {
-      return await uma(carteira, metodo, args, TAXA_INCLUSAO * 4 ** lance, diario);
+      return await uma(carteira, metodo, args, TAXA_INCLUSAO * 4 ** lance, diario, folga);
     } catch (e) {
       // Taxa curta não é erro do voto: a transação não entrou em ledger nenhum.
       // Re-simular junto com o lance maior também renova o footprint.
@@ -318,6 +342,7 @@ async function uma(
   args: xdr.ScVal[],
   lance: number,
   diario?: Diario,
+  folga = 0,
 ): Promise<string> {
   const conta = await servidor.getAccount(carteira.endereco());
   const bruta = new TransactionBuilder(conta, {
@@ -351,8 +376,24 @@ async function uma(
     /* o SDK mudou de forma: o custo é informação, não pode derrubar o voto */
   }
 
-  const pronta = rpc.assembleTransaction(bruta, sim).build();
-  diario?.({ tipo: "val", txt: `taxa = ${Number(pronta.fee).toLocaleString("pt-BR")} stroops` });
+  let pronta = rpc.assembleTransaction(bruta, sim).build();
+
+  if (folga > 0) {
+    const dados = new SorobanDataBuilder(
+      pronta.toEnvelope().v1().tx().ext().sorobanData().toXDR("base64"),
+    );
+    const r = dados.build().resources();
+    // `diskReadBytes`, não `readBytes`: o protocolo 23 renomeou.
+    dados.setResources(r.instructions(), r.diskReadBytes(), r.writeBytes() + folga);
+    pronta = TransactionBuilder.cloneFrom(pronta, {
+      fee: (BigInt(pronta.fee) + BigInt(folga) * STROOPS_POR_BYTE).toString(),
+      sorobanData: dados.build(),
+    }).build();
+  }
+
+  // O declarado, não o cobrado: com folga de escrita os dois divergem bastante,
+  // e o cobrado só existe depois que a transação entra.
+  diario?.({ tipo: "val", txt: `taxa reservada = ${Number(pronta.fee).toLocaleString("pt-BR")} stroops` });
 
   const assinada = TransactionBuilder.fromXDR(
     await carteira.assinar(pronta.toXDR()),
@@ -369,6 +410,12 @@ async function uma(
   for (let i = 0; i < 180; i++) {
     const r = await servidor.getTransaction(envio.hash);
     if (r.status === rpc.Api.GetTransactionStatus.SUCCESS) {
+      // O que de fato saiu da conta. A diferença para o reservado volta, e é
+      // por isso que declarar folga de escrita sai quase de graça.
+      const cobrado = r.resultXdr?.feeCharged?.()?.toString();
+      if (cobrado) {
+        diario?.({ tipo: "val", txt: `taxa cobrada = ${Number(cobrado).toLocaleString("pt-BR")} stroops · o resto volta` });
+      }
       diario?.({ tipo: "ok", txt: `tx ${envio.hash}` });
       return envio.hash;
     }
@@ -428,6 +475,8 @@ export const comparecer = (
   caminho: string[],
   indice: number,
   d?: Diario,
+  /** O tamanho do eleitorado: é o teto do anel, e dimensiona a folga. */
+  aptos = 40,
 ) =>
   enviar(
     c,
@@ -435,6 +484,7 @@ export const comparecer = (
     [bytesN(id), endereco(c.endereco()), ponto(chaveAnel), vetor(caminho.map(bytesN)), u32(indice)],
     d,
     `proposta ${id.slice(0, 8)}… · folha ${indice} · caminho com ${caminho.length} irmão${caminho.length === 1 ? "" : "s"}`,
+    folgaDoCaderno(aptos),
   );
 
 /**
