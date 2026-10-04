@@ -152,7 +152,7 @@ mod testes {
         assert_eq!(soma, comprometer(&g, &h, &escalar(2), &(r1 + r2)));
     }
 
-    /// A ocultação perfeita é um teorema (SPEC §3.2), não algo que um teste
+    /// A ocultação perfeita é um teorema (PROTOCOLO §3.2), não algo que um teste
     /// unitário prove. O que dá para fazer em código é a checagem empírica
     /// grosseira: compromissos a 0 e a 1, com `r` independente, têm de ser
     /// indistinguíveis por qualquer estatística simples dos bytes.

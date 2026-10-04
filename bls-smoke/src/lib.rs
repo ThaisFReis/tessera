@@ -19,7 +19,7 @@ use soroban_sdk::{
 
 /// Domain separation tag do desafio de Fiat-Shamir.
 /// TODO: renomear para TESSERA-V1-FIAT-SHAMIR de uma vez so, antes de
-/// publicar qualquer vetor de teste (SPEC.md §2).
+/// publicar qualquer vetor de teste (PROTOCOLO.md §2).
 const DST: &[u8] = b"KARN-URNA-V0-CHALLENGE";
 
 /// DST do segundo gerador. "Nothing up my sleeve": H sai de hash-to-curve de
@@ -408,9 +408,9 @@ impl BlsSmoke {
     // ====================== SONDA 13 (C3): caminho de Merkle ===============
     //
     // O ultimo item do orcamento de votar() que ainda era ESTIMATIVA (~1M no
-    // SPEC §7.2). A folha e H(0x00 || endereco || peso_be): o contrato
+    // PROTOCOLO §7.2). A folha e H(0x00 || endereco || peso_be): o contrato
     // RECALCULA a folha, entao um peso inflado produz outra folha e o caminho
-    // nao fecha. Essa e a defesa inteira contra peso falso (SPEC §6.4).
+    // nao fecha. Essa e a defesa inteira contra peso falso (PROTOCOLO §6.4).
     //
     // Separacao de dominio entre folha (0x00) e no (0x01): sem ela, uma folha
     // de 64 bytes bem escolhida seria apresentada como no interno.

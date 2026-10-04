@@ -224,7 +224,7 @@ persistente é de 120.959. Ambos são **7 dias**.
 Sem intervenção, no sétimo dia os dois níveis de verificação morrem juntos: o
 RPC para de servir os eventos *e* o acumulador arquiva. Nada emite erro no
 dia 1. As consequências de desenho estão em
-[`docs/SPEC.md`](docs/SPEC.md) §5.1 e §8.3 — resumidas:
+[`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) §5.1 e §8.3 — resumidas:
 
 - o verificador lê dos **arquivos de histórico** por padrão, não do RPC;
 - `abrir()` estende o TTL de `Proposta` e dos acumuladores ao teto da rede
@@ -325,12 +325,14 @@ decimal errado.
 
 | | |
 |---|---|
-| [`docs/SPEC.md`](docs/SPEC.md) | a especificação do protocolo: modelo de ameaça, criptografia, interface, orçamento, desenhos rejeitados |
+| [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | a especificação do protocolo: modelo de ameaça, criptografia, interface, orçamento, desenhos rejeitados |
 | [`docs/SMOKES.md`](docs/SMOKES.md) | o catálogo de smoke tests, com a árvore de decisão |
 | [`docs/PLANO.md`](docs/PLANO.md) | cronograma até a submissão, com portões e cortes pré-decididos |
 | [`docs/UX.md`](docs/UX.md) | a especificação de UX, e por que o valor deste produto é uma ausência |
 | [`docs/UX-CLI.md`](docs/UX-CLI.md) | a saída exata da CLI, medida em colunas |
 | [`docs/design-votacao.md`](docs/design-votacao.md) | o desenho do dapp, os bastidores e o guarda do diário |
+| [`docs/SPEC.md`](docs/SPEC.md) | a especificação de trabalho: invariantes, portões, quadro de tarefas, decisões |
+| [`docs/SOURCES.md`](docs/SOURCES.md) | todo fato externo conferido, com data |
 | [`CLAUDE.md`](CLAUDE.md) | como se trabalha neste repositório |
 
 Decks: [português](index.html) · [inglês](index.en.html)

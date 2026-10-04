@@ -545,7 +545,7 @@ fn sonda7_pedersen_abertura_do_agregado_fecha() {
         TX_CPU_LIMIT / c_verify.max(1)
     );
 
-    // Criterio do smoke B1: <= 8M (projetado 5,4M no SPEC §7.2).
+    // Criterio do smoke B1: <= 8M (projetado 5,4M no PROTOCOLO §7.2).
     assert!(
         c_verify <= 8_000_000,
         "verify_aggregate custou {}, acima do teto de 8M do smoke",
@@ -761,7 +761,7 @@ fn sonda12_cds_verifica_e_custa() {
 /// **SONDA 13 (C3) — caminho de Merkle, medido.**
 ///
 /// Fecha o ultimo item do orcamento de `votar()` que ainda era estimativa: o
-/// SPEC §7.2 projetava ~1M para profundidade 8.
+/// PROTOCOLO §7.2 projetava ~1M para profundidade 8.
 ///
 /// O vetor vem do `core` (`merkle::vetor::emitir_vetor_merkle_para_o_contrato`):
 /// 256 aptos deterministicos, caminho do indice 173. Se a raiz calculada aqui,

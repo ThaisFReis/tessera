@@ -53,7 +53,7 @@ $ tessera abrir --proposta contas-2025 \
 ```
 
 A **longa** repete `--pergunta "texto | opções | natureza"`, e é onde mora a
-cédula mista (SPEC §6.5):
+cédula mista (PROTOCOLO §6.5):
 
 ```
 $ tessera abrir --proposta assembleia-2026 \
@@ -209,7 +209,7 @@ $ tessera votar --proposta assembleia-2026 \
 ```
 
 Faltar uma é **recusa**, com a cédula inteira impressa — nunca abstenção
-silenciosa. Abster-se de uma pergunta precisaria da própria prova (SPEC §6.5), e
+silenciosa. Abster-se de uma pergunta precisaria da própria prova (PROTOCOLO §6.5), e
 isso é v1.1; até lá, deixar de responder não pode ser um acidente de digitação.
 
 ```
@@ -259,7 +259,7 @@ isso é v1.1; até lá, deixar de responder não pode ser um acidente de digita�
 
 **Não existe `--publico`, e a ausência é o recurso.** Houve uma versão em que o eleitor podia abrir a própria cédula inteira no ledger. Parecia um direito e era uma alavanca: quem coage confere sozinho, lendo o ledger, sem a pessoa na frente — coação verificável em escala. Uma escolha que o coator pode exigir não é liberdade.
 
-Perguntas públicas continuam existindo e são outra coisa: valem para todos e são decididas pelo estatuto em `abrir` (SPEC §6.5).
+Perguntas públicas continuam existindo e são outra coisa: valem para todos e são decididas pelo estatuto em `abrir` (PROTOCOLO §6.5).
 
 **`Posição 27 de 43 em segredo` é a verificabilidade individual virando uma frase que Dona Marta entende.** Não é "seu commitment está no acumulador". É "você é a 27ª de 43".
 
@@ -548,7 +548,7 @@ Sem tom de reprimenda. O erro mais comum é a pessoa não ter certeza se o voto 
   não decide quem vota.
 ```
 
-A última frase não é desculpa, é arquitetura: o módulo não opina sobre aptidão (SPEC §0). Dizer isso no erro ensina o modelo a quem está integrando.
+A última frase não é desculpa, é arquitetura: o módulo não opina sobre aptidão (PROTOCOLO §0). Dizer isso no erro ensina o modelo a quem está integrando.
 
 ---
 

@@ -683,7 +683,7 @@ fn votar_em_duas_opcoes_e_recusado() {
 }
 
 /// Peso diferente de 1 é recusado por desenho, não documentado como cuidado.
-/// Pesos públicos distintos são quebrados por subconjunto-soma (SPEC §6.3).
+/// Pesos públicos distintos são quebrados por subconjunto-soma (PROTOCOLO §6.3).
 #[test]
 fn peso_nao_unitario_e_recusado() {
     let c = montar(16);

@@ -156,7 +156,7 @@ vetor em `src/test.rs`, porque provador e verificador derivando `H` diferente
 | taxa | 11.852 stroops | **8.622 stroops** (−27%) |
 | sigilo | computacional, com prazo | **permanente, information-theoretic** |
 
-A projeção do SPEC §7.2 era ~5,4M e o medido foi 5.408.931 — **erro de 0,2%**.
+A projeção do PROTOCOLO §7.2 era ~5,4M e o medido foi 5.408.931 — **erro de 0,2%**.
 Cabem 73 apurações numa transação.
 
 Não há trade-off aqui: o desenho que dá sigilo permanente é também o mais

@@ -7,7 +7,7 @@ use soroban_sdk::{
 };
 
 /// Quórum de sigilo: mínimo de cédulas para que a apuração não entregue quem
-/// votou. Ver SPEC §6.6.
+/// votou. Ver PROTOCOLO §6.6.
 ///
 /// Com poucas cédulas o total determina os votos por subtração — no limite,
 /// uma cédula só *é* o voto daquela pessoa. O sigilo dos compromissos é
@@ -60,7 +60,7 @@ pub enum Erro {
     VotacaoAindaAberta = 7,
     JaVotou = 8,
     NaoEstaNaListaDeAptos = 9,
-    /// A v1 só aceita um-voto-por-pessoa. Ver SPEC §6.3: pesos públicos
+    /// A v1 só aceita um-voto-por-pessoa. Ver PROTOCOLO §6.3: pesos públicos
     /// distintos são quebrados por subconjunto-soma, e o contrato **recusa**
     /// essa configuração em vez de documentá-la como cuidado.
     PesoNaoUnitario = 10,
@@ -74,7 +74,7 @@ pub enum Erro {
     MesaAbaixoDoLimiar = 16,
     NaoEMembroDaMesa = 17,
     MembroRepetido = 18,
-    /// Menos de `TAU` cédulas confidenciais. SPEC §6.6: impor o limiar
+    /// Menos de `TAU` cédulas confidenciais. PROTOCOLO §6.6: impor o limiar
     /// converte uma quebra de privacidade numa falha de liveness.
     AnonimatoInsuficiente = 19,
     ArgumentoMalFormado = 20,
@@ -216,7 +216,7 @@ pub struct Proposta {
 }
 
 /// Prova disjuntiva de Cramer–Damgård–Schoenmakers: `v ∈ {0,1}`.
-/// 2 pontos + 4 escalares = 320 bytes. SPEC §6.1.
+/// 2 pontos + 4 escalares = 320 bytes. PROTOCOLO §6.1.
 #[contracttype]
 #[derive(Clone)]
 pub struct ProvaCds {
@@ -229,7 +229,7 @@ pub struct ProvaCds {
 }
 
 /// Schnorr em base `H`, provando conhecimento de `ρ = Σ r_j` com
-/// `D = (Σ C_j) − w·G = ρ·H`. Uma prova, não `m` provas. SPEC §6.2.
+/// `D = (Σ C_j) − w·G = ρ·H`. Uma prova, não `m` provas. PROTOCOLO §6.2.
 #[contracttype]
 #[derive(Clone)]
 pub struct ProvaSoma {

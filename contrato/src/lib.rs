@@ -378,7 +378,7 @@ impl Tessera {
         // quem organizou — a tela avisa. Com seções, **alguém decidiu** quem se
         // esconde atrás de quem, e uma seção minúscula entregaria o voto de
         // quem caiu nela. Aqui a recusa vale mais que o aviso: o mesmo princípio
-        // do SPEC §6.6, que prefere falhar a vazar.
+        // do PROTOCOLO §6.6, que prefere falhar a vazar.
         if p.secoes > 1 && anel.len() < TAU {
             return Err(Erro::AnonimatoInsuficiente);
         }
@@ -460,7 +460,7 @@ impl Tessera {
     /// Revelar `R_j = Σ r_{i,j}` não revela nenhum `r_{i,j}`: é a soma de `n`
     /// valores uniformes, e conhecer a soma de `n` incógnitas não determina
     /// nenhuma delas. E `R_j` chega à mesa por shares de Shamir, então nenhum
-    /// `r` individual se junta em lugar algum (SPEC §4.3).
+    /// `r` individual se junta em lugar algum (PROTOCOLO §4.3).
     ///
     /// ## Por que endosso e não co-assinatura
     ///
@@ -506,7 +506,7 @@ impl Tessera {
             return Err(Erro::NaoEMembroDaMesa);
         }
 
-        // **A regra de τ.** Ver SPEC §6.6. Ou ninguém votou em sigilo — e não
+        // **A regra de τ.** Ver PROTOCOLO §6.6. Ou ninguém votou em sigilo — e não
         // há sigilo a proteger — ou pelo menos τ votaram. Uma coligação que
         // publique os próprios votos de propósito encolheria o conjunto
         // secreto até determiná-lo; aqui ela trava a apuração em vez de ler os
@@ -930,7 +930,7 @@ fn abrir_proposta(env: &Env, proposta: &BytesN<32>) -> Result<Proposta, Erro> {
 /// Aptidão e peso, numa checagem só.
 ///
 /// A v1 exige peso 1. Pesos públicos distintos são quebrados por
-/// subconjunto-soma (SPEC §6.3) e o contrato **recusa** a configuração em vez
+/// subconjunto-soma (PROTOCOLO §6.3) e o contrato **recusa** a configuração em vez
 /// de documentá-la como cuidado. O campo existe na folha para a v1.1, onde ele
 /// vira identificador de faixa com ocupação mínima τ.
 fn conferir_aptidao(

@@ -3,7 +3,7 @@
 //! **O problema que isto resolve.** Se a mesa for uma entidade só, ela recebe
 //! `r_{i,j}` e, com o `C_{i,j}` que é público, calcula `C − r·H = v·G` e lê o
 //! voto individual. Uma mesa única **vê todos os votos** — e a mesa é
-//! tipicamente indicada por quem já tem poder na governança. Ver SPEC §4.3.
+//! tipicamente indicada por quem já tem poder na governança. Ver PROTOCOLO §4.3.
 //!
 //! **A propriedade que faz funcionar.** Shamir é aditivamente homomórfico *nas
 //! shares*: somar as shares de índice `l` de vários segredos dá uma share de

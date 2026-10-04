@@ -235,7 +235,7 @@ pub fn verificar_soma(
 ///
 /// A folha é **recalculada** a partir do endereço, do peso e da seção que
 /// chegaram na chamada. Peso inflado produz outra folha e o caminho não fecha —
-/// essa é a defesa inteira contra peso falso (SPEC §6.4).
+/// essa é a defesa inteira contra peso falso (PROTOCOLO §6.4).
 ///
 /// A seção entra pela mesma razão: se fosse só um argumento, o votante
 /// escolheria a sua, e pegaria a menor ou aquela em que adivinha melhor os

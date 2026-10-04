@@ -2,7 +2,7 @@
 
 **Autor:** Kaan (UX Designer) · **Data:** 2026-09-30
 **Para:** a demo de submissão do hackathon, congelamento 2026-10-04 12:00
-**Leia antes:** [SPEC.md](SPEC.md) §1 (modelo de ameaça), §6.5–6.6 (semi-confidencial), [PLANO.md](PLANO.md) §4 (cortes)
+**Leia antes:** [PROTOCOLO.md](PROTOCOLO.md) §1 (modelo de ameaça), §6.5–6.6 (semi-confidencial), [PLANO.md](PLANO.md) §4 (cortes)
 
 ---
 

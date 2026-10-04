@@ -14,7 +14,7 @@
 //! A governança integradora monta a árvore na
 //! data de corte e passa só a **raiz** para `abrir()`. Quem vota apresenta o
 //! caminho; o contrato confere e usa **o peso da folha, nunca o peso informado
-//! na chamada** (SPEC §6.4).
+//! na chamada** (PROTOCOLO §6.4).
 //!
 //! Isto revela *quem* votou — intencional, é N1, a governança precisa de
 //! quórum. Não revela nada sobre *em quê*.

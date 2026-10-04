@@ -598,7 +598,7 @@ fn nao_apta(e: &Estado) -> R {
     );
     tela::branco();
     // A última frase não é desculpa, é arquitetura: o módulo não opina sobre
-    // aptidão (SPEC §0). Dizer isso no erro ensina o modelo a quem integra.
+    // aptidão (PROTOCOLO §0). Dizer isso no erro ensina o modelo a quem integra.
     tela::linha("Se você deveria estar, fale com quem abriu a votação. Tessera");
     tela::linha("não decide quem vota.");
     tela::branco();
