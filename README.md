@@ -4,20 +4,30 @@
 Hackathon Find Your Way (Meridian) · trilha General
 
 Tessera é um módulo de votação para contratos Soroban. Não é um aplicativo de
-governança nem uma DAO: é um contrato com três funções que qualquer governança
-já existente pode chamar para realizar uma votação em que
+governança nem uma DAO: é um contrato que qualquer governança já existente pode
+chamar para realizar uma votação em que
 
-- **sabe-se que uma pessoa votou**, e isso é público e auditável;
-- **não se sabe em que ela votou**, e isso é secreto *para sempre*, não apenas
-  enquanto a criptografia de hoje resistir;
+- **sabe-se quem compareceu**, e isso é público e auditável — é o que permite
+  voto obrigatório, porque `aptos − compareceram` é a lista de quem faltou;
+- **não se sabe em que cada pessoa votou**, e o compromisso publicado é
+  perfeitamente ocultante: matematicamente vazio de informação, contra qualquer
+  poder computacional, para sempre;
+- **não se sabe de quem é cada cédula**, porque ela sai de uma chave de uso
+  único com assinatura em anel — e nada no ledger liga as duas coisas;
 - **qualquer pessoa pode recalcular o resultado** a partir do ledger e detectar
   uma mesa apuradora que minta.
 
 A ideia que organiza o desenho: num registro permanente, "criptografado hoje"
 significa "legível quando a chave vazar". Então o ledger **nunca recebe um texto
-cifrado do voto**. Ele recebe um compromisso de Pedersen, que é perfeitamente
-ocultante — matematicamente vazio de informação, contra qualquer poder
-computacional, para sempre. O voto em si transita fora da cadeia e é destruído.
+cifrado do voto**. Ele recebe um compromisso de Pedersen, `C = v·G + r·H`. O
+voto em si transita fora da cadeia e é destruído.
+
+A segunda ideia veio da urna brasileira, que resolve há décadas e sem
+criptografia nenhuma o problema de o remetente da cédula ser a identidade de
+quem vota: **o caderno diz quem compareceu, a urna diz o que foi votado, e nada
+liga os dois.** Tessera faz isso em dois atos — `comparecer()` identificado, e
+`votar_anonimo()` de uma chave efêmera, com uma imagem de chave que impede a
+segunda cédula da mesma pessoa sem revelar quem ela é.
 
 ---
 
@@ -25,16 +35,19 @@ computacional, para sempre. O voto em si transita fora da cadeia e é destruído
 
 | | |
 |---|---|
-| Sonda criptográfica medida na testnet | ✅ no ar |
-| Desenho Pedersen verificado on-chain | ✅ medido |
-| Contrato de urna (`abrir`/`votar`/`apurar`) | ✅ no ar, 20 testes |
+| Sondas criptográficas medidas na testnet | ✅ 13 sondas |
+| Contrato de urna (`abrir`/`votar`/`apurar`) | ✅ no ar, 30 testes |
+| Caderno e urna separados (`comparecer`/`votar_anonimo`) | ✅ no ar, rodada de 30 na testnet |
+| Seções (anel por seção, resultado único) | ✅ no ar, 30 em 3 seções |
 | Cliente CLI | ✅ rodada completa na testnet |
 | Verificador público | ✅ no `tessera verificar` |
+| dapp (React, cripto no navegador) | ✅ roda local, **não publicado** |
+| Apuração pelo dapp | ⬜ só pela CLI — as parcelas vivem no navegador de cada membro |
 | Console de demonstração | ✅ visor sobre a saída da CLI |
 
-**O que está no ar hoje é a sonda que estabelece o modelo de custo, não a urna.**
-Todo número abaixo veio de uma invocação real na testnet da Stellar, nunca de
-simulação. O que é projeção está marcado como projeção.
+Todo número abaixo veio de uma invocação real na testnet ou de um teste que roda
+no host do Soroban, nunca de projeção. O que é projeção está marcado como
+projeção.
 
 ---
 
@@ -105,6 +118,67 @@ Detalhes e método em [`bls-smoke/RESULTADOS.md`](bls-smoke/RESULTADOS.md).
 
 ---
 
+## O anel, as seções, e o teto que some
+
+Esconder a escolha não basta quando o remetente da cédula é o endereço de quem
+vota. O anel resolve isso: a cédula sai de uma chave de uso único, com uma
+assinatura que prova que quem assinou está entre os que compareceram **sem
+dizer qual deles**. Uma imagem de chave `I = x·Hp` colide quando a mesma pessoa
+tenta votar duas vezes, e o contrato recusa com `ImagemJaUsada` sem saber de
+quem é.
+
+O anel é a prova disjuntiva de `core/src/cds.rs` generalizada de 2 para `n`
+ramos — mesmo sigma-protocolo, mesmo Fiat–Shamir. **Sem SNARK, sem cerimônia de
+setup, sem circuito.**
+
+Verificar custa **10.822.850 instruções por membro**, linear. Medido com
+`votar_anonimo()` inteiro, não a soma das primitivas:
+
+| no anel | instruções | do teto de 400M |
+|---|---|---|
+| 5 | 94.517.040 | 23,6% |
+| 10 | 148.747.642 | 37,2% |
+| 20 | 257.211.151 | 64,3% |
+| 30 | 365.680.568 | 91,4% |
+
+A reta é `40,3 M fixos + 10,85 M por pessoa`, então a parede aritmética fica em
+32. Mas na testnet um anel de 30 mostrou outro teto antes desse: **só uma cédula
+dessas entra por ledger**, e 18 de 30 confirmaram em 646 s enquanto o resto
+expirou.
+
+Daí as **seções**. O eleitorado é dividido, cada seção tem o seu anel, e o custo
+por cédula para de depender do tamanho da votação. Trinta pessoas em três seções
+de dez, na testnet:
+
+```
+caderno   30/30 aceitas · 30 transações · 25 no mesmo ledger
+urna      30/30 aceitas · 3 por ledger · zero recusas
+cédula    148.889.608 instruções · 37,2% do teto
+```
+
+**O resultado continua único.** O acumulador é por proposta e não sabe de que
+seção veio cada cédula — o Brasil publica boletim por seção e é daí que vem o
+vazamento da seção unânime; aqui não precisa.
+
+O que se paga é o conjunto de anonimato, que passa a ser a seção.
+
+### Quem divide as seções
+
+Ninguém escolhe. Se o organizador escolhesse, poria um dissidente numa seção
+sozinho — anel de um, voto ligado à pessoa, sem precisar de conluio. A ordem vem
+de `H(0x03 ‖ proposta ‖ endereço)` e as seções saem em rodízio sobre ela, o que
+as deixa do mesmo tamanho a menos de um e deixa qualquer pessoa com a lista
+recalcular e conferir.
+
+E a seção entra **na folha de Merkle** — `H(0x00 ‖ endereço ‖ peso ‖ seção)` —
+senão seria argumento da chamada e quem vota escolheria a sua.
+
+O limite que sobra está declarado: quem abre ainda pode moer o identificador da
+proposta atrás de um sorteio que lhe agrade. Com blocos de tamanho igual isso
+não produz uma seção de um, que é o ataque que importa.
+
+---
+
 ## A rodada completa, na testnet
 
 ```bash
@@ -116,6 +190,15 @@ tessera votar   --proposta contas --opcao rejeitar --identidade marta
 tessera queimar --identidade marta
 tessera apurar  --proposta contas
 tessera verificar --proposta contas
+```
+
+No modo anel a CLI **abre** a votação e não vota nela — o voto em anel é do
+dapp, que é onde a chave de anel pode viver no navegador de quem vota:
+
+```bash
+tessera abrir --proposta assembleia --anel --secoes 3 \
+              --pergunta "Aprovar?" --opcoes aprovar,rejeitar \
+              --aptos … --mesa mesa1 -k 1 --inicio 5m --prazo 30m
 ```
 
 Custo real por voto, medido:
@@ -187,14 +270,28 @@ RPC sete dias depois de feitas. Depois disso, leia dos arquivos de histórico.
 ## Reproduzir
 
 ```bash
-cd bls-smoke && cargo test --lib -- --nocapture --test-threads=1   # 13 sondas
-cd ../core   && cargo test                                          # 48 testes
-cd ../contrato && cargo test                                        # 21 testes
-cd ../cli    && cargo test                                          # 23 testes
+cd bls-smoke   && cargo test --lib -- --nocapture --test-threads=1  # 13 sondas
+cd ../core     && cargo test --lib                                  # 68 testes
+cd ../contrato && cargo test                                        # 30 testes
+cd ../cli      && cargo test                                        # 25 testes
+cd ../app      && for t in scripts/*.test.mjs; do node "$t"; done    # 3 testes
 ```
 
-Requer `rustc 1.97+`, `stellar-cli 25.2+`, alvo `wasm32v1-none`.
-Cento e seis testes, todos passando, sem rede.
+Requer `rustc 1.97.1`, `stellar-cli 25.2.0`, alvo `wasm32v1-none`, Node 22+
+(os testes do app usam a remoção de tipos nativa do Node).
+**Cento e trinta e seis testes em Rust e três em JavaScript**, todos passando,
+sem rede.
+
+O dapp precisa do cliente wasm antes de rodar:
+
+```bash
+cd app && npm run wasm && npm run dev     # http://localhost:5273
+```
+
+`npm run wasm` reconstrói e **relinka** o pacote: o `pnpm` liga os arquivos por
+hard-link e o `wasm-pack` reescreve o `.wasm` como arquivo novo, então sem o
+relink a cola nova chama o binário velho e o sintoma é
+`table index is out of bounds`.
 
 O crate `core/` é a matemática compartilhada entre contrato, cliente e
 verificador. Ele usa **arkworks, o mesmo crate do host do Soroban** — o que
@@ -233,12 +330,21 @@ decimal errado.
 | [`docs/PLANO.md`](docs/PLANO.md) | cronograma até a submissão, com portões e cortes pré-decididos |
 | [`docs/UX.md`](docs/UX.md) | a especificação de UX, e por que o valor deste produto é uma ausência |
 | [`docs/UX-CLI.md`](docs/UX-CLI.md) | a saída exata da CLI, medida em colunas |
+| [`docs/design-votacao.md`](docs/design-votacao.md) | o desenho do dapp, os bastidores e o guarda do diário |
+| [`CLAUDE.md`](CLAUDE.md) | como se trabalha neste repositório |
 
 Decks: [português](index.html) · [inglês](index.en.html)
 
 Console: [`console/`](console/) — visor sobre uma rodada real, com a grade de
 compromissos indistinguíveis que não cabe num terminal. É um **visor**, não um
 aplicativo: sem carteira, sem servidor, e não assina nada.
+
+dapp: [`app/`](app/) — React + TypeScript, estático, com `tessera-core`
+compilado para WebAssembly. As provas nascem na aba de quem vota, então **não
+existe servidor que pudesse ver o fator de aleatoriedade, porque não existe
+servidor**. A rota `/bastidores` mostra, numa segunda janela, o que o contrato
+responde a cada ato — inclusive o custo em instruções que a simulação descobriu.
+Ainda não está publicado em lugar nenhum.
 
 ---
 
@@ -247,8 +353,26 @@ aplicativo: sem carteira, sem servidor, e não assina nada.
 Declarar os limites faz parte do desenho. Um sistema de votação que promete
 sigilo além do que entrega é pior que um honesto.
 
-- **Anonimato do ato de votar.** O ledger registra *que* aquela conta votou.
-  É intencional: a governança precisa de quórum.
+- **Duas garantias de naturezas diferentes, e elas não são a mesma coisa.** O
+  compromisso de Pedersen é **perfeitamente** ocultante: não há suposição a
+  quebrar, nem com computador quântico. O anonimato do anel **não** é — ele
+  repousa sobre um problema que se acredita difícil. Achatar as duas numa só
+  frase venderia o que não existe.
+- **Anonimato do comparecimento.** O caderno registra *que* aquela conta
+  compareceu. É intencional: é disso que sai a lista de quem faltou, e sem ela
+  não existe voto obrigatório. O que o ledger não mostra é qual cédula é dela.
+- **A lista de aptos fica pública no modo anel.** Um anel só é verificável por
+  quem tem as chaves de todos os ramos: anonimato de anel é anonimato *dentro de
+  um conjunto conhecido*. É coerente com a urna — no Brasil o eleitorado e o
+  caderno são ambos públicos — mas é uma troca, e ela não existia no desenho
+  identificado.
+- **Um anel de um não esconde ninguém.** O sigilo é propriedade do grupo, não da
+  matemática sozinha. Com seções o contrato recusa anel abaixo de `TAU`; sem
+  seções ele avisa e deixa passar, porque ali ninguém escolheu o grupo.
+- **Uma votação em anel não apura.** Ela não reparte com a mesa o fator que
+  esconde o voto, então ninguém reconstrói a abertura — e ninguém publica total.
+  Não é promessa, é o contrato: qualquer total afirmado cai em
+  `AberturaNaoFecha`. O sigilo é absoluto e o resultado é impossível.
 - **Resistência à coação.** Quem vota conhece o próprio fator de aleatoriedade e
   *consegue* provar o voto a um terceiro. O protocolo remove o registro público
   permanente; não remove a capacidade de alguém se auto-incriminar. É a lacuna

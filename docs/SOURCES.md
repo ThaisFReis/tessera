@@ -1,0 +1,47 @@
+# Fontes
+
+Todo fato externo conferido e todo código copiado, com data. Formato definido em
+[`CLAUDE.md`](../CLAUDE.md).
+
+Medições **internas** — custo de CPU, taxas, vazão — não entram aqui: elas vivem
+no teste que as produz, que é o que as mantém verdadeiras. Ver
+`contrato/src/test.rs::ate_quantas_pessoas_cabe_um_anel`,
+`::trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez` e
+`app/scripts/rodada-30.mjs`.
+
+## Fatos
+
+| Data | Fato | Valor | Versão | Fonte |
+|------|------|-------|--------|-------|
+| 2026-10-03 | Prazo de submissão do hackathon | 12 out 2026, 20:59 | — | https://demo.stellarpassport.xyz/hackathons/find-your-way-meridian-hackathon |
+| 2026-10-03 | Trilhas e prêmios (General: 2.000/1.000/500 USDC) | 5.000 USDC no total | — | idem |
+| 2026-10-03 | Critérios de avaliação da trilha General | execução técnica, uso significativo da Stellar, originalidade, impacto, experiência de uso, apresentação | — | idem |
+| 2026-10-03 | `SorobanResources` renomeou `readBytes` | `diskReadBytes` | protocolo 23 | `@stellar/stellar-sdk` 14.6.1, introspecção de `SorobanDataBuilder().build().resources()` |
+| 2026-10-03 | A rede cobra o mínimo necessário, não o lance oferecido | lance 100 e 1.000.000 → mesma cobrança de 19.690.096 stroops | — | medido na testnet, duas invocações de `abrir` |
+| 2026-10-03 | Folga de escrita declarada é devolvida | 3.679.157 sem folga · 3.682.659 com | — | medido na testnet, `app/scripts/folga.mjs` |
+| 2026-10-02 | Janela útil de eventos do RPC público para a lista de votações | 2.000 ledgers (17.000 devolve zero em silêncio) | — | medido: 100→0, 500→1, 2000→1, 17000→0 |
+| 2026-10-02 | XDR de um `Address` como folha de Merkle | 44 bytes (`toScVal().toXDR()`); `toScAddress()` dá 40 e omite o discriminante | SDK 14 | congelado em `app/scripts/xdr.test.mjs` e `cli/src/chave.rs` |
+| 2026-10-02 | `Bls12381Fr` no ABI do contrato | `U256`, não `BytesN<32>` | — | `stellar contract info interface` |
+| — | Teto de CPU por transação na testnet | 400.000.000 | — | achado por bissecção, `bls-smoke/RESULTADOS.md` |
+| — | Codificação do ponto no infinito em G1 | flag zcash `0x40` no byte alto, zeros no resto — **não** 96 bytes de zero | — | achado somando candidatos ao gerador; travado em `core/src/ponto.rs` |
+| — | Retenção do RPC público e TTL padrão de entrada persistente | 120.960 e 120.959 ledgers — ambos 7 dias | — | sondas 8 e 9, `bls-smoke/RESULTADOS.md` |
+
+## Versões fixadas
+
+| Data | Ferramenta | Versão |
+|------|------------|--------|
+| 2026-10-03 | rustc | 1.97.1 (8bab26f4f 2026-07-14) |
+| 2026-10-03 | stellar-cli | 25.2.0 |
+| 2026-10-03 | node | 24.14.1 (os testes do app usam remoção de tipos nativa, requer 22+) |
+| 2026-10-03 | pnpm | 10.33.0 |
+| 2026-10-03 | @stellar/stellar-sdk | 14.6.1 |
+
+## Código copiado
+
+| Data | Nosso caminho | Origem (URL + commit) | Licença | Tarefa |
+|------|---------------|-----------------------|---------|--------|
+| — | — | nenhum até aqui | — | — |
+
+A matemática vem de `arkworks` como **dependência**, não como cópia — de
+propósito: é o mesmo crate que o host do Soroban usa, o que elimina pela raiz a
+divergência entre o provador nativo e o verificador Wasm.
