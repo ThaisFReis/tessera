@@ -63,7 +63,9 @@ foi auditado por terceiros.
 | "ninguém pode abrir uma cédula em anel" | ela não reparte o fator com a mesa; `AberturaNaoFecha` recusa qualquer total afirmado |
 
 **Proibido afirmar:** que o dapp está publicado (não está), que houve auditoria,
-que há garantia contra coação, ou qualquer número que não venha de medição.
+que há garantia contra coação, que **não existe vínculo nenhum fora do ledger**
+(o friendbot vê IP e endereço efêmero — DEC-004), ou qualquer número que não
+venha de medição.
 
 ---
 
@@ -251,7 +253,8 @@ cd app && node scripts/folga.mjs                    # contenção de escrita
 | T-006 | Atualizar os decks | T-001 | §2 | todo | slide 06 deixa de listar desvinculação como futura; seções aparecem |
 | T-007 | "O modo" em `/abrir` | T-001 | §4 | todo | a tela não oferece votação que `/votar` recusa |
 | T-008 | `/apurar` junta as parcelas da mesa | T-005 | §4 | todo | apuração pelo dapp, sem CLI |
-| T-009 | Assembleia sem mesa nenhuma | T-000 | §5 | blocked | §11-A |
+| T-009 | Assembleia sem mesa nenhuma | T-000 | §5, §10 | todo | `limiar == 0` aceito sse `mesa` vazia; redeploy; os 12 arquivos repontados; `/abrir` e `/apurar` param de exigir mesa |
+| T-010 | `/abrir` avisa quando a seção nasce pequena | T-009 | §10 | todo | recusa abrir com `aptos / secoes < TAU`, dizendo o tamanho que daria; teste do cálculo |
 
 ---
 
@@ -286,34 +289,67 @@ Medição interna vive no teste que a produz, que é o que a mantém verdadeira.
 
 **Consequências.** §8 e §4 apontam para testes, não para a tabela.
 
+### DEC-003: Assembleia sem mesa nenhuma, com o redeploy que vem junto (2026-10-07, T-009)
+
+**Contexto.** §11-A. O contrato exige mesa (`limiar == 0 || limiar > mesa.len()`
+cai em `LimiarInvalido`), mas numa cédula em anel a mesa **não recebe parcela
+nenhuma**: existe no estado e não serve para nada. A tela precisava explicar uma
+exigência sem função.
+
+**Decisão.** Permitir `limiar == 0` se e somente se `mesa` for vazia. O humano
+aceitou o redeploy em 2026-10-07.
+
+**Alternativas.** Manter e explicar na tela — rejeitada: a tela já explicava, e
+explicar bem uma coisa errada continua sendo uma coisa errada.
+
+**Consequências.** Mudança de ABI, logo redeploy, logo toda votação aberta morre
+e os 12 arquivos que pinam o endereço mudam. Desbloqueia T-009.
+
+### DEC-004: O vínculo do friendbot fica declarado, não resolvido (2026-10-07, T-005)
+
+**Contexto.** §11-B. O dapp cria uma chave nova por cédula e o friendbot a
+financia — e vê o IP de quem pediu junto do endereço que vai votar. Minutos
+depois aquele endereço manda uma cédula.
+
+**Decisão.** Aceitar e declarar. O vínculo é *pessoa ↔ cédula*, nunca
+*pessoa ↔ escolha*: a escolha segue protegida pelo compromisso, que é
+perfeitamente ocultante. E é fora do ledger — quem lê a cadeia não vê nada
+disso.
+
+**Alternativas.** (a) Exigir que a pessoa traga a própria conta — rejeitada:
+identifica de forma permanente, que é pior. (b) Passar o pedido por um proxy —
+rejeitada: exigiria o servidor que o projeto existe para não ter.
+
+**Consequências.** É limite de testnet: em mainnet não há friendbot. Já dito na
+tela de votar; §2 passa a listar como afirmação proibida dizer que não existe
+vínculo nenhum fora do ledger.
+
+### DEC-005: `TAU` no anel é regra do contrato, mas o aviso é do organizador (2026-10-07, T-010)
+
+**Contexto.** §11-C. O contrato recusa anel abaixo de `TAU` quando há mais de
+uma seção, e só avisa quando há uma só. O humano observou que **seções existem
+para número grande de pessoas** — então seção pequena é sintoma de configuração
+errada, não um caso de uso.
+
+**Decisão.** A regra do contrato fica: ela é imposta sobre o **comparecimento
+real**, que é a única verdade que ele tem. Mas o momento da checagem estava
+errado — quem descobre hoje é o votante, depois de todo mundo já ter
+comparecido. O organizador passa a ser avisado em `/abrir`, quando ainda dá para
+consertar.
+
+**Alternativas.** (a) Exigir `TAU` em toda votação em anel — rejeitada: uma
+assembleia de três não votaria em sigilo. (b) Validar no contrato em `abrir()` —
+rejeitada: ele só tem a raiz de Merkle, não o tamanho do eleitorado; um número
+declarado daria falsa garantia contra organizador de má-fé, e contra erro o
+aviso no cliente resolve igual.
+
+**Consequências.** Nenhuma mudança de ABI. Abre T-010.
+
 ---
 
 ## §11 Perguntas em aberto
 
-### §11-A — Assembleia aberta sem mesa nenhuma (bloqueia T-009)
+§11-A, §11-B e §11-C foram respondidas em 2026-10-07 e viraram DEC-003, DEC-004
+e DEC-005.
 
-O contrato exige mesa: `limiar == 0 || limiar > mesa.len()` cai em
-`LimiarInvalido`. Mas numa cédula em anel a mesa **não recebe parcela nenhuma** —
-ela existe no estado e não serve para nada, e a tela precisa explicar isso.
-
-O desenho limpo seria permitir `limiar == 0` se e somente se `mesa` for vazia.
-É mudança de ABI, logo redeploy, logo invalida toda votação aberta e os 12
-arquivos que pinam o endereço. **Vale o redeploy antes da submissão?**
-
-### §11-B — O dapp aberto é "nada encenado" até onde? (afeta T-005)
-
-A exigência foi: ambiente controlado para o vídeo, e um dapp aberto para a
-comunidade testar, em que ninguém descubra o voto de outra pessoa. O anel
-entrega isso. Mas o dapp aberto na testnet depende do friendbot, que **vê o IP**
-de quem cria a chave efêmera — vínculo fora do ledger, já dito na tela.
-
-Isso é aceitável para a submissão, ou o dapp aberto deve exigir que a pessoa
-traga a própria conta financiada?
-
-### §11-C — `TAU` por seção (afeta T-009 e o desenho de seções)
-
-Hoje `votar_anonimo` recusa anel abaixo de `TAU` **só quando há mais de uma
-seção**, com o argumento de que ali alguém escolheu o agrupamento. Sem seções o
-contrato avisa e deixa passar.
-
-É a regra certa, ou toda votação em anel deveria exigir `TAU`?
+Nenhuma pergunta em aberto.
