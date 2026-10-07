@@ -237,7 +237,10 @@ mod testes {
 
         assert_eq!(descobrir_total(&a, &g, &h, &soma_r, 100), Some(5));
         // e com o R errado nao se acha total nenhum
-        assert_eq!(descobrir_total(&a, &g, &h, &(soma_r + escalar(1)), 100), None);
+        assert_eq!(
+            descobrir_total(&a, &g, &h, &(soma_r + escalar(1)), 100),
+            None
+        );
         // nem alem do teto da busca
         assert_eq!(descobrir_total(&a, &g, &h, &soma_r, 3), None);
 

@@ -24,7 +24,10 @@ pub fn caminho(identidade: &str) -> PathBuf {
 
 pub fn queimar(identidade: &str) -> Result<Vec<String>, String> {
     let mut feitos = Vec::new();
-    for p in [caminho(identidade), PathBuf::from("recibos").join(format!("{}.json", identidade))] {
+    for p in [
+        caminho(identidade),
+        PathBuf::from("recibos").join(format!("{}.json", identidade)),
+    ] {
         if !p.exists() {
             continue;
         }
@@ -72,7 +75,10 @@ mod testes {
         let feitos = queimar("marta").unwrap();
         assert_eq!(feitos.len(), 1);
         assert!(!caminho("marta").exists());
-        assert!(queimar("marta").unwrap().is_empty(), "queimar duas vezes quebrou");
+        assert!(
+            queimar("marta").unwrap().is_empty(),
+            "queimar duas vezes quebrou"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }

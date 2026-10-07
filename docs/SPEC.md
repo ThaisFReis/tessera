@@ -147,9 +147,14 @@ pergunta.
 | Códigos de erro `Erro` | `contrato/src/tipos.rs` | espelhados em `app/src/rede.ts::ERROS` |
 | DSTs do anel (`TESSERA-V1-ANEL`, `-HP`, `-CONJUNTO`) | `core/src/anel.rs`, `contrato/src/cripto.rs` | divergir faz toda assinatura falhar sem dizer por quê |
 
-**Dados-ouro:** `bls-smoke/vetores.env` (vetores públicos),
-`contrato/test_snapshots/` (orçamento), `app/scripts/xdr.test.mjs` (o vetor de
-44 bytes, espelhado em `cli/src/chave.rs`).
+**Dados-ouro:** `bls-smoke/vetores.env` (vetores públicos) e
+`app/scripts/xdr.test.mjs` (o vetor de 44 bytes, espelhado em
+`cli/src/chave.rs`).
+
+`contrato/test_snapshots/` **não é dado-ouro**, apesar do nome. Medido em
+T-002: rodar o mesmo teste sem tocar no código altera o arquivo. Eles sujam
+todo diff com milhares de linhas que ninguém lê — e um arquivo que muda sozinho
+não prende nada. Ver T-011.
 
 **Não congelado, mas frágil:** `console/` — qualquer mudança nas telas passa por
 `guarda.py` (INV-16).
@@ -257,6 +262,7 @@ cd app && node scripts/folga.mjs                    # contenção de escrita
 | T-008 | `/apurar` junta as parcelas da mesa | T-005 | §4 | todo | apuração pelo dapp, sem CLI |
 | T-009 | Assembleia sem mesa nenhuma | T-000 | §5, §10 | todo | `limiar == 0` aceito sse `mesa` vazia; redeploy; os 12 arquivos repontados; `/abrir` e `/apurar` param de exigir mesa |
 | T-010 | `/abrir` avisa quando a seção nasce pequena | T-009 | §10 | todo | recusa abrir com `aptos / secoes < TAU`, dizendo o tamanho que daria; teste do cálculo |
+| T-011 | Parar o churn de `test_snapshots/` | T-002 | §5 | todo | ou viram determinísticos, ou saem do git; nenhum diff futuro os carrega |
 
 ---
 

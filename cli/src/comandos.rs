@@ -49,7 +49,11 @@ fn lista(arg: &str) -> Result<Vec<String>, String> {
             .filter(|l| !l.is_empty())
             .collect());
     }
-    Ok(arg.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+    Ok(arg
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect())
 }
 
 /// `2h`, `30m`, `90s` ou um número de ledgers. Um ledger fecha em ~5 s.
@@ -61,7 +65,9 @@ fn prazo_em_ledgers(s: &str) -> Result<u64, String> {
         Some('s') => (&s[..s.len() - 1], 1),
         _ => (s, 1),
     };
-    let v: u64 = n.parse().map_err(|_| format!("não entendi o prazo {:?}", s))?;
+    let v: u64 = n
+        .parse()
+        .map_err(|_| format!("não entendi o prazo {:?}", s))?;
     Ok(v * mult)
 }
 
@@ -116,11 +122,23 @@ fn resultado_local(e: &Estado, totais: &[u32]) -> Vec<u32> {
         for j in 0..pg.opcoes.len() {
             let mut claro = 0u32;
             for v in e.votos.iter() {
-                let Some(esc) = v.escolhas.as_ref() else { continue };
-                let i = if v.publico { off_todas + j } else if pg.confidencial { continue } else { off_publ + j };
+                let Some(esc) = v.escolhas.as_ref() else {
+                    continue;
+                };
+                let i = if v.publico {
+                    off_todas + j
+                } else if pg.confidencial {
+                    continue;
+                } else {
+                    off_publ + j
+                };
                 claro += esc.get(i).copied().unwrap_or(0);
             }
-            r.push(if pg.confidencial { totais[off_conf + j] + claro } else { claro });
+            r.push(if pg.confidencial {
+                totais[off_conf + j] + claro
+            } else {
+                claro
+            });
         }
         off_todas += pg.opcoes.len();
         if pg.confidencial {
@@ -187,7 +205,11 @@ fn ler_pergunta(spec: &str) -> Result<PerguntaEstado, String> {
             ))
         }
     };
-    Ok(PerguntaEstado { texto, opcoes, confidencial })
+    Ok(PerguntaEstado {
+        texto,
+        opcoes,
+        confidencial,
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -198,12 +220,19 @@ fn ler_pergunta(spec: &str) -> Result<PerguntaEstado, String> {
 /// outra devolve `NaoEstaNaListaDeAptos`, que não diz por quê; por isso as três
 /// chamadas da CLI passam por aqui.
 fn folhas_de(proposta: &[u8], aptos: &[String], secoes: u32) -> Result<Vec<merkle::Apto>, String> {
-    let es: Vec<Vec<u8>> = aptos.iter().map(|a| cedula::xdr(a)).collect::<Result<_, _>>()?;
+    let es: Vec<Vec<u8>> = aptos
+        .iter()
+        .map(|a| cedula::xdr(a))
+        .collect::<Result<_, _>>()?;
     let d = merkle::dividir(proposta, &es, secoes);
     Ok(es
         .into_iter()
         .zip(&d)
-        .map(|(endereco, secao)| merkle::Apto { endereco, peso: 1, secao: *secao })
+        .map(|(endereco, secao)| merkle::Apto {
+            endereco,
+            peso: 1,
+            secao: *secao,
+        })
         .collect())
 }
 
@@ -237,22 +266,36 @@ pub fn abrir(
             if opcoes.len() < 2 || opcoes.len() > 16 {
                 return Err(format!("são 2 a 16 opções, e você deu {}", opcoes.len()));
             }
-            vec![PerguntaEstado { texto: pergunta[0].clone(), opcoes, confidencial: true }]
+            vec![PerguntaEstado {
+                texto: pergunta[0].clone(),
+                opcoes,
+                confidencial: true,
+            }]
         }
         None => {
             if pergunta.is_empty() {
                 return Err("a cédula está vazia: passe ao menos uma `--pergunta`.".into());
             }
-            pergunta.iter().map(|p| ler_pergunta(p)).collect::<Result<_, _>>()?
+            pergunta
+                .iter()
+                .map(|p| ler_pergunta(p))
+                .collect::<Result<_, _>>()?
         }
     };
     if perguntas.len() > 8 {
-        return Err(format!("são até 8 perguntas, e você deu {}", perguntas.len()));
+        return Err(format!(
+            "são até 8 perguntas, e você deu {}",
+            perguntas.len()
+        ));
     }
     // O orçamento de CPU é limitado pelas opções **sigilosas**: 13.501.500
     // instruções cada. As públicas são conferidas a olho e custam ~350 mil a
     // cédula inteira.
-    let conf: usize = perguntas.iter().filter(|p| p.confidencial).map(|p| p.opcoes.len()).sum();
+    let conf: usize = perguntas
+        .iter()
+        .filter(|p| p.confidencial)
+        .map(|p| p.opcoes.len())
+        .sum();
     if conf > 16 {
         return Err(format!(
             "a cédula tem {} opções sigilosas somadas, e o teto é 16.\n  \
@@ -304,19 +347,31 @@ pub fn abrir(
     for (q, pg) in perguntas.iter().enumerate() {
         tela::linha(&format!("{}. {}", q + 1, pg.texto));
         tela::campo(
-            if pg.confidencial { "  em sigilo" } else { "  em aberto" },
+            if pg.confidencial {
+                "  em sigilo"
+            } else {
+                "  em aberto"
+            },
             &pg.opcoes.join(" · "),
         );
     }
     tela::branco();
     tela::campo(
         "Aptos",
-        &format!("{}  (raiz de Merkle {})", enderecos_aptos.len(), tela::abreviar(&hex(&raiz), 4, 4)),
+        &format!(
+            "{}  (raiz de Merkle {})",
+            enderecos_aptos.len(),
+            tela::abreviar(&hex(&raiz), 4, 4)
+        ),
     );
     tela::campo("Peso", "um voto por pessoa");
     tela::campo(
         "Mesa",
-        &format!("{} membros, {} assinaturas para apurar", enderecos_mesa.len(), limiar),
+        &format!(
+            "{} membros, {} assinaturas para apurar",
+            enderecos_mesa.len(),
+            limiar
+        ),
     );
     tela::campo("Sigilo mínimo", "5 votos confidenciais");
     tela::campo(
@@ -329,7 +384,11 @@ pub fn abrir(
     );
     tela::campo(
         "Encerra",
-        &format!("{}  (ledger {})", relogio((fecha_em - agora) as i64), fecha_em),
+        &format!(
+            "{}  (ledger {})",
+            relogio((fecha_em - agora) as i64),
+            fecha_em
+        ),
     );
 
     let r = c
@@ -377,7 +436,10 @@ pub fn abrir(
 
     tela::secao("publicado");
     tela::campo("Contrato", &tela::abreviar(contrato, 8, 4));
-    tela::campo("Transação", &format!("{}       ledger {}", &tx[..8.min(tx.len())], ledger));
+    tela::campo(
+        "Transação",
+        &format!("{}       ledger {}", &tx[..8.min(tx.len())], ledger),
+    );
     tela::campo("Taxa", &format!("{} stroops", taxa));
     tela::confere("votação aberta");
 
@@ -391,7 +453,12 @@ pub fn abrir(
         aptos: enderecos_aptos,
         identidades: nomes_aptos,
         sigilo_minimo: 5,
-        mesa: Mesa { membros: enderecos_mesa.len(), limiar, enderecos: enderecos_mesa, identidades: nomes_mesa },
+        mesa: Mesa {
+            membros: enderecos_mesa.len(),
+            limiar,
+            enderecos: enderecos_mesa,
+            identidades: nomes_mesa,
+        },
         inicio_ledger: abre_em,
         anel,
         secoes,
@@ -406,7 +473,10 @@ pub fn abrir(
 
     tela::proximo(
         "Compartilhe com quem vota:",
-        &format!("tessera cedula --proposta {} --identidade SEU_NOME", proposta),
+        &format!(
+            "tessera cedula --proposta {} --identidade SEU_NOME",
+            proposta
+        ),
     );
     Ok(())
 }
@@ -437,7 +507,11 @@ pub fn mostrar_cedula(proposta: &str, identidade: &str) -> R {
     for (q, pg) in e.perguntas.iter().enumerate() {
         tela::linha(&format!("{}. {}", q + 1, pg.texto));
         tela::campo(
-            if pg.confidencial { "  em sigilo" } else { "  em aberto" },
+            if pg.confidencial {
+                "  em sigilo"
+            } else {
+                "  em aberto"
+            },
             &pg.opcoes.join(" · "),
         );
     }
@@ -445,8 +519,16 @@ pub fn mostrar_cedula(proposta: &str, identidade: &str) -> R {
     tela::linha(&format!(
         "{} · você {} · {}",
         janela(e.inicio_ledger, e.prazo_ledger, agora),
-        if apta { "é apta" } else { "NÃO está na lista" },
-        if votou { "já votou" } else { "ainda não votou" }
+        if apta {
+            "é apta"
+        } else {
+            "NÃO está na lista"
+        },
+        if votou {
+            "já votou"
+        } else {
+            "ainda não votou"
+        }
     ));
 
     if !apta {
@@ -479,7 +561,10 @@ pub fn mostrar_cedula(proposta: &str, identidade: &str) -> R {
     let perg: Vec<cedula::Pergunta> = e
         .perguntas
         .iter()
-        .map(|p| cedula::Pergunta { opcoes: p.opcoes.len(), confidencial: p.confidencial })
+        .map(|p| cedula::Pergunta {
+            opcoes: p.opcoes.len(),
+            confidencial: p.confidencial,
+        })
         .collect();
     let a = cedula::montar(&h, &pid, &addr, &perg, &esc_a)?;
     let b = cedula::montar(&h, &pid, &addr, &perg, &esc_b)?;
@@ -528,7 +613,11 @@ pub fn mostrar_cedula(proposta: &str, identidade: &str) -> R {
             .collect();
         tela::linha(&format!(
             "Esta cédula é mista. {} vai em claro, ao lado do seu endereço:",
-            if publicas.len() == 1 { "Uma pergunta" } else { "Algumas perguntas" }
+            if publicas.len() == 1 {
+                "Uma pergunta"
+            } else {
+                "Algumas perguntas"
+            }
         ));
         for p in &publicas {
             tela::linha(&format!("  · {}", p));
@@ -594,7 +683,11 @@ fn nao_apta(e: &Estado) -> R {
     tela::branco();
     tela::campo(
         "Raiz de aptos",
-        &format!("{}  ({} aptos)", tela::abreviar(&e.raiz_aptos, 4, 4), e.aptos.len()),
+        &format!(
+            "{}  ({} aptos)",
+            tela::abreviar(&e.raiz_aptos, 4, 4),
+            e.aptos.len()
+        ),
     );
     tela::branco();
     // A última frase não é desculpa, é arquitetura: o módulo não opina sobre
@@ -683,7 +776,11 @@ pub fn votar(proposta: &str, opcao: &[String], identidade: &str) -> R {
             &format!(
                 "{}   [{}]",
                 opcao[q].to_uppercase(),
-                if pg.confidencial { "em segredo" } else { "em claro" }
+                if pg.confidencial {
+                    "em segredo"
+                } else {
+                    "em claro"
+                }
             ),
         );
     }
@@ -705,7 +802,10 @@ pub fn votar(proposta: &str, opcao: &[String], identidade: &str) -> R {
         let perg: Vec<cedula::Pergunta> = e
             .perguntas
             .iter()
-            .map(|p| cedula::Pergunta { opcoes: p.opcoes.len(), confidencial: p.confidencial })
+            .map(|p| cedula::Pergunta {
+                opcoes: p.opcoes.len(),
+                confidencial: p.confidencial,
+            })
             .collect();
         let ced: Cedula = cedula::montar(&h, &id32(proposta), &addr, &perg, &escolhas_idx)?;
 
@@ -743,12 +843,23 @@ pub fn votar(proposta: &str, opcao: &[String], identidade: &str) -> R {
         let por_membro = cedula::dividir_para_a_mesa(&ced.acasos, e.mesa.limiar, e.mesa.membros)?;
         entregar_shares(proposta, &por_membro)?;
 
-        let publicas = if ced.publicas.is_empty() { None } else { Some(ced.publicas.clone()) };
+        let publicas = if ced.publicas.is_empty() {
+            None
+        } else {
+            Some(ced.publicas.clone())
+        };
         registrar(
-            &mut e, proposta, identidade, &endereco, compromissos_hex,
+            &mut e,
+            proposta,
+            identidade,
+            &endereco,
+            compromissos_hex,
             ced.provas.iter().map(|p| hex(&p.serializar())).collect(),
             ced.somas.iter().map(|p| hex(&p.serializar())).collect(),
-            false, publicas, &tx, &c,
+            false,
+            publicas,
+            &tx,
+            &c,
         )?;
 
         // **O recibo não é gravado, e isso é o desenho.**
@@ -768,7 +879,10 @@ pub fn votar(proposta: &str, opcao: &[String], identidade: &str) -> R {
     let conf = e.confidenciais();
 
     tela::secao("enviado");
-    tela::campo("Transação", &format!("{}       ledger {}", &tx[..8.min(tx.len())], ledger));
+    tela::campo(
+        "Transação",
+        &format!("{}       ledger {}", &tx[..8.min(tx.len())], ledger),
+    );
     tela::campo("Taxa", &format!("{} stroops", taxa));
     // Verificabilidade individual numa frase que Dona Marta entende: não é
     // "seu commitment está no acumulador", é "você é a 27ª de 43".
@@ -896,22 +1010,28 @@ pub fn status(proposta: &str) -> R {
     let agora = Cadeia::ledger_atual(&e.rede).unwrap_or(0);
     let (conf, publ) = (e.confidenciais(), e.publicos());
 
-    tela::titulo_com(proposta, &janela(e.inicio_ledger, e.prazo_ledger, agora).to_lowercase());
+    tela::titulo_com(
+        proposta,
+        &janela(e.inicio_ledger, e.prazo_ledger, agora).to_lowercase(),
+    );
     tela::branco();
     let esq = format!("{} de {} votaram", e.votos.len(), e.aptos.len());
     tela::centrado(&format!("{}            {} em segredo", esq, conf));
-    tela::centrado(&format!("{}{} públicos", " ".repeat(esq.chars().count() + 13), publ));
+    tela::centrado(&format!(
+        "{}{} públicos",
+        " ".repeat(esq.chars().count() + 13),
+        publ
+    ));
     tela::branco();
 
     let pode = conf == 0 || conf >= e.sigilo_minimo;
-    tela::campo_veredito(
-        "Sigilo mínimo",
-        &format!("{}", e.sigilo_minimo),
-        pode,
-    );
+    tela::campo_veredito("Sigilo mínimo", &format!("{}", e.sigilo_minimo), pode);
     tela::campo(
         "Mesa",
-        &format!("{} de {} assinaturas para apurar", e.mesa.limiar, e.mesa.membros),
+        &format!(
+            "{} de {} assinaturas para apurar",
+            e.mesa.limiar, e.mesa.membros
+        ),
     );
     tela::branco();
     tela::regua();
@@ -922,11 +1042,17 @@ pub fn status(proposta: &str) -> R {
             &format!("tessera verificar --proposta {}", proposta),
         );
     } else if agora >= e.prazo_ledger {
-        tela::proximo("Apurar:", &format!("tessera apurar --proposta {}", proposta));
+        tela::proximo(
+            "Apurar:",
+            &format!("tessera apurar --proposta {}", proposta),
+        );
     } else {
         tela::proximo(
             "Enquanto está aberta:",
-            &format!("tessera cedula --proposta {} --identidade SEU_NOME", proposta),
+            &format!(
+                "tessera cedula --proposta {} --identidade SEU_NOME",
+                proposta
+            ),
         );
     }
     Ok(())
@@ -953,7 +1079,10 @@ pub fn apurar(proposta: &str, forcar: Option<&str>) -> R {
     let aberturas = cedula::reconstruir_aberturas(&somas, e.mesa.limiar, n_conf)?;
     tela::campo(
         "Mesa",
-        &format!("{} de {} reconstruíram a abertura agregada", e.mesa.limiar, e.mesa.membros),
+        &format!(
+            "{} de {} reconstruíram a abertura agregada",
+            e.mesa.limiar, e.mesa.membros
+        ),
     );
     let conf = e.confidenciais();
     tela::campo_veredito(
@@ -968,13 +1097,19 @@ pub fn apurar(proposta: &str, forcar: Option<&str>) -> R {
     let rotulos_conf = rotulos_confidenciais(&e);
     let mut totais = Vec::new();
     for j in 0..n_conf {
-        let t = pedersen::descobrir_total(&acumuladores[j], &g, &h, &aberturas[j], e.aptos.len() as u64)
-            .ok_or_else(|| {
-                format!(
-                    "a mesa não achou total nenhum para {:?}: as shares não abrem o acumulador",
-                    rotulos_conf[j]
-                )
-            })?;
+        let t = pedersen::descobrir_total(
+            &acumuladores[j],
+            &g,
+            &h,
+            &aberturas[j],
+            e.aptos.len() as u64,
+        )
+        .ok_or_else(|| {
+            format!(
+                "a mesa não achou total nenhum para {:?}: as shares não abrem o acumulador",
+                rotulos_conf[j]
+            )
+        })?;
         totais.push(t as u32);
     }
 
@@ -1003,7 +1138,8 @@ pub fn apurar(proposta: &str, forcar: Option<&str>) -> R {
     tela::secao("o contrato conferiu");
     let mut fecha_local = true;
     for j in 0..n_conf {
-        let ok = pedersen::verifica_agregado(&acumuladores[j], &g, &h, totais[j] as u64, &aberturas[j]);
+        let ok =
+            pedersen::verifica_agregado(&acumuladores[j], &g, &h, totais[j] as u64, &aberturas[j]);
         fecha_local &= ok;
         tela::campo_veredito(
             &format!("Acumulado {}", rotulos_conf[j].to_uppercase()),
@@ -1026,17 +1162,24 @@ pub fn apurar(proposta: &str, forcar: Option<&str>) -> R {
         ("aberturas", serde_json::to_string(&aberturas_dec).unwrap()),
     ];
 
-    let mut envio = Ok(crate::cadeia::Resposta { valor: String::new(), tx: None });
+    let mut envio = Ok(crate::cadeia::Resposta {
+        valor: String::new(),
+        tx: None,
+    });
     let mut fechou = false;
     let mut abriu_secao = false;
-    for (i, membro) in e.mesa.identidades.iter().take(e.mesa.limiar as usize).enumerate() {
+    for (i, membro) in e
+        .mesa
+        .identidades
+        .iter()
+        .take(e.mesa.limiar as usize)
+        .enumerate()
+    {
         let mut com_membro = args.to_vec();
         com_membro.push(("membro", e.mesa.enderecos[i].clone()));
         envio = c.invocar(membro, true, "apurar", &com_membro);
         match &envio {
-            Err(x) => {
-                return recusada(&x.to_string(), conf, e.sigilo_minimo, &totais, fecha_local)
-            }
+            Err(x) => return recusada(&x.to_string(), conf, e.sigilo_minimo, &totais, fecha_local),
             Ok(r) => {
                 if !abriu_secao {
                     tela::secao("a mesa endossa");
@@ -1045,11 +1188,7 @@ pub fn apurar(proposta: &str, forcar: Option<&str>) -> R {
                 fechou = !r.valor.trim().is_empty() && r.valor.trim() != "null";
                 tela::campo(
                     membro,
-                    &format!(
-                        "endossou  ({} de {})",
-                        i + 1,
-                        e.mesa.limiar
-                    ),
+                    &format!("endossou  ({} de {})", i + 1, e.mesa.limiar),
                 );
             }
         }
@@ -1062,7 +1201,10 @@ pub fn apurar(proposta: &str, forcar: Option<&str>) -> R {
             let tx = r.tx.unwrap_or_default();
             let (taxa, ledger) = c.detalhes(&tx).unwrap_or((0, 0));
             tela::branco();
-            tela::campo("Transação", &format!("{}       ledger {}", &tx[..8.min(tx.len())], ledger));
+            tela::campo(
+                "Transação",
+                &format!("{}       ledger {}", &tx[..8.min(tx.len())], ledger),
+            );
             tela::campo("Taxa", &format!("{} stroops", taxa));
             tela::branco();
             tela::regua();
@@ -1090,12 +1232,21 @@ pub fn apurar(proposta: &str, forcar: Option<&str>) -> R {
                 tela::centrado_grande(&format!(
                     "{} · {}",
                     pg.opcoes[vencedora].to_uppercase(),
-                    placar.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(" a ")
+                    placar
+                        .iter()
+                        .map(|t| t.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" a ")
                 ));
                 off += pg.opcoes.len();
             }
 
-            e.apuracao = Some(Apuracao { afirmado: totais, confere: true, tx, ledger });
+            e.apuracao = Some(Apuracao {
+                afirmado: totais,
+                confere: true,
+                tx,
+                ledger,
+            });
             e.aberturas = aberturas.iter().map(cedula::dec_escalar).collect();
             e.gravar()?;
 
@@ -1146,11 +1297,19 @@ fn recusada(erro: &str, conf: u32, minimo: u32, totais: &[u32], fecha_local: boo
 /// Cada membro soma **localmente** as shares que recebeu. Esta função é o que
 /// cada um rodaria na própria máquina; aqui ela lê os diretórios porque a
 /// entrega é simulada, mas a aritmética é a mesma.
-fn ler_shares(proposta: &str, opcoes: usize, membros: usize) -> Result<Vec<(u32, Vec<Fr>)>, String> {
+fn ler_shares(
+    proposta: &str,
+    opcoes: usize,
+    membros: usize,
+) -> Result<Vec<(u32, Vec<Fr>)>, String> {
     let mut saida = Vec::new();
     for l in 1..=membros {
-        let p = std::path::PathBuf::from("shares").join(l.to_string()).join(format!("{}.jsonl", proposta));
-        let Ok(s) = std::fs::read_to_string(&p) else { continue };
+        let p = std::path::PathBuf::from("shares")
+            .join(l.to_string())
+            .join(format!("{}.jsonl", proposta));
+        let Ok(s) = std::fs::read_to_string(&p) else {
+            continue;
+        };
         let mut soma = vec![pedersen::escalar(0); opcoes];
         for linha in s.lines().filter(|l| !l.trim().is_empty()) {
             let v: Vec<String> = serde_json::from_str(linha).map_err(|e| e.to_string())?;
@@ -1168,14 +1327,27 @@ fn decimal_para_fr(s: &str) -> Result<Fr, String> {
     Fr::from_str(s).map_err(|_| format!("escalar decimal inválido: {}", s))
 }
 
-fn acumuladores_da_cadeia(c: &Cadeia, proposta: &str, opcoes: usize) -> Result<Vec<G1Affine>, String> {
+fn acumuladores_da_cadeia(
+    c: &Cadeia,
+    proposta: &str,
+    opcoes: usize,
+) -> Result<Vec<G1Affine>, String> {
     let r = c
-        .invocar("urna-smoke", false, "acumulador", &[("proposta", hex(&id32(proposta)))])
+        .invocar(
+            "urna-smoke",
+            false,
+            "acumulador",
+            &[("proposta", hex(&id32(proposta)))],
+        )
         .map_err(|e| e.to_string())?;
     let v: Vec<String> = serde_json::from_str(&r.valor)
         .map_err(|e| format!("não entendi os acumuladores: {} ({})", e, r.valor))?;
     if v.len() != opcoes {
-        return Err(format!("o contrato devolveu {} acumuladores e a proposta tem {} opções", v.len(), opcoes));
+        return Err(format!(
+            "o contrato devolveu {} acumuladores e a proposta tem {} opções",
+            v.len(),
+            opcoes
+        ));
     }
     v.iter()
         .map(|s| ponto::de_hex(s).map_err(|e| format!("acumulador ilegível: {:?}", e)))
@@ -1193,7 +1365,14 @@ pub fn verificar(proposta: &str) -> R {
 
     tela::titulo("verificador independente");
     tela::branco();
-    tela::campo("Fonte", &format!("contrato {} na {}", tela::abreviar(&e.contrato, 8, 4), e.rede));
+    tela::campo(
+        "Fonte",
+        &format!(
+            "contrato {} na {}",
+            tela::abreviar(&e.contrato, 8, 4),
+            e.rede
+        ),
+    );
     // Honesto: o que o verificador confia é o conjunto de compromissos
     // individuais do arquivo local — e mesmo esse está preso pela soma, que
     // vem da cadeia. Tudo o mais é lido do contrato.
@@ -1205,27 +1384,52 @@ pub fn verificar(proposta: &str) -> R {
     let arvore = merkle::Arvore::montar(&folhas).map_err(|x| format!("{:?}", x))?;
     let raiz_local = hex(&arvore.raiz());
     let prop = c
-        .invocar("urna-smoke", false, "proposta", &[("proposta", hex(&id32(proposta)))])
+        .invocar(
+            "urna-smoke",
+            false,
+            "proposta",
+            &[("proposta", hex(&id32(proposta)))],
+        )
         .map_err(|x| x.to_string())?;
-    let raiz_na_cadeia = prop.valor.split("\"raiz_aptos\":\"").nth(1).and_then(|s| s.split('"').next()).unwrap_or("").to_string();
+    let raiz_na_cadeia = prop
+        .valor
+        .split("\"raiz_aptos\":\"")
+        .nth(1)
+        .and_then(|s| s.split('"').next())
+        .unwrap_or("")
+        .to_string();
     let aptidao = raiz_local == raiz_na_cadeia && !raiz_na_cadeia.is_empty();
     tela::campo_veredito(
         "Aptidão",
-        &format!("{} de {} na raiz {}", e.aptos.len(), e.aptos.len(), tela::abreviar(&raiz_local, 4, 4)),
+        &format!(
+            "{} de {} na raiz {}",
+            e.aptos.len(),
+            e.aptos.len(),
+            tela::abreviar(&raiz_local, 4, 4)
+        ),
         aptidao,
     );
 
     // 2. unicidade
     let mut vistos = std::collections::HashSet::new();
-    let repetidos = e.votos.iter().filter(|v| !vistos.insert(&v.endereco)).count();
-    tela::campo_veredito("Unicidade", &format!("{} repetidos", repetidos), repetidos == 0);
+    let repetidos = e
+        .votos
+        .iter()
+        .filter(|v| !vistos.insert(&v.endereco))
+        .count();
+    tela::campo_veredito(
+        "Unicidade",
+        &format!("{} repetidos", repetidos),
+        repetidos == 0,
+    );
 
     // 3. boa formação: cada prova CDS e cada prova de soma, reverificadas do
     //    zero — **por pergunta**, com o contexto que amarra a pergunta.
     let n_conf = e.opcoes_confidenciais();
     let n_perg_conf = e.perguntas_confidenciais();
     let mut boa = true;
-    let (mut checadas, mut somas_ok, mut somas_total, mut cedulas) = (0usize, 0usize, 0usize, 0usize);
+    let (mut checadas, mut somas_ok, mut somas_total, mut cedulas) =
+        (0usize, 0usize, 0usize, 0usize);
     for v in e.votos.iter().filter(|v| !v.publico) {
         if v.provas.is_empty() {
             continue;
@@ -1250,7 +1454,10 @@ pub fn verificar(proposta: &str) -> R {
                     Ok(p) => {
                         if cds::verificar(
                             &cedula::contexto(&id32(proposta), &addr, q as u32, j as u32),
-                            &g, &h, &cj, &p,
+                            &g,
+                            &h,
+                            &cj,
+                            &p,
                         ) {
                             checadas += 1;
                         } else {
@@ -1272,7 +1479,9 @@ pub fn verificar(proposta: &str) -> R {
                     let d = tessera_core::soma::alvo(&g, &cs, 1);
                     if tessera_core::soma::verificar(
                         &cedula::contexto(&id32(proposta), &addr, q as u32, cedula::OPCAO_DA_SOMA),
-                        &h, &d, &p,
+                        &h,
+                        &d,
+                        &p,
                     ) {
                         somas_ok += 1;
                     } else {
@@ -1285,7 +1494,11 @@ pub fn verificar(proposta: &str) -> R {
             i_soma += 1;
         }
     }
-    tela::campo_veredito("Boa formação", &format!("{} disjuntivas válidas", checadas), boa);
+    tela::campo_veredito(
+        "Boa formação",
+        &format!("{} disjuntivas válidas", checadas),
+        boa,
+    );
     tela::campo_veredito(
         "Soma por pergunta",
         &format!("{} de {} somam 1", somas_ok, somas_total),
@@ -1296,7 +1509,9 @@ pub fn verificar(proposta: &str) -> R {
     //    pergunta. Vale para as duas origens — quem abriu a cédula inteira e
     //    quem respondeu em claro só as perguntas públicas.
     let claro_ok = e.votos.iter().all(|v| {
-        let Some(esc) = v.escolhas.as_ref() else { return true };
+        let Some(esc) = v.escolhas.as_ref() else {
+            return true;
+        };
         let mut off = 0usize;
         for pg in e.perguntas.iter() {
             if !v.publico && pg.confidencial {
@@ -1395,10 +1610,7 @@ pub fn verificar(proposta: &str) -> R {
     // produto prometendo sigilo — é um auditor que tentou tudo, provou o que
     // podia, e relata o que não conseguiu.
     tela::linha("E o que este verificador NÃO conseguiu descobrir:");
-    tela::linha(&format!(
-        "  em que cada uma das {} pessoas votou.",
-        conf
-    ));
+    tela::linha(&format!("  em que cada uma das {} pessoas votou.", conf));
     tela::branco();
 
     e.verificacao = Some(Verificacao {
@@ -1449,10 +1661,7 @@ mod testes {
         assert_eq!(lista("a, b ,c").unwrap(), vec!["a", "b", "c"]);
         let p = std::env::temp_dir().join(format!("tessera-lista-{}.txt", std::process::id()));
         std::fs::write(&p, "marta\n# comentário\njoao   # inline\n\n").unwrap();
-        assert_eq!(
-            lista(p.to_str().unwrap()).unwrap(),
-            vec!["marta", "joao"]
-        );
+        assert_eq!(lista(p.to_str().unwrap()).unwrap(), vec!["marta", "joao"]);
         let _ = std::fs::remove_file(&p);
     }
 }

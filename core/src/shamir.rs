@@ -22,8 +22,8 @@
 //! *brutas*, antes de somar, conseguem. Daí N3 ser procedimental.
 
 use crate::pedersen::acaso_fr;
-use ark_ff::{Field, Zero};
 use ark_bls12_381::Fr;
+use ark_ff::{Field, Zero};
 
 #[derive(Debug, PartialEq)]
 pub enum Erro {
@@ -77,7 +77,10 @@ fn avaliar(coef: &[Fr], x: &Fr) -> Fr {
 /// são aceitas: o polinômio é o mesmo.
 pub fn reconstruir(shares: &[Share], k: usize) -> Result<Fr, Erro> {
     if shares.len() < k {
-        return Err(Erro::PoucasShares { tem: shares.len(), precisa: k });
+        return Err(Erro::PoucasShares {
+            tem: shares.len(),
+            precisa: k,
+        });
     }
     let usar = &shares[..k];
     for (i, s) in usar.iter().enumerate() {
@@ -115,7 +118,10 @@ pub fn reconstruir(shares: &[Share], k: usize) -> Result<Fr, Erro> {
 /// função é o que o membro `l` roda no seu próprio computador — e o resultado
 /// é a única coisa que ele devolve. Os `s_{i,l}` brutos são destruídos aqui.
 pub fn somar_shares(minhas: &[Share]) -> Result<Share, Erro> {
-    let membro = minhas.first().ok_or(Erro::PoucasShares { tem: 0, precisa: 1 })?.membro;
+    let membro = minhas
+        .first()
+        .ok_or(Erro::PoucasShares { tem: 0, precisa: 1 })?
+        .membro;
     if minhas.iter().any(|s| s.membro != membro) {
         return Err(Erro::ComprimentosDiferentes);
     }
@@ -141,14 +147,12 @@ mod testes {
         let (k, n) = (3usize, 5usize);
 
         // cada votante divide o seu r_i e manda uma share a cada membro
-        let por_votante: Vec<Vec<Share>> =
-            rs.iter().map(|r| dividir(r, k, n).unwrap()).collect();
+        let por_votante: Vec<Vec<Share>> = rs.iter().map(|r| dividir(r, k, n).unwrap()).collect();
 
         // cada membro l soma o que recebeu, e isso é tudo que ele devolve
         let parciais: Vec<Share> = (0..n)
             .map(|l| {
-                let minhas: Vec<Share> =
-                    por_votante.iter().map(|v| v[l].clone()).collect();
+                let minhas: Vec<Share> = por_votante.iter().map(|v| v[l].clone()).collect();
                 somar_shares(&minhas).unwrap()
             })
             .collect();
@@ -187,7 +191,10 @@ mod testes {
         // os dois pontos nao excluem nenhum segredo.
         for candidato in [escalar(0), escalar(1), escalar(999), segredo] {
             let tres = vec![
-                Share { membro: 0, valor: candidato }, // f(0) = candidato
+                Share {
+                    membro: 0,
+                    valor: candidato,
+                }, // f(0) = candidato
                 dois[0].clone(),
                 dois[1].clone(),
             ];
@@ -207,7 +214,9 @@ mod testes {
             let xj = Fr::from(sj.membro as u64);
             let (mut num, mut den) = (Fr::from(1u64), Fr::from(1u64));
             for (m, sm) in pts.iter().enumerate() {
-                if m == j { continue; }
+                if m == j {
+                    continue;
+                }
                 let xm = Fr::from(sm.membro as u64);
                 num *= *x - xm;
                 den *= xj - xm;
@@ -255,7 +264,13 @@ mod testes {
         let repetidas = vec![shares[1].clone(), shares[1].clone()];
         assert_eq!(reconstruir(&repetidas, 2), Err(Erro::IndicesRepetidos));
 
-        let com_zero = vec![Share { membro: 0, valor: escalar(1) }, shares[0].clone()];
+        let com_zero = vec![
+            Share {
+                membro: 0,
+                valor: escalar(1),
+            },
+            shares[0].clone(),
+        ];
         assert_eq!(reconstruir(&com_zero, 2), Err(Erro::IndiceZero));
     }
 

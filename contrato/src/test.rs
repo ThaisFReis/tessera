@@ -111,7 +111,10 @@ fn montar_janela(
 
     let mut perg_sdk = Vec::new(&env);
     for (opcoes, confidencial) in perguntas {
-        perg_sdk.push_back(Pergunta { opcoes: *opcoes, confidencial: *confidencial });
+        perg_sdk.push_back(Pergunta {
+            opcoes: *opcoes,
+            confidencial: *confidencial,
+        });
     }
 
     let proposta: BytesN<32> = BytesN::from_array(&env, &[7u8; 32]);
@@ -125,7 +128,7 @@ fn montar_janela(
         &abre_em,
         &fecha_em,
         &false,
-    &1u32,
+        &1u32,
     );
 
     let h = ponto::de_hex(&{
@@ -243,7 +246,9 @@ impl Cenario {
                 continue;
             }
 
-            let rs: Vetor<ArkFr> = (0..*opcoes).map(|_| pedersen::acaso_fr().unwrap()).collect();
+            let rs: Vetor<ArkFr> = (0..*opcoes)
+                .map(|_| pedersen::acaso_fr().unwrap())
+                .collect();
             let cs: Vetor<ArkG1> = (0..*opcoes)
                 .map(|j| {
                     let v = if j == escolha { 1u64 } else { 0 };
@@ -283,7 +288,10 @@ impl Cenario {
                 &rho,
             )
             .unwrap();
-            provas_soma.push_back(ProvaSoma { a: g1(env, &ps.a), z: escalar(env, &ps.z) });
+            provas_soma.push_back(ProvaSoma {
+                a: g1(env, &ps.a),
+                z: escalar(env, &ps.z),
+            });
             todos_rs.extend(rs);
         }
 
@@ -474,7 +482,10 @@ fn mesa_que_mente_no_total_e_recusada() {
         Erro::TotalDiferenteDoComparecimento.into()
     );
     // e o honesto passa
-    let r = c.endossar(3, &tot(&c.env, 4, 2), &ab(&c.env)).unwrap().unwrap();
+    let r = c
+        .endossar(3, &tot(&c.env, 4, 2), &ab(&c.env))
+        .unwrap()
+        .unwrap();
     assert_eq!(r.get(0).unwrap(), 4);
 }
 
@@ -530,7 +541,17 @@ fn ninguem_vota_duas_vezes() {
     let (cs, provas, psoma, pubs, _) = c.cedula(0, 1);
     let (caminho, indice) = c.caminho(0);
     assert_eq!(
-        c.cliente.try_votar(&c.proposta, &c.aptos[0], &cs, &provas, &psoma, &pubs, &caminho, &indice, &1u32),
+        c.cliente.try_votar(
+            &c.proposta,
+            &c.aptos[0],
+            &cs,
+            &provas,
+            &psoma,
+            &pubs,
+            &caminho,
+            &indice,
+            &1u32
+        ),
         Err(Ok(Erro::JaVotou))
     );
 }
@@ -555,24 +576,51 @@ fn quem_nao_esta_na_lista_nao_vota() {
         let v = if j == 0 { 1u64 } else { 0 };
         let p = cds::provar(
             &ctx(env, &c.proposta, &intrusa, 0, j),
-            &c.g, &c.h, &cs_ark[j as usize], v, &rs[j as usize],
-        ).unwrap();
+            &c.g,
+            &c.h,
+            &cs_ark[j as usize],
+            v,
+            &rs[j as usize],
+        )
+        .unwrap();
         compromissos.push_back(g1(env, &cs_ark[j as usize]));
         provas.push_back(ProvaCds {
-            a0: g1(env, &p.a0), a1: g1(env, &p.a1),
-            e0: escalar(env, &p.e0), z0: escalar(env, &p.z0),
-            e1: escalar(env, &p.e1), z1: escalar(env, &p.z1),
+            a0: g1(env, &p.a0),
+            a1: g1(env, &p.a1),
+            e0: escalar(env, &p.e0),
+            z0: escalar(env, &p.z0),
+            e1: escalar(env, &p.e1),
+            z1: escalar(env, &p.z1),
         });
     }
     let rho = rs.iter().fold(ArkFr::from(0u64), |a, r| a + r);
     let d = soma::alvo(&c.g, &cs_ark, 1);
-    let ps = soma::provar(&ctx(env, &c.proposta, &intrusa, 0, u32::MAX), &c.h, &d, &rho).unwrap();
-    let psoma = c.so_uma(ProvaSoma { a: g1(env, &ps.a), z: escalar(env, &ps.z) });
+    let ps = soma::provar(
+        &ctx(env, &c.proposta, &intrusa, 0, u32::MAX),
+        &c.h,
+        &d,
+        &rho,
+    )
+    .unwrap();
+    let psoma = c.so_uma(ProvaSoma {
+        a: g1(env, &ps.a),
+        z: escalar(env, &ps.z),
+    });
     let pubs = c.sem_publicas();
 
     let (caminho, indice) = c.caminho(0);
     assert_eq!(
-        c.cliente.try_votar(&c.proposta, &intrusa, &compromissos, &provas, &psoma, &pubs, &caminho, &indice, &1u32),
+        c.cliente.try_votar(
+            &c.proposta,
+            &intrusa,
+            &compromissos,
+            &provas,
+            &psoma,
+            &pubs,
+            &caminho,
+            &indice,
+            &1u32
+        ),
         Err(Ok(Erro::NaoEstaNaListaDeAptos))
     );
 }
@@ -588,7 +636,17 @@ fn cedula_de_outra_pessoa_nao_vale() {
     let (cs, provas, psoma, pubs, _) = c.cedula(0, 1);
     let (caminho, indice) = c.caminho(1);
     assert_eq!(
-        c.cliente.try_votar(&c.proposta, &c.aptos[1], &cs, &provas, &psoma, &pubs, &caminho, &indice, &1u32),
+        c.cliente.try_votar(
+            &c.proposta,
+            &c.aptos[1],
+            &cs,
+            &provas,
+            &psoma,
+            &pubs,
+            &caminho,
+            &indice,
+            &1u32
+        ),
         Err(Ok(Erro::ProvaBinariaInvalida))
     );
 }
@@ -610,32 +668,74 @@ fn voto_fora_do_binario_e_recusado() {
 
     // a soma fecha — v = (3, −2) soma 1 — então a prova de soma PASSARIA
     let d = soma::alvo(&c.g, &cs_ark, 1);
-    let ps = soma::provar(&ctx(env, &c.proposta, votante, 0, u32::MAX), &c.h, &d, &(r0 + r1)).unwrap();
-    assert!(soma::verificar(&ctx(env, &c.proposta, votante, 0, u32::MAX), &c.h, &d, &ps));
+    let ps = soma::provar(
+        &ctx(env, &c.proposta, votante, 0, u32::MAX),
+        &c.h,
+        &d,
+        &(r0 + r1),
+    )
+    .unwrap();
+    assert!(soma::verificar(
+        &ctx(env, &c.proposta, votante, 0, u32::MAX),
+        &c.h,
+        &d,
+        &ps
+    ));
 
     // e o `core` nem deixa provar v=3
     assert_eq!(
-        cds::provar(&ctx(env, &c.proposta, votante, 0, 0), &c.g, &c.h, &cs_ark[0], 3, &r0),
+        cds::provar(
+            &ctx(env, &c.proposta, votante, 0, 0),
+            &c.g,
+            &c.h,
+            &cs_ark[0],
+            3,
+            &r0
+        ),
         Err(cds::Erro::VotoForaDoBinario(3))
     );
 
     // então quem ataca tem de forjar. Forja uma disjuntiva qualquer:
-    let forjada = cds::provar(&ctx(env, &c.proposta, votante, 0, 0), &c.g, &c.h, &cs_ark[1], 0, &r1).unwrap();
+    let forjada = cds::provar(
+        &ctx(env, &c.proposta, votante, 0, 0),
+        &c.g,
+        &c.h,
+        &cs_ark[1],
+        0,
+        &r1,
+    )
+    .unwrap();
     let mut compromissos = Vec::new(env);
     let mut provas = Vec::new(env);
     for j in 0..OPCOES as usize {
         compromissos.push_back(g1(env, &cs_ark[j]));
         provas.push_back(ProvaCds {
-            a0: g1(env, &forjada.a0), a1: g1(env, &forjada.a1),
-            e0: escalar(env, &forjada.e0), z0: escalar(env, &forjada.z0),
-            e1: escalar(env, &forjada.e1), z1: escalar(env, &forjada.z1),
+            a0: g1(env, &forjada.a0),
+            a1: g1(env, &forjada.a1),
+            e0: escalar(env, &forjada.e0),
+            z0: escalar(env, &forjada.z0),
+            e1: escalar(env, &forjada.e1),
+            z1: escalar(env, &forjada.z1),
         });
     }
-    let psoma = c.so_uma(ProvaSoma { a: g1(env, &ps.a), z: escalar(env, &ps.z) });
+    let psoma = c.so_uma(ProvaSoma {
+        a: g1(env, &ps.a),
+        z: escalar(env, &ps.z),
+    });
     let pubs = c.sem_publicas();
     let (caminho, indice) = c.caminho(0);
     assert_eq!(
-        c.cliente.try_votar(&c.proposta, votante, &compromissos, &provas, &psoma, &pubs, &caminho, &indice, &1u32),
+        c.cliente.try_votar(
+            &c.proposta,
+            votante,
+            &compromissos,
+            &provas,
+            &psoma,
+            &pubs,
+            &caminho,
+            &indice,
+            &1u32
+        ),
         Err(Ok(Erro::ProvaBinariaInvalida))
     );
 }
@@ -659,25 +759,46 @@ fn votar_em_duas_opcoes_e_recusado() {
     for j in 0..OPCOES {
         let p = cds::provar(
             &ctx(env, &c.proposta, votante, 0, j),
-            &c.g, &c.h, &cs_ark[j as usize], 1, &rs[j as usize],
-        ).unwrap();
+            &c.g,
+            &c.h,
+            &cs_ark[j as usize],
+            1,
+            &rs[j as usize],
+        )
+        .unwrap();
         compromissos.push_back(g1(env, &cs_ark[j as usize]));
         provas.push_back(ProvaCds {
-            a0: g1(env, &p.a0), a1: g1(env, &p.a1),
-            e0: escalar(env, &p.e0), z0: escalar(env, &p.z0),
-            e1: escalar(env, &p.e1), z1: escalar(env, &p.z1),
+            a0: g1(env, &p.a0),
+            a1: g1(env, &p.a1),
+            e0: escalar(env, &p.e0),
+            z0: escalar(env, &p.z0),
+            e1: escalar(env, &p.e1),
+            z1: escalar(env, &p.z1),
         });
     }
 
     let rho = rs.iter().fold(ArkFr::from(0u64), |a, r| a + r);
     let d = soma::alvo(&c.g, &cs_ark, 1);
     let ps = soma::provar(&ctx(env, &c.proposta, votante, 0, u32::MAX), &c.h, &d, &rho).unwrap();
-    let psoma = c.so_uma(ProvaSoma { a: g1(env, &ps.a), z: escalar(env, &ps.z) });
+    let psoma = c.so_uma(ProvaSoma {
+        a: g1(env, &ps.a),
+        z: escalar(env, &ps.z),
+    });
     let pubs = c.sem_publicas();
 
     let (caminho, indice) = c.caminho(0);
     assert_eq!(
-        c.cliente.try_votar(&c.proposta, votante, &compromissos, &provas, &psoma, &pubs, &caminho, &indice, &1u32),
+        c.cliente.try_votar(
+            &c.proposta,
+            votante,
+            &compromissos,
+            &provas,
+            &psoma,
+            &pubs,
+            &caminho,
+            &indice,
+            &1u32
+        ),
         Err(Ok(Erro::ProvaDeSomaInvalida))
     );
 }
@@ -690,7 +811,17 @@ fn peso_nao_unitario_e_recusado() {
     let (cs, provas, psoma, pubs, _) = c.cedula(0, 0);
     let (caminho, indice) = c.caminho(0);
     assert_eq!(
-        c.cliente.try_votar(&c.proposta, &c.aptos[0], &cs, &provas, &psoma, &pubs, &caminho, &indice, &1000u32),
+        c.cliente.try_votar(
+            &c.proposta,
+            &c.aptos[0],
+            &cs,
+            &provas,
+            &psoma,
+            &pubs,
+            &caminho,
+            &indice,
+            &1000u32
+        ),
         Err(Ok(Erro::PesoNaoUnitario))
     );
 }
@@ -702,7 +833,17 @@ fn nao_se_vota_depois_do_prazo() {
     let (cs, provas, psoma, pubs, _) = c.cedula(0, 0);
     let (caminho, indice) = c.caminho(0);
     assert_eq!(
-        c.cliente.try_votar(&c.proposta, &c.aptos[0], &cs, &provas, &psoma, &pubs, &caminho, &indice, &1u32),
+        c.cliente.try_votar(
+            &c.proposta,
+            &c.aptos[0],
+            &cs,
+            &provas,
+            &psoma,
+            &pubs,
+            &caminho,
+            &indice,
+            &1u32
+        ),
         Err(Ok(Erro::VotacaoEncerrada))
     );
 }
@@ -737,8 +878,15 @@ fn a_votacao_so_aceita_voto_dentro_da_janela() {
         let (compromissos, provas, provas_soma, publicas, _) = c.cedula_mista(0, &[0]);
         let (irmaos, indice) = c.caminho(0);
         c.cliente.try_votar(
-            &c.proposta, &c.aptos[0], &compromissos, &provas, &provas_soma,
-            &publicas, &irmaos, &indice, &1u32,
+            &c.proposta,
+            &c.aptos[0],
+            &compromissos,
+            &provas,
+            &provas_soma,
+            &publicas,
+            &irmaos,
+            &indice,
+            &1u32,
         )
     };
 
@@ -752,8 +900,15 @@ fn a_votacao_so_aceita_voto_dentro_da_janela() {
     let (irmaos, indice) = c.caminho(1);
     assert_eq!(
         c.cliente.try_votar(
-            &c.proposta, &c.aptos[1], &compromissos, &provas, &provas_soma,
-            &publicas, &irmaos, &indice, &1u32,
+            &c.proposta,
+            &c.aptos[1],
+            &compromissos,
+            &provas,
+            &provas_soma,
+            &publicas,
+            &irmaos,
+            &indice,
+            &1u32,
         ),
         Err(Ok(Erro::VotacaoEncerrada))
     );
@@ -764,7 +919,10 @@ fn a_votacao_so_aceita_voto_dentro_da_janela() {
 fn a_janela_precisa_ter_duracao() {
     let c = montar(4);
     let mut perg = Vec::new(&c.env);
-    perg.push_back(Pergunta { opcoes: OPCOES, confidencial: true });
+    perg.push_back(Pergunta {
+        opcoes: OPCOES,
+        confidencial: true,
+    });
     let mut mesa_sdk = Vec::new(&c.env);
     for m in &c.mesa {
         mesa_sdk.push_back(m.clone());
@@ -772,10 +930,16 @@ fn a_janela_precisa_ter_duracao() {
     let outra: BytesN<32> = BytesN::from_array(&c.env, &[43u8; 32]);
     assert_eq!(
         c.cliente.try_abrir(
-            &Address::generate(&c.env), &outra, &perg,
-            &BytesN::from_array(&c.env, &c.arvore.raiz()), &mesa_sdk,
-            &3u32, &300u32, &300u32, &false,
-        &1u32,
+            &Address::generate(&c.env),
+            &outra,
+            &perg,
+            &BytesN::from_array(&c.env, &c.arvore.raiz()),
+            &mesa_sdk,
+            &3u32,
+            &300u32,
+            &300u32,
+            &false,
+            &1u32,
         ),
         Err(Ok(Erro::PrazoNoPassado))
     );
@@ -840,35 +1004,93 @@ fn abrir_recusa_configuracao_invalida() {
     let cedula = |perguntas: &[(u32, bool)]| {
         let mut v = Vec::new(&env);
         for (opcoes, confidencial) in perguntas {
-            v.push_back(Pergunta { opcoes: *opcoes, confidencial: *confidencial });
+            v.push_back(Pergunta {
+                opcoes: *opcoes,
+                confidencial: *confidencial,
+            });
         }
         v
     };
     let ok = cedula(&[(2, true)]);
 
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&[(1, true)]), &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32),
+        cliente.try_abrir(
+            &gov,
+            &id,
+            &cedula(&[(1, true)]),
+            &raiz,
+            &mesa,
+            &2u32,
+            &0u32,
+            &1000u32,
+            &false,
+            &1u32
+        ),
         Err(Ok(Erro::OpcoesForaDaFaixa))
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&[(17, true)]), &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32),
+        cliente.try_abrir(
+            &gov,
+            &id,
+            &cedula(&[(17, true)]),
+            &raiz,
+            &mesa,
+            &2u32,
+            &0u32,
+            &1000u32,
+            &false,
+            &1u32
+        ),
         Err(Ok(Erro::OpcoesForaDaFaixa))
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&[]), &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32),
+        cliente.try_abrir(
+            &gov,
+            &id,
+            &cedula(&[]),
+            &raiz,
+            &mesa,
+            &2u32,
+            &0u32,
+            &1000u32,
+            &false,
+            &1u32
+        ),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
     // Nove perguntas passam de MAX_PERGUNTAS.
     let nove: Vetor<(u32, bool)> = (0..9).map(|_| (2u32, false)).collect();
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&nove), &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32),
+        cliente.try_abrir(
+            &gov,
+            &id,
+            &cedula(&nove),
+            &raiz,
+            &mesa,
+            &2u32,
+            &0u32,
+            &1000u32,
+            &false,
+            &1u32
+        ),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
     // Cada pergunta cabe, mas o total confidencial passa de MAX_OPCOES — e é
     // o total que o orçamento de CPU limita.
     let gordas: Vetor<(u32, bool)> = (0..3).map(|_| (16u32, true)).collect();
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &cedula(&gordas), &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32),
+        cliente.try_abrir(
+            &gov,
+            &id,
+            &cedula(&gordas),
+            &raiz,
+            &mesa,
+            &2u32,
+            &0u32,
+            &1000u32,
+            &false,
+            &1u32
+        ),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
     // As mesmas 48 opções, mas públicas, não custam disjuntiva nenhuma.
@@ -910,7 +1132,9 @@ fn abrir_recusa_configuracao_invalida() {
         Err(Ok(Erro::MembroRepetido))
     );
 
-    cliente.abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32);
+    cliente.abrir(
+        &gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32,
+    );
     assert_eq!(
         cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32),
         Err(Ok(Erro::PropostaJaExiste))
@@ -946,13 +1170,19 @@ fn o_infinito_do_host_e_a_flag_zcash_nao_zeros() {
     let bls = env.crypto().bls12_381();
     let g = cripto::gerador_g(&env);
 
-    let inf = Bls12381G1Affine::from_bytes(BytesN::from_array(
-        &env,
-        &tessera_core::ponto::INFINITO,
-    ));
-    assert_eq!(bls.g1_add(&inf, &g), g, "INFINITO do core nao e neutro no host");
+    let inf =
+        Bls12381G1Affine::from_bytes(BytesN::from_array(&env, &tessera_core::ponto::INFINITO));
+    assert_eq!(
+        bls.g1_add(&inf, &g),
+        g,
+        "INFINITO do core nao e neutro no host"
+    );
 
-    for ruim in [[0u8; 96], { let mut v = [0u8; 96]; v[0] = 0xc0; v }] {
+    for ruim in [[0u8; 96], {
+        let mut v = [0u8; 96];
+        v[0] = 0xc0;
+        v
+    }] {
         let p = Bls12381G1Affine::from_bytes(BytesN::from_array(&env, &ruim));
         assert!(
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| bls.g1_add(&p, &g))).is_err(),
@@ -989,8 +1219,17 @@ fn orcamento_de_votar_e_de_apurar() {
     let (cs, provas, psoma, pubs, _) = c.cedula(0, 0);
     let (caminho, indice) = c.caminho(0);
     let custo_votar = cpu(&c.env, || {
-        c.cliente
-            .votar(&c.proposta, &c.aptos[0], &cs, &provas, &psoma, &pubs, &caminho, &indice, &1u32)
+        c.cliente.votar(
+            &c.proposta,
+            &c.aptos[0],
+            &cs,
+            &provas,
+            &psoma,
+            &pubs,
+            &caminho,
+            &indice,
+            &1u32,
+        )
     });
 
     // mais quatro confidenciais, para passar de τ
@@ -1007,8 +1246,14 @@ fn orcamento_de_votar_e_de_apurar() {
 
     std::println!("\n== ORCAMENTO DO CONTRATO (m=2) ==");
     std::println!("votar() .......................... {:>10}", custo_votar);
-    std::println!("   % do teto de 400M ............. {:.1}%", 100.0 * custo_votar as f64 / TETO as f64);
-    std::println!("   folga ......................... {:.1}x", TETO as f64 / custo_votar as f64);
+    std::println!(
+        "   % do teto de 400M ............. {:.1}%",
+        100.0 * custo_votar as f64 / TETO as f64
+    );
+    std::println!(
+        "   folga ......................... {:.1}x",
+        TETO as f64 / custo_votar as f64
+    );
     std::println!("   projecao somada das sondas .... {:>10}", 33_480_865u64);
 
     // Portão 1 do PLANO: ≤200M segue sem cortes.
@@ -1073,13 +1318,17 @@ fn apurar_nao_cresce_com_o_comparecimento() {
     std::println!("5 votantes ....................... {:>10}", c5);
     std::println!("40 votantes ...................... {:>10}", c40);
     std::println!("40 votantes, resultado (5,35) .... {:>10}", c40_dividido);
-    std::println!("   8x mais votantes custa ........ {:+.2}%",
-        100.0 * (c40 as f64 - c5 as f64) / c5 as f64);
+    std::println!(
+        "   8x mais votantes custa ........ {:+.2}%",
+        100.0 * (c40 as f64 - c5 as f64) / c5 as f64
+    );
     std::println!("-- atribuicao da sobra --");
     std::println!("leitura pura, 5 votantes ......... {:>10}", l5);
     std::println!("leitura pura, 40 votantes ........ {:>10}", l40);
-    std::println!("   mesma sobra, sem curva ........ {:+.2}%",
-        100.0 * (l40 as f64 - l5 as f64) / l5 as f64);
+    std::println!(
+        "   mesma sobra, sem curva ........ {:+.2}%",
+        100.0 * (l40 as f64 - l5 as f64) / l5 as f64
+    );
 
     // 1. a aritmetica nao depende do resultado
     assert_eq!(
@@ -1204,7 +1453,15 @@ fn prova_nao_migra_entre_perguntas() {
     let (caminho, indice) = c.caminho(0);
     assert_eq!(
         c.cliente.try_votar(
-            &c.proposta, &c.aptos[0], &cs2, &pr2, &ps2, &pubs, &caminho, &indice, &1u32
+            &c.proposta,
+            &c.aptos[0],
+            &cs2,
+            &pr2,
+            &ps2,
+            &pubs,
+            &caminho,
+            &indice,
+            &1u32
         ),
         Err(Ok(Erro::ProvaBinariaInvalida)),
         "a prova da pergunta 1 não pode valer na 2"
@@ -1227,7 +1484,15 @@ fn falta_uma_prova_de_soma() {
     let (caminho, indice) = c.caminho(0);
     assert_eq!(
         c.cliente.try_votar(
-            &c.proposta, &c.aptos[0], &cs, &provas, &so_uma, &pubs, &caminho, &indice, &1u32
+            &c.proposta,
+            &c.aptos[0],
+            &cs,
+            &provas,
+            &so_uma,
+            &pubs,
+            &caminho,
+            &indice,
+            &1u32
         ),
         Err(Ok(Erro::ArgumentoMalFormado))
     );
@@ -1249,7 +1514,15 @@ fn a_parte_publica_fecha_por_pergunta() {
     }
     assert_eq!(
         c.cliente.try_votar(
-            &c.proposta, &c.aptos[0], &cs, &provas, &psomas, &torta, &caminho, &indice, &1u32
+            &c.proposta,
+            &c.aptos[0],
+            &cs,
+            &provas,
+            &psomas,
+            &torta,
+            &caminho,
+            &indice,
+            &1u32
         ),
         Err(Ok(Erro::SomaDiferenteDoPeso))
     );
@@ -1267,18 +1540,34 @@ fn orcamento_da_cedula_mista() {
     let (cs, pr, ps, pb, _) = so_conf.cedula_mista(0, &[0]);
     let (cam, ind) = so_conf.caminho(0);
     let uma = cpu(&so_conf.env, || {
-        so_conf
-            .cliente
-            .votar(&so_conf.proposta, &so_conf.aptos[0], &cs, &pr, &ps, &pb, &cam, &ind, &1u32)
+        so_conf.cliente.votar(
+            &so_conf.proposta,
+            &so_conf.aptos[0],
+            &cs,
+            &pr,
+            &ps,
+            &pb,
+            &cam,
+            &ind,
+            &1u32,
+        )
     });
 
     let mista = montar_cedula(16, &[(2, false), (2, true), (2, true)]);
     let (cs, pr, ps, pb, _) = mista.cedula_mista(0, &[0, 0, 0]);
     let (cam, ind) = mista.caminho(0);
     let tres = cpu(&mista.env, || {
-        mista
-            .cliente
-            .votar(&mista.proposta, &mista.aptos[0], &cs, &pr, &ps, &pb, &cam, &ind, &1u32)
+        mista.cliente.votar(
+            &mista.proposta,
+            &mista.aptos[0],
+            &cs,
+            &pr,
+            &ps,
+            &pb,
+            &cam,
+            &ind,
+            &1u32,
+        )
     });
 
     std::println!("uma pergunta sigilosa ............ {:>12}", uma);
@@ -1320,7 +1609,13 @@ fn orcamento_do_anel() {
     let hp = ponto::desserializar(&hp_sdk.to_array()).unwrap();
 
     std::println!("\n== ORCAMENTO DO ANEL ==");
-    std::println!("{:>7}  {:>12}  {:>8}  {:>9}", "membros", "instrucoes", "% de 400M", "bytes");
+    std::println!(
+        "{:>7}  {:>12}  {:>8}  {:>9}",
+        "membros",
+        "instrucoes",
+        "% de 400M",
+        "bytes"
+    );
 
     let mut custo_10 = 0u64;
     for n in [5usize, 10, 20] {
@@ -1345,7 +1640,9 @@ fn orcamento_do_anel() {
 
         let mut ok = false;
         let custo = cpu(&env, || {
-            ok = cripto::verificar_anel(&env, &pre, &g_sdk, &hp_sdk, &anel_sdk, &imagem, &c0, &z_sdk);
+            ok = cripto::verificar_anel(
+                &env, &pre, &g_sdk, &hp_sdk, &anel_sdk, &imagem, &c0, &z_sdk,
+            );
         });
         assert!(ok, "o anel de {} nao fechou no host", n);
         if n == 10 {
@@ -1425,7 +1722,11 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
     let aptos: Vetor<Address> = (0..10).map(|_| Address::generate(&env)).collect();
     let folhas: Vetor<merkle::Apto> = aptos
         .iter()
-        .map(|a| merkle::Apto { endereco: bytes_de(&a.clone().to_xdr(&env)), peso: 1, secao: 0 })
+        .map(|a| merkle::Apto {
+            endereco: bytes_de(&a.clone().to_xdr(&env)),
+            peso: 1,
+            secao: 0,
+        })
         .collect();
     let arvore = merkle::Arvore::montar(&folhas).unwrap();
 
@@ -1434,14 +1735,23 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
         mesa_sdk.push_back(Address::generate(&env));
     }
     let mut perg = Vec::new(&env);
-    perg.push_back(Pergunta { opcoes: 2, confidencial: true });
+    perg.push_back(Pergunta {
+        opcoes: 2,
+        confidencial: true,
+    });
 
     let proposta: BytesN<32> = BytesN::from_array(&env, &[7u8; 32]);
     cliente.abrir(
-        &Address::generate(&env), &proposta, &perg,
-        &BytesN::from_array(&env, &arvore.raiz()), &mesa_sdk,
-        &3u32, &4_989_990u32, &4_990_190u32, &true,
-    &1u32,
+        &Address::generate(&env),
+        &proposta,
+        &perg,
+        &BytesN::from_array(&env, &arvore.raiz()),
+        &mesa_sdk,
+        &3u32,
+        &4_989_990u32,
+        &4_990_190u32,
+        &true,
+        &1u32,
     );
 
     let g = pedersen::gerador();
@@ -1450,7 +1760,9 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
 
     // ---- fase 1: o caderno ----
     const COMPARECERAM: usize = 7;
-    let xs: Vetor<ArkFr> = (0..COMPARECERAM).map(|_| pedersen::acaso_fr().unwrap()).collect();
+    let xs: Vetor<ArkFr> = (0..COMPARECERAM)
+        .map(|_| pedersen::acaso_fr().unwrap())
+        .collect();
     let mut anel_ark: Vetor<ArkG1> = Vetor::new();
     for (i, x) in xs.iter().enumerate() {
         let pk = anel::chave_publica(&g, x);
@@ -1462,8 +1774,19 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
             }
             (c, p.indice)
         };
-        let tamanho = cliente.comparecer(&proposta, &aptos[i], &g1(&env, &pk), &caminho, &indice, &0u32);
-        assert_eq!(tamanho, i as u32 + 1, "o anel nao cresceu com o comparecimento");
+        let tamanho = cliente.comparecer(
+            &proposta,
+            &aptos[i],
+            &g1(&env, &pk),
+            &caminho,
+            &indice,
+            &0u32,
+        );
+        assert_eq!(
+            tamanho,
+            i as u32 + 1,
+            "o anel nao cresceu com o comparecimento"
+        );
         anel_ark.push(pk);
     }
 
@@ -1475,7 +1798,12 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
                 .persistent()
                 .has(&Chave::Compareceu(proposta.clone(), aptos[i].clone()))
         });
-        assert_eq!(compareceu, i < COMPARECERAM, "o caderno errou sobre o membro {}", i);
+        assert_eq!(
+            compareceu,
+            i < COMPARECERAM,
+            "o caderno errou sobre o membro {}",
+            i
+        );
     }
 
     let mut anel_sdk: Vec<Bls12381G1Affine> = Vec::new(&env);
@@ -1498,7 +1826,14 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
     };
     let atrasado = anel::chave_publica(&g, &pedersen::acaso_fr().unwrap());
     assert_eq!(
-        cliente.try_comparecer(&proposta, &aptos[8], &g1(&env, &atrasado), &caminho, &indice, &0u32),
+        cliente.try_comparecer(
+            &proposta,
+            &aptos[8],
+            &g1(&env, &atrasado),
+            &caminho,
+            &indice,
+            &0u32
+        ),
         Err(Ok(Erro::ComparecimentoEncerrado))
     );
 
@@ -1531,16 +1866,22 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
             let p = cds::provar(&ctx_de(j), &g, &h, &cs[j as usize], v, &rs[j as usize]).unwrap();
             compromissos.push_back(g1(&env, &cs[j as usize]));
             provas.push_back(ProvaCds {
-                a0: g1(&env, &p.a0), a1: g1(&env, &p.a1),
-                e0: escalar(&env, &p.e0), z0: escalar(&env, &p.z0),
-                e1: escalar(&env, &p.e1), z1: escalar(&env, &p.z1),
+                a0: g1(&env, &p.a0),
+                a1: g1(&env, &p.a1),
+                e0: escalar(&env, &p.e0),
+                z0: escalar(&env, &p.z0),
+                e1: escalar(&env, &p.e1),
+                z1: escalar(&env, &p.z1),
             });
         }
         let rho = rs.iter().fold(ArkFr::from(0u64), |a, r| a + r);
         let d = soma::alvo(&g, &cs, 1);
         let ps = soma::provar(&ctx_de(u32::MAX), &h, &d, &rho).unwrap();
         let mut provas_soma = Vec::new(&env);
-        provas_soma.push_back(ProvaSoma { a: g1(&env, &ps.a), z: escalar(&env, &ps.z) });
+        provas_soma.push_back(ProvaSoma {
+            a: g1(&env, &ps.a),
+            z: escalar(&env, &ps.z),
+        });
         let escolhas: Vec<u32> = Vec::new(&env);
 
         let msg = cripto::mensagem_cedula(&env, &proposta, &compromissos, &escolhas);
@@ -1549,8 +1890,16 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
         for zi in &s.z {
             z.push_back(escalar(&env, zi));
         }
-        (anel_sdk.clone(), g1(&env, &s.imagem), escalar(&env, &s.c0), z,
-         compromissos, provas, provas_soma, escolhas)
+        (
+            anel_sdk.clone(),
+            g1(&env, &s.imagem),
+            escalar(&env, &s.c0),
+            z,
+            compromissos,
+            provas,
+            provas_soma,
+            escolhas,
+        )
     };
 
     for i in 0..COMPARECERAM {
@@ -1582,15 +1931,28 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
 
     // E o comparecimento confidencial bateu: sete cédulas, nenhuma com dono.
     let (conf, _publ): (u32, u32) = env.as_contract(&id, || {
-        env.storage().persistent().get(&Chave::Comparecimento(proposta.clone())).unwrap()
+        env.storage()
+            .persistent()
+            .get(&Chave::Comparecimento(proposta.clone()))
+            .unwrap()
     });
     assert_eq!(conf, COMPARECERAM as u32);
 
     std::println!("\n== CADERNO E URNA ==");
     std::println!("aptos ............... 10");
-    std::println!("compareceram ........ {}  (o caderno nomeia os 3 que faltaram)", COMPARECERAM);
-    std::println!("cedulas ............. {}  (nenhuma com endereco de membro)", conf);
-    std::println!("anel ................ {} ramos, {} bytes", COMPARECERAM, anel::tamanho(COMPARECERAM));
+    std::println!(
+        "compareceram ........ {}  (o caderno nomeia os 3 que faltaram)",
+        COMPARECERAM
+    );
+    std::println!(
+        "cedulas ............. {}  (nenhuma com endereco de membro)",
+        conf
+    );
+    std::println!(
+        "anel ................ {} ramos, {} bytes",
+        COMPARECERAM,
+        anel::tamanho(COMPARECERAM)
+    );
 }
 
 /// **O portão 2 do PLANO: a cédula que o navegador monta é aceita pelo contrato.**
@@ -1617,7 +1979,11 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
     let aptos: Vetor<Address> = (0..3).map(|_| Address::generate(&env)).collect();
     let folhas: Vetor<merkle::Apto> = aptos
         .iter()
-        .map(|a| merkle::Apto { endereco: bytes_de(&a.clone().to_xdr(&env)), peso: 1, secao: 0 })
+        .map(|a| merkle::Apto {
+            endereco: bytes_de(&a.clone().to_xdr(&env)),
+            peso: 1,
+            secao: 0,
+        })
         .collect();
     let arvore = merkle::Arvore::montar(&folhas).unwrap();
     let mut mesa_sdk = Vec::new(&env);
@@ -1628,15 +1994,27 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
     // caso em que os deslocamentos entre compromissos e escolhas podem
     // divergir, e é por isso que o teste usa ela.
     let mut perg = Vec::new(&env);
-    perg.push_back(Pergunta { opcoes: 3, confidencial: true });
-    perg.push_back(Pergunta { opcoes: 2, confidencial: false });
+    perg.push_back(Pergunta {
+        opcoes: 3,
+        confidencial: true,
+    });
+    perg.push_back(Pergunta {
+        opcoes: 2,
+        confidencial: false,
+    });
 
     let proposta: BytesN<32> = BytesN::from_array(&env, &[0x5au8; 32]);
     cliente.abrir(
-        &Address::generate(&env), &proposta, &perg,
-        &BytesN::from_array(&env, &arvore.raiz()), &mesa_sdk,
-        &3u32, &4_989_990u32, &4_990_190u32, &true,
-    &1u32,
+        &Address::generate(&env),
+        &proposta,
+        &perg,
+        &BytesN::from_array(&env, &arvore.raiz()),
+        &mesa_sdk,
+        &3u32,
+        &4_989_990u32,
+        &4_990_190u32,
+        &true,
+        &1u32,
     );
 
     let g = pedersen::gerador();
@@ -1652,7 +2030,14 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
         for s in &c.irmaos {
             irmaos.push_back(BytesN::from_array(&env, s));
         }
-        cliente.comparecer(&proposta, &aptos[i], &g1(&env, pk), &irmaos, &c.indice, &0u32);
+        cliente.comparecer(
+            &proposta,
+            &aptos[i],
+            &g1(&env, pk),
+            &irmaos,
+            &c.indice,
+            &0u32,
+        );
     }
     env.ledger().set_sequence_number(4_990_000);
 
@@ -1661,8 +2046,14 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
     let imagem = anel::imagem(&hp, &xs[EU]);
     let ident = ponto::serializar(&imagem).to_vec();
     let perguntas_js = [
-        PerguntaJs { opcoes: 3, confidencial: true },
-        PerguntaJs { opcoes: 2, confidencial: false },
+        PerguntaJs {
+            opcoes: 3,
+            confidencial: true,
+        },
+        PerguntaJs {
+            opcoes: 2,
+            confidencial: false,
+        },
     ];
     let escolhas_feitas = [2u32, 0u32];
     let anel_hex: Vetor<std::string::String> = anel_ark.iter().map(ponto::para_hex).collect();
@@ -1673,17 +2064,29 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
     // o anel assina. Montar isso por fora foi o que deixou passar uma
     // assinatura sobre a cédula errada até a testnet.
     let a = anonima(
-        &ponto_hex(&proposta.to_array()), &ponto::para_hex(&hp), &h_hex,
-        &anel_hex, EU, &segredo_hex, &perguntas_js, &escolhas_feitas,
+        &ponto_hex(&proposta.to_array()),
+        &ponto::para_hex(&hp),
+        &h_hex,
+        &anel_hex,
+        EU,
+        &segredo_hex,
+        &perguntas_js,
+        &escolhas_feitas,
     )
     .expect("o cliente nao montou a cedula anonima");
     let c = &a.cedula;
-    assert!(c.parcelas.is_empty(), "sem mesa, nao pode sair parcela de Shamir");
+    assert!(
+        c.parcelas.is_empty(),
+        "sem mesa, nao pode sair parcela de Shamir"
+    );
     let msg = msg_cliente(&proposta.to_array(), &c.compromissos, &c.escolhas).unwrap();
     let s = anel::Assinatura {
         imagem: ponto::de_hex(&a.imagem).unwrap(),
         c0: pedersen::fr_de_bytes_be(&hex_bytes(&a.c0)),
-        z: a.z.iter().map(|h| pedersen::fr_de_bytes_be(&hex_bytes(h))).collect(),
+        z: a.z
+            .iter()
+            .map(|h| pedersen::fr_de_bytes_be(&hex_bytes(h)))
+            .collect(),
     };
     assert!(
         anel::verificar(&msg, &g, &hp, &anel_ark, &s),
@@ -1701,7 +2104,9 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
     }
     assert_eq!(
         msg,
-        bytes_de(&cripto::mensagem_cedula(&env, &proposta, &compr_sdk, &esc_sdk)),
+        bytes_de(&cripto::mensagem_cedula(
+            &env, &proposta, &compr_sdk, &esc_sdk
+        )),
         "a mensagem do cliente divergiu da do contrato"
     );
     let _ = anel_hex;
@@ -1734,13 +2139,24 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
     }
 
     cliente.votar_anonimo(
-        &proposta, &0u32, &anel_sdk, &g1(&env, &s.imagem), &escalar(&env, &s.c0), &z_sdk,
-        &compr_sdk, &provas_sdk, &soma_sdk, &esc_sdk,
+        &proposta,
+        &0u32,
+        &anel_sdk,
+        &g1(&env, &s.imagem),
+        &escalar(&env, &s.c0),
+        &z_sdk,
+        &compr_sdk,
+        &provas_sdk,
+        &soma_sdk,
+        &esc_sdk,
     );
 
     // A pergunta pública conta em claro; a sigilosa só soma no acumulador.
     let publico: u32 = env.as_contract(&id, || {
-        env.storage().persistent().get(&Chave::TotalPublico(proposta.clone(), 1, 0)).unwrap()
+        env.storage()
+            .persistent()
+            .get(&Chave::TotalPublico(proposta.clone(), 1, 0))
+            .unwrap()
     });
     assert_eq!(publico, 1, "a escolha publica do cliente nao chegou");
 
@@ -1753,9 +2169,11 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
 }
 
 fn hex_bytes(s: &str) -> Vetor<u8> {
-    (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
+        .collect()
 }
-
 
 fn ponto_hex(b: &[u8]) -> std::string::String {
     b.iter().map(|x| std::format!("{:02x}", x)).collect()
@@ -1788,21 +2206,34 @@ fn ate_quantas_pessoas_cabe_um_anel() {
         let aptos: Vetor<Address> = (0..n).map(|_| Address::generate(&env)).collect();
         let folhas: Vetor<merkle::Apto> = aptos
             .iter()
-            .map(|a| merkle::Apto { endereco: bytes_de(&a.clone().to_xdr(&env)), peso: 1, secao: 0 })
+            .map(|a| merkle::Apto {
+                endereco: bytes_de(&a.clone().to_xdr(&env)),
+                peso: 1,
+                secao: 0,
+            })
             .collect();
         let arvore = merkle::Arvore::montar(&folhas).unwrap();
 
         let mut mesa_sdk = Vec::new(&env);
         mesa_sdk.push_back(Address::generate(&env));
         let mut perg = Vec::new(&env);
-        perg.push_back(Pergunta { opcoes: 2, confidencial: true });
+        perg.push_back(Pergunta {
+            opcoes: 2,
+            confidencial: true,
+        });
 
         let proposta: BytesN<32> = BytesN::from_array(&env, &[7u8; 32]);
         cliente.abrir(
-            &Address::generate(&env), &proposta, &perg,
-            &BytesN::from_array(&env, &arvore.raiz()), &mesa_sdk,
-            &1u32, &4_989_990u32, &4_990_190u32, &true,
-        &1u32,
+            &Address::generate(&env),
+            &proposta,
+            &perg,
+            &BytesN::from_array(&env, &arvore.raiz()),
+            &mesa_sdk,
+            &1u32,
+            &4_989_990u32,
+            &4_990_190u32,
+            &true,
+            &1u32,
         );
 
         let g = pedersen::gerador();
@@ -1853,16 +2284,22 @@ fn ate_quantas_pessoas_cabe_um_anel() {
             let p = cds::provar(&ctx_de(j), &g, &h, &cs[j as usize], v, &rs[j as usize]).unwrap();
             compromissos.push_back(g1(&env, &cs[j as usize]));
             provas.push_back(ProvaCds {
-                a0: g1(&env, &p.a0), a1: g1(&env, &p.a1),
-                e0: escalar(&env, &p.e0), z0: escalar(&env, &p.z0),
-                e1: escalar(&env, &p.e1), z1: escalar(&env, &p.z1),
+                a0: g1(&env, &p.a0),
+                a1: g1(&env, &p.a1),
+                e0: escalar(&env, &p.e0),
+                z0: escalar(&env, &p.z0),
+                e1: escalar(&env, &p.e1),
+                z1: escalar(&env, &p.z1),
             });
         }
         let rho = rs.iter().fold(ArkFr::from(0u64), |a, r| a + r);
         let d = soma::alvo(&g, &cs, 1);
         let ps = soma::provar(&ctx_de(u32::MAX), &h, &d, &rho).unwrap();
         let mut provas_soma = Vec::new(&env);
-        provas_soma.push_back(ProvaSoma { a: g1(&env, &ps.a), z: escalar(&env, &ps.z) });
+        provas_soma.push_back(ProvaSoma {
+            a: g1(&env, &ps.a),
+            z: escalar(&env, &ps.z),
+        });
         let escolhas: Vec<u32> = Vec::new(&env);
 
         let msg = cripto::mensagem_cedula(&env, &proposta, &compromissos, &escolhas);
@@ -1876,14 +2313,24 @@ fn ate_quantas_pessoas_cabe_um_anel() {
 
         let custo = cpu(&env, || {
             cliente.votar_anonimo(
-                &proposta, &0u32, &anel_sdk, &imagem, &c0, &z,
-                &compromissos, &provas, &provas_soma, &escolhas,
+                &proposta,
+                &0u32,
+                &anel_sdk,
+                &imagem,
+                &c0,
+                &z,
+                &compromissos,
+                &provas,
+                &provas_soma,
+                &escolhas,
             );
         });
 
         std::println!(
             "{:>7}  {:>12}  {:>8.1}%",
-            n, custo, 100.0 * custo as f64 / TETO as f64
+            n,
+            custo,
+            100.0 * custo as f64 / TETO as f64
         );
 
         // O que a landing afirma: vinte cabe. Trinta é onde a conta aperta.
@@ -1891,13 +2338,19 @@ fn ate_quantas_pessoas_cabe_um_anel() {
             assert!(
                 custo <= TETO,
                 "um anel de 20 nao cabe numa transacao: {} de {}",
-                custo, TETO
+                custo,
+                TETO
             );
         }
         // E o crescimento tem de continuar linear: se um dia virar quadrático,
         // o número publicado deixa de valer sem ninguém perceber.
         if anterior > 0 {
-            assert!(custo > anterior, "o custo nao cresceu de {} para {}", anterior, custo);
+            assert!(
+                custo > anterior,
+                "o custo nao cresceu de {} para {}",
+                anterior,
+                custo
+            );
         }
         anterior = custo;
     }
@@ -1936,26 +2389,43 @@ fn trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez() {
 
     let proposta: BytesN<32> = BytesN::from_array(&env, &[11u8; 32]);
     let aptos: Vetor<Address> = (0..N).map(|_| Address::generate(&env)).collect();
-    let xdrs: Vetor<Vetor<u8>> = aptos.iter().map(|a| bytes_de(&a.clone().to_xdr(&env))).collect();
+    let xdrs: Vetor<Vetor<u8>> = aptos
+        .iter()
+        .map(|a| bytes_de(&a.clone().to_xdr(&env)))
+        .collect();
 
     // A divisão vem da lista. Quem organiza não escolhe quem cai com quem.
     let divisao = merkle::dividir(&proposta.to_array(), &xdrs, SECOES);
     let folhas: Vetor<merkle::Apto> = xdrs
         .iter()
         .zip(&divisao)
-        .map(|(e, s)| merkle::Apto { endereco: e.clone(), peso: 1, secao: *s })
+        .map(|(e, s)| merkle::Apto {
+            endereco: e.clone(),
+            peso: 1,
+            secao: *s,
+        })
         .collect();
     let arvore = merkle::Arvore::montar(&folhas).unwrap();
 
     let mut mesa_sdk = Vec::new(&env);
     mesa_sdk.push_back(Address::generate(&env));
     let mut perg = Vec::new(&env);
-    perg.push_back(Pergunta { opcoes: 2, confidencial: true });
+    perg.push_back(Pergunta {
+        opcoes: 2,
+        confidencial: true,
+    });
 
     cliente.abrir(
-        &Address::generate(&env), &proposta, &perg,
-        &BytesN::from_array(&env, &arvore.raiz()), &mesa_sdk,
-        &1u32, &4_989_990u32, &4_990_190u32, &true, &SECOES,
+        &Address::generate(&env),
+        &proposta,
+        &perg,
+        &BytesN::from_array(&env, &arvore.raiz()),
+        &mesa_sdk,
+        &1u32,
+        &4_989_990u32,
+        &4_990_190u32,
+        &true,
+        &SECOES,
     );
 
     let g = pedersen::gerador();
@@ -1976,9 +2446,15 @@ fn trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez() {
     let outra = (divisao[0] + 1) % SECOES;
     assert_eq!(
         cliente.try_comparecer(
-            &proposta, &aptos[0],
-            &g1(&env, &anel::chave_publica(&g, &pedersen::acaso_fr().unwrap())),
-            &c0_, &i0_, &outra,
+            &proposta,
+            &aptos[0],
+            &g1(
+                &env,
+                &anel::chave_publica(&g, &pedersen::acaso_fr().unwrap())
+            ),
+            &c0_,
+            &i0_,
+            &outra,
         ),
         Err(Ok(Erro::NaoEstaNaListaDeAptos)),
         "deu para escolher a seção: quem vota pegaria a menor"
@@ -1999,7 +2475,10 @@ fn trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez() {
             N / SECOES as usize,
             "o rodízio devia deixar as seções do mesmo tamanho"
         );
-        assert_eq!(cliente.anel(&proposta, &s).len() as usize, aneis[s as usize].len());
+        assert_eq!(
+            cliente.anel(&proposta, &s).len() as usize,
+            aneis[s as usize].len()
+        );
     }
 
     let aneis_sdk: Vetor<Vec<Bls12381G1Affine>> = aneis
@@ -2041,27 +2520,45 @@ fn trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez() {
             let p = cds::provar(&ctx_de(j), &g, &h, &cs[j as usize], v, &rs[j as usize]).unwrap();
             compromissos.push_back(g1(&env, &cs[j as usize]));
             provas.push_back(ProvaCds {
-                a0: g1(&env, &p.a0), a1: g1(&env, &p.a1),
-                e0: escalar(&env, &p.e0), z0: escalar(&env, &p.z0),
-                e1: escalar(&env, &p.e1), z1: escalar(&env, &p.z1),
+                a0: g1(&env, &p.a0),
+                a1: g1(&env, &p.a1),
+                e0: escalar(&env, &p.e0),
+                z0: escalar(&env, &p.z0),
+                e1: escalar(&env, &p.e1),
+                z1: escalar(&env, &p.z1),
             });
         }
         let rho = rs.iter().fold(ArkFr::from(0u64), |a, r| a + r);
         let d = soma::alvo(&g, &cs, 1);
         let ps = soma::provar(&ctx_de(u32::MAX), &h, &d, &rho).unwrap();
         let mut provas_soma = Vec::new(&env);
-        provas_soma.push_back(ProvaSoma { a: g1(&env, &ps.a), z: escalar(&env, &ps.z) });
+        provas_soma.push_back(ProvaSoma {
+            a: g1(&env, &ps.a),
+            z: escalar(&env, &ps.z),
+        });
         let escolhas: Vec<u32> = Vec::new(&env);
 
         let msg = cripto::mensagem_cedula(&env, &proposta, &compromissos, &escolhas);
-        let dentro = aneis[secao].iter().position(|p| *p == anel::chave_publica(&g, &xs[i])).unwrap();
+        let dentro = aneis[secao]
+            .iter()
+            .position(|p| *p == anel::chave_publica(&g, &xs[i]))
+            .unwrap();
         let s = anel::assinar(&bytes_de(&msg), &g, &hp, &aneis[secao], dentro, &xs[i]).unwrap();
         let mut z = Vec::new(&env);
         for zi in &s.z {
             z.push_back(escalar(&env, zi));
         }
-        (divisao[i], aneis_sdk[secao].clone(), g1(&env, &s.imagem), escalar(&env, &s.c0), z,
-         compromissos, provas, provas_soma, escolhas)
+        (
+            divisao[i],
+            aneis_sdk[secao].clone(),
+            g1(&env, &s.imagem),
+            escalar(&env, &s.c0),
+            z,
+            compromissos,
+            provas,
+            provas_soma,
+            escolhas,
+        )
     };
 
     let mut custo_cedula = 0u64;
@@ -2076,14 +2573,19 @@ fn trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez() {
     }
 
     std::println!("\n== TRINTA EM TRES SECOES ==");
-    std::println!("  cedula de anel {}: {} instrucoes, {:.1}% do teto",
-        N / SECOES as usize, custo_cedula, 100.0 * custo_cedula as f64 / TETO as f64);
+    std::println!(
+        "  cedula de anel {}: {} instrucoes, {:.1}% do teto",
+        N / SECOES as usize,
+        custo_cedula,
+        100.0 * custo_cedula as f64 / TETO as f64
+    );
 
     // O ganho inteiro: trinta votantes, mas o preço de um anel de dez.
     assert!(
         custo_cedula < TETO / 2,
         "a cédula de uma seção de 10 devia caber folgado: {} de {}",
-        custo_cedula, TETO
+        custo_cedula,
+        TETO
     );
 
     // ---- o anel de uma seção não serve em outra ----
@@ -2091,7 +2593,16 @@ fn trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez() {
     let vizinha = (sec + 1) % SECOES;
     assert_eq!(
         cliente.try_votar_anonimo(
-            &proposta, &vizinha, &aneis_sdk[sec as usize], &img, &c0, &z, &cs, &pr, &psm, &esc,
+            &proposta,
+            &vizinha,
+            &aneis_sdk[sec as usize],
+            &img,
+            &c0,
+            &z,
+            &cs,
+            &pr,
+            &psm,
+            &esc,
         ),
         Err(Ok(Erro::AnelInvalido)),
         "uma cédula migrou de seção, e o anel de uma seção não prova nada na outra"

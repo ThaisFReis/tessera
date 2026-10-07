@@ -5,11 +5,11 @@
 //! referências entre parênteses são as sondas de `bls-smoke/RESULTADOS.md`.
 
 use crate::tipos::{Erro, ProvaCds, ProvaSoma};
+use soroban_sdk::xdr::ToXdr;
 use soroban_sdk::{
     crypto::bls12_381::{Bls12381Fr, Bls12381G1Affine},
     Address, Bytes, BytesN, Env, Vec,
 };
-use soroban_sdk::xdr::ToXdr;
 
 /// "Nothing up my sleeve": `H` sai de hash-to-curve de uma string fixa, então
 /// ninguém conhece `log_G(H)`. Se alguém conhecesse, poderia abrir qualquer
@@ -25,6 +25,10 @@ const DOM_FOLHA: u8 = 0x00;
 const DOM_NO: u8 = 0x01;
 
 /// Gerador canônico de G1, não comprimido: `be_bytes(X) ‖ be_bytes(Y)`.
+///
+/// As linhas têm 16 bytes de propósito: seis delas são os 96 do ponto, e as
+/// três primeiras são X. O `rustfmt` reflowa para 14 e a estrutura some.
+#[rustfmt::skip]
 pub fn gerador_g(env: &Env) -> Bls12381G1Affine {
     Bls12381G1Affine::from_bytes(BytesN::from_array(env, &[
         0x17,0xf1,0xd3,0xa7,0x31,0x97,0xd7,0x94,0x26,0x95,0x63,0x8c,0x4f,0xa9,0xac,0x0f,

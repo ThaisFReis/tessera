@@ -14,7 +14,10 @@ mod tela;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "tessera", about = "Voto secreto para qualquer governança, na Stellar.")]
+#[command(
+    name = "tessera",
+    about = "Voto secreto para qualquer governança, na Stellar."
+)]
 struct Cli {
     #[command(subcommand)]
     comando: Comando,
@@ -128,13 +131,50 @@ enum Comando {
 fn main() {
     let cli = Cli::parse();
     let r = match &cli.comando {
-        Comando::Abrir { proposta, pergunta, opcoes, aptos, mesa, limiar, inicio, prazo, anel, secoes, contrato, rede, governanca } =>
-            comandos::abrir(proposta, pergunta, opcoes.as_deref(), aptos, mesa, *limiar, inicio, prazo, *anel, *secoes, contrato, rede, governanca),
-        Comando::Cedula { proposta, identidade } => comandos::mostrar_cedula(proposta, identidade),
-        Comando::Votar { proposta, opcao, identidade } => comandos::votar(proposta, opcao, identidade),
+        Comando::Abrir {
+            proposta,
+            pergunta,
+            opcoes,
+            aptos,
+            mesa,
+            limiar,
+            inicio,
+            prazo,
+            anel,
+            secoes,
+            contrato,
+            rede,
+            governanca,
+        } => comandos::abrir(
+            proposta,
+            pergunta,
+            opcoes.as_deref(),
+            aptos,
+            mesa,
+            *limiar,
+            inicio,
+            prazo,
+            *anel,
+            *secoes,
+            contrato,
+            rede,
+            governanca,
+        ),
+        Comando::Cedula {
+            proposta,
+            identidade,
+        } => comandos::mostrar_cedula(proposta, identidade),
+        Comando::Votar {
+            proposta,
+            opcao,
+            identidade,
+        } => comandos::votar(proposta, opcao, identidade),
         Comando::Queimar { identidade } => comandos::queimar(identidade),
         Comando::Status { proposta } => comandos::status(proposta),
-        Comando::Apurar { proposta, forcar_total } => comandos::apurar(proposta, forcar_total.as_deref()),
+        Comando::Apurar {
+            proposta,
+            forcar_total,
+        } => comandos::apurar(proposta, forcar_total.as_deref()),
         Comando::Verificar { proposta } => comandos::verificar(proposta),
     };
     if let Err(e) = r {

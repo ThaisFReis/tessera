@@ -45,13 +45,29 @@ fn resumir(saida: &str) -> String {
 /// de propósito: se o contrato ganhar um erro novo e a CLI não souber dele, a
 /// mensagem crua aparece em vez de uma tradução errada.
 const NOMES_DE_ERRO: &[&str] = &[
-    "PropostaJaExiste", "PropostaNaoExiste", "OpcoesForaDaFaixa", "LimiarInvalido",
-    "PrazoNoPassado", "VotacaoEncerrada", "VotacaoAindaAberta", "JaVotou",
-    "NaoEstaNaListaDeAptos", "PesoNaoUnitario", "ProvaBinariaInvalida",
-    "ProvaDeSomaInvalida", "PontoForaDoSubgrupo", "AberturaNaoFecha", "JaApurada",
-    "MesaAbaixoDoLimiar", "NaoEMembroDaMesa", "MembroRepetido",
-    "AnonimatoInsuficiente", "ArgumentoMalFormado", "EscolhaForaDoBinario",
-    "SomaDiferenteDoPeso", "TotalDiferenteDoComparecimento",
+    "PropostaJaExiste",
+    "PropostaNaoExiste",
+    "OpcoesForaDaFaixa",
+    "LimiarInvalido",
+    "PrazoNoPassado",
+    "VotacaoEncerrada",
+    "VotacaoAindaAberta",
+    "JaVotou",
+    "NaoEstaNaListaDeAptos",
+    "PesoNaoUnitario",
+    "ProvaBinariaInvalida",
+    "ProvaDeSomaInvalida",
+    "PontoForaDoSubgrupo",
+    "AberturaNaoFecha",
+    "JaApurada",
+    "MesaAbaixoDoLimiar",
+    "NaoEMembroDaMesa",
+    "MembroRepetido",
+    "AnonimatoInsuficiente",
+    "ArgumentoMalFormado",
+    "EscolhaForaDoBinario",
+    "SomaDiferenteDoPeso",
+    "TotalDiferenteDoComparecimento",
 ];
 
 pub struct Resposta {
@@ -67,7 +83,10 @@ pub struct Cadeia {
 
 impl Cadeia {
     pub fn nova(contrato: &str, rede: &str) -> Cadeia {
-        Cadeia { contrato: contrato.to_string(), rede: rede.to_string() }
+        Cadeia {
+            contrato: contrato.to_string(),
+            rede: rede.to_string(),
+        }
     }
 
     /// Resolve o nome de uma identidade da `stellar` CLI no endereço `G…`.
@@ -94,8 +113,16 @@ impl Cadeia {
         args: &[(&str, String)],
     ) -> Result<Resposta, Erro> {
         let mut cmd = Command::new("stellar");
-        cmd.args(["contract", "invoke", "--id", &self.contrato, "--source", fonte,
-                  "--network", &self.rede]);
+        cmd.args([
+            "contract",
+            "invoke",
+            "--id",
+            &self.contrato,
+            "--source",
+            fonte,
+            "--network",
+            &self.rede,
+        ]);
         if enviar {
             cmd.arg("--send=yes");
         }
@@ -112,7 +139,10 @@ impl Cadeia {
             return Err(Erro::Rede { saida: err });
         }
         let valor = String::from_utf8_lossy(&s.stdout).trim().to_string();
-        Ok(Resposta { valor, tx: extrair_tx(&err) })
+        Ok(Resposta {
+            valor,
+            tx: extrair_tx(&err),
+        })
     }
 
     /// **A mesa `k`-de-`n` assinando junto.**
@@ -136,8 +166,18 @@ impl Cadeia {
         })?;
 
         let mut cmd = Command::new("stellar");
-        cmd.args(["contract", "invoke", "--id", &self.contrato, "--source", fonte,
-                  "--network", &self.rede, "--build-only", "--"]);
+        cmd.args([
+            "contract",
+            "invoke",
+            "--id",
+            &self.contrato,
+            "--source",
+            fonte,
+            "--network",
+            &self.rede,
+            "--build-only",
+            "--",
+        ]);
         cmd.arg(metodo);
         for (k, v) in args {
             cmd.arg(format!("--{}", k));
@@ -145,7 +185,9 @@ impl Cadeia {
         }
         let s = cmd.output().map_err(|e| Erro::Comando(e.to_string()))?;
         if !s.status.success() {
-            return Err(Erro::Rede { saida: String::from_utf8_lossy(&s.stderr).to_string() });
+            return Err(Erro::Rede {
+                saida: String::from_utf8_lossy(&s.stderr).to_string(),
+            });
         }
         let bruto = String::from_utf8_lossy(&s.stdout).trim().to_string();
 
@@ -154,11 +196,21 @@ impl Cadeia {
         // que os preenche — e é também o que monta as entradas de autorização
         // que cada membro vai assinar.
         let s = Command::new("stellar")
-            .args(["tx", "simulate", &bruto, "--source", fonte, "--network", &self.rede])
+            .args([
+                "tx",
+                "simulate",
+                &bruto,
+                "--source",
+                fonte,
+                "--network",
+                &self.rede,
+            ])
             .output()
             .map_err(|e| Erro::Comando(e.to_string()))?;
         if !s.status.success() {
-            return Err(Erro::Rede { saida: String::from_utf8_lossy(&s.stderr).to_string() });
+            return Err(Erro::Rede {
+                saida: String::from_utf8_lossy(&s.stderr).to_string(),
+            });
         }
         let mut envelope = String::from_utf8_lossy(&s.stdout).trim().to_string();
 
@@ -172,7 +224,9 @@ impl Cadeia {
             .map_err(|e| Erro::Comando(e.to_string()))?;
         let err = String::from_utf8_lossy(&s.stderr).to_string();
         if !s.status.success() {
-            return Err(Erro::Rede { saida: format!("{}{}", String::from_utf8_lossy(&s.stdout), err) });
+            return Err(Erro::Rede {
+                saida: format!("{}{}", String::from_utf8_lossy(&s.stdout), err),
+            });
         }
         let saida = String::from_utf8_lossy(&s.stdout).to_string();
         Ok(Resposta {
@@ -183,7 +237,15 @@ impl Cadeia {
 
     fn assinar(envelope: &str, identidade: &str, rede: &str) -> Result<String, Erro> {
         let s = Command::new("stellar")
-            .args(["tx", "sign", envelope, "--sign-with-key", identidade, "--network", rede])
+            .args([
+                "tx",
+                "sign",
+                envelope,
+                "--sign-with-key",
+                identidade,
+                "--network",
+                rede,
+            ])
             .output()
             .map_err(|e| Erro::Comando(e.to_string()))?;
         if !s.status.success() {
@@ -206,8 +268,14 @@ impl Cadeia {
     /// medi uma parada de 140 s no meio de uma fila de votos, que levou o
     /// prazo junto.
     pub fn detalhes(&self, tx: &str) -> Option<(u64, u64)> {
-        let url = format!("https://horizon-{}.stellar.org/transactions/{}", self.rede, tx);
-        let s = Command::new("curl").args(["-s", "--max-time", "10", &url]).output().ok()?;
+        let url = format!(
+            "https://horizon-{}.stellar.org/transactions/{}",
+            self.rede, tx
+        );
+        let s = Command::new("curl")
+            .args(["-s", "--max-time", "10", &url])
+            .output()
+            .ok()?;
         let v: serde_json::Value = serde_json::from_slice(&s.stdout).ok()?;
         let taxa = v.get("fee_charged")?.as_str()?.parse().ok()?;
         let ledger = v.get("ledger")?.as_u64()?;
@@ -220,7 +288,10 @@ impl Cadeia {
             "https://horizon-{}.stellar.org/ledgers?order=desc&limit=1",
             rede
         );
-        let s = Command::new("curl").args(["-s", "--max-time", "10", &url]).output().ok()?;
+        let s = Command::new("curl")
+            .args(["-s", "--max-time", "10", &url])
+            .output()
+            .ok()?;
         let v: serde_json::Value = serde_json::from_slice(&s.stdout).ok()?;
         v["_embedded"]["records"][0]["sequence"].as_u64()
     }

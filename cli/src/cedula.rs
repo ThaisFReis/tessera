@@ -95,9 +95,7 @@ pub fn montar(
 
         let mut rs = Vec::with_capacity(pg.opcoes);
         for _ in 0..pg.opcoes {
-            rs.push(
-                pedersen::acaso_fr().map_err(|_| "sem aleatoriedade do sistema".to_string())?,
-            );
+            rs.push(pedersen::acaso_fr().map_err(|_| "sem aleatoriedade do sistema".to_string())?);
         }
         let cs: Vec<G1Affine> = (0..pg.opcoes)
             .map(|j| {
@@ -118,7 +116,12 @@ pub fn montar(
                     &rs[j],
                 )
                 .map_err(|e| {
-                    format!("não consegui provar a opção {} da pergunta {}: {:?}", j, q + 1, e)
+                    format!(
+                        "não consegui provar a opção {} da pergunta {}: {:?}",
+                        j,
+                        q + 1,
+                        e
+                    )
                 })?,
             );
         }
@@ -140,7 +143,13 @@ pub fn montar(
         acasos.extend(rs);
     }
 
-    Ok(Cedula { compromissos, provas, somas, publicas, acasos })
+    Ok(Cedula {
+        compromissos,
+        provas,
+        somas,
+        publicas,
+        acasos,
+    })
 }
 
 // ---------- serialização para a `stellar contract invoke` ----------
@@ -255,7 +264,10 @@ pub fn reconstruir_aberturas(
         let shares: Vec<shamir::Share> = somas
             .iter()
             .take(limiar as usize)
-            .map(|(membro, v)| shamir::Share { membro: *membro, valor: v[j] })
+            .map(|(membro, v)| shamir::Share {
+                membro: *membro,
+                valor: v[j],
+            })
             .collect();
         r.push(
             shamir::reconstruir(&shares, limiar as usize)
@@ -288,12 +300,21 @@ mod testes {
         let (h, p32) = (h(), [7u8; 32]);
         let addr = xdr(CONTA).unwrap();
 
-        let uma = [Pergunta { opcoes: 3, confidencial: true }];
+        let uma = [Pergunta {
+            opcoes: 3,
+            confidencial: true,
+        }];
         for escolha in 0..3 {
             let c = montar(&h, &p32, &addr, &uma, &[escolha]).unwrap();
             for j in 0..3 {
                 assert!(
-                    cds::verificar(&contexto(&p32, &addr, 0, j as u32), &g, &h, &c.compromissos[j], &c.provas[j]),
+                    cds::verificar(
+                        &contexto(&p32, &addr, 0, j as u32),
+                        &g,
+                        &h,
+                        &c.compromissos[j],
+                        &c.provas[j]
+                    ),
                     "a disjuntiva da opcao {} nao fecha",
                     j
                 );
@@ -319,9 +340,18 @@ mod testes {
         let (h, p32) = (h(), [11u8; 32]);
         let addr = xdr(CONTA).unwrap();
         let perguntas = [
-            Pergunta { opcoes: 2, confidencial: true },
-            Pergunta { opcoes: 2, confidencial: false },
-            Pergunta { opcoes: 3, confidencial: true },
+            Pergunta {
+                opcoes: 2,
+                confidencial: true,
+            },
+            Pergunta {
+                opcoes: 2,
+                confidencial: false,
+            },
+            Pergunta {
+                opcoes: 3,
+                confidencial: true,
+            },
         ];
         let c = montar(&h, &p32, &addr, &perguntas, &[1, 0, 2]).unwrap();
 
@@ -336,27 +366,48 @@ mod testes {
             for j in ini..fim {
                 assert!(cds::verificar(
                     &contexto(&p32, &addr, q, (j - ini) as u32),
-                    &g, &h, &c.compromissos[j], &c.provas[j]
+                    &g,
+                    &h,
+                    &c.compromissos[j],
+                    &c.provas[j]
                 ));
             }
         }
         let d0 = soma::alvo(&g, &c.compromissos[0..2], 1);
-        assert!(soma::verificar(&contexto(&p32, &addr, 0, OPCAO_DA_SOMA), &h, &d0, &c.somas[0]));
+        assert!(soma::verificar(
+            &contexto(&p32, &addr, 0, OPCAO_DA_SOMA),
+            &h,
+            &d0,
+            &c.somas[0]
+        ));
         let d2 = soma::alvo(&g, &c.compromissos[2..5], 1);
-        assert!(soma::verificar(&contexto(&p32, &addr, 2, OPCAO_DA_SOMA), &h, &d2, &c.somas[1]));
+        assert!(soma::verificar(
+            &contexto(&p32, &addr, 2, OPCAO_DA_SOMA),
+            &h,
+            &d2,
+            &c.somas[1]
+        ));
 
         // **A prova nao migra.** A disjuntiva da opcao 0 da pergunta 0,
         // conferida como se fosse da pergunta 2, tem de falhar.
         assert!(
             !cds::verificar(
                 &contexto(&p32, &addr, 2, 0),
-                &g, &h, &c.compromissos[0], &c.provas[0]
+                &g,
+                &h,
+                &c.compromissos[0],
+                &c.provas[0]
             ),
             "a prova da pergunta 1 nao pode valer na pergunta 3"
         );
         // E a prova de soma tambem nao.
         assert!(
-            !soma::verificar(&contexto(&p32, &addr, 2, OPCAO_DA_SOMA), &h, &d0, &c.somas[0]),
+            !soma::verificar(
+                &contexto(&p32, &addr, 2, OPCAO_DA_SOMA),
+                &h,
+                &d0,
+                &c.somas[0]
+            ),
             "a soma da pergunta 1 nao pode valer na pergunta 3"
         );
     }
@@ -379,7 +430,10 @@ mod testes {
         let mut caixa: Vec<Vec<Fr>> = vec![vec![pedersen::escalar(0); opcoes]; membros];
         let mut acumuladores = vec![Vec::new(); opcoes];
 
-        let uma = [Pergunta { opcoes: 2, confidencial: true }];
+        let uma = [Pergunta {
+            opcoes: 2,
+            confidencial: true,
+        }];
         for escolha in escolhas {
             let c = montar(&h, &p32, &addr, &uma, &[escolha]).unwrap();
             for j in 0..opcoes {
@@ -420,7 +474,13 @@ mod testes {
                 "a mesa nao achou o total da opcao {}",
                 j
             );
-            assert!(pedersen::verifica_agregado(&a, &g, &h, esperado, &aberturas[j]));
+            assert!(pedersen::verifica_agregado(
+                &a,
+                &g,
+                &h,
+                esperado,
+                &aberturas[j]
+            ));
         }
 
         // e dois membros nao fecham
@@ -451,6 +511,9 @@ mod testes {
 
         // Duas perguntas diferentes nao podem dar o mesmo contexto — e esse
         // era exatamente o furo antes de a pergunta entrar no desafio.
-        assert_ne!(contexto(&[7u8; 32], &addr, 0, 0), contexto(&[7u8; 32], &addr, 1, 0));
+        assert_ne!(
+            contexto(&[7u8; 32], &addr, 0, 0),
+            contexto(&[7u8; 32], &addr, 1, 0)
+        );
     }
 }

@@ -93,7 +93,12 @@ impl BlsSmoke {
 
     /// Desafio de Fiat-Shamir. Exposto para o provador off-chain usar
     /// exatamente a mesma funcao que o verificador on-chain.
-    pub fn challenge(env: Env, g: Bls12381G1Affine, pk: Bls12381G1Affine, a: Bls12381G1Affine) -> Bls12381Fr {
+    pub fn challenge(
+        env: Env,
+        g: Bls12381G1Affine,
+        pk: Bls12381G1Affine,
+        a: Bls12381G1Affine,
+    ) -> Bls12381Fr {
         challenge_fr(&env, &g, &pk, &a)
     }
 
@@ -104,7 +109,13 @@ impl BlsSmoke {
     ///
     /// Esta e a forma exata da Chaum-Pedersen que a mesa apuradora usa para
     /// provar decifracao correta. Custo: 2 g1_mul + 1 g1_add + 1 sha256.
-    pub fn verify_schnorr(env: Env, g: Bls12381G1Affine, pk: Bls12381G1Affine, a: Bls12381G1Affine, z: Bls12381Fr) -> bool {
+    pub fn verify_schnorr(
+        env: Env,
+        g: Bls12381G1Affine,
+        pk: Bls12381G1Affine,
+        a: Bls12381G1Affine,
+        z: Bls12381Fr,
+    ) -> bool {
         let bls = env.crypto().bls12_381();
         let e = challenge_fr(&env, &g, &pk, &a);
         let lhs = bls.g1_mul(&g, &z);
@@ -123,7 +134,14 @@ impl BlsSmoke {
     /// Decifra: `M = sum C2 - sk * sum C1 = (sum m_i)*G`.
     ///
     /// Devolve `sum m_i`. Panica se o total passar de `max`.
-    pub fn tally(env: Env, g: Bls12381G1Affine, c1s: Vec<Bls12381G1Affine>, c2s: Vec<Bls12381G1Affine>, sk: Bls12381Fr, max: u32) -> u32 {
+    pub fn tally(
+        env: Env,
+        g: Bls12381G1Affine,
+        c1s: Vec<Bls12381G1Affine>,
+        c2s: Vec<Bls12381G1Affine>,
+        sk: Bls12381Fr,
+        max: u32,
+    ) -> u32 {
         let bls = env.crypto().bls12_381();
         let n = c1s.len();
         if n == 0 || n != c2s.len() {
@@ -181,7 +199,10 @@ impl BlsSmoke {
             acc2 = bls.g1_add(&acc2, &c2s.get(i).unwrap());
         }
         let m = bls.g1_add(&acc2, &(-bls.g1_mul(&acc1, &sk)));
-        let alegado = bls.g1_mul(&g, &Bls12381Fr::from_u256(soroban_sdk::U256::from_u32(&env, total_alegado)));
+        let alegado = bls.g1_mul(
+            &g,
+            &Bls12381Fr::from_u256(soroban_sdk::U256::from_u32(&env, total_alegado)),
+        );
         m == alegado
     }
 
@@ -470,7 +491,12 @@ fn u32_fr(env: &Env, v: u32) -> Bls12381Fr {
     Bls12381Fr::from_u256(soroban_sdk::U256::from_u32(env, v))
 }
 
-fn challenge_fr(env: &Env, g: &Bls12381G1Affine, pk: &Bls12381G1Affine, a: &Bls12381G1Affine) -> Bls12381Fr {
+fn challenge_fr(
+    env: &Env,
+    g: &Bls12381G1Affine,
+    pk: &Bls12381G1Affine,
+    a: &Bls12381G1Affine,
+) -> Bls12381Fr {
     let mut buf = Bytes::from_slice(env, DST);
     buf.extend_from_array(&g.to_array());
     buf.extend_from_array(&pk.to_array());

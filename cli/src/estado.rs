@@ -72,7 +72,6 @@ pub struct Verificacao {
     pub agregado: bool,
 }
 
-
 /// Propostas gravadas antes das seções existirem tinham um anel só.
 fn uma_secao() -> u32 {
     1
@@ -234,9 +233,16 @@ mod testes {
     #[test]
     fn conta_confidenciais_e_publicos() {
         let voto = |publico| Voto {
-            posicao: 0, identidade: "x".into(), endereco: "G".into(),
-            compromissos: vec![], provas: vec![], provas_soma: vec![],
-            publico, escolhas: None, tx: "t".into(), ledger: 0,
+            posicao: 0,
+            identidade: "x".into(),
+            endereco: "G".into(),
+            compromissos: vec![],
+            provas: vec![],
+            provas_soma: vec![],
+            publico,
+            escolhas: None,
+            tx: "t".into(),
+            ledger: 0,
         };
         let e = Estado {
             votos: vec![voto(false), voto(false), voto(true)],
@@ -269,7 +275,11 @@ mod testes {
         let v: Estado = serde_json::from_str(&s).unwrap();
         assert_eq!(v.perguntas.len(), 2);
         assert_eq!(v.todas_as_opcoes().len(), 4);
-        assert_eq!(v.opcoes_confidenciais(), 2, "só a segunda pergunta é sigilosa");
+        assert_eq!(
+            v.opcoes_confidenciais(),
+            2,
+            "só a segunda pergunta é sigilosa"
+        );
         assert_eq!(v.perguntas_confidenciais(), 1);
         assert!(v.e_mista());
         assert_eq!(v.sigilo_minimo, 5);

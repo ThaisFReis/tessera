@@ -83,7 +83,10 @@ pub struct Assinatura {
 #[derive(Debug, PartialEq)]
 pub enum Erro {
     AnelVazio,
-    IndiceForaDoAnel { indice: usize, tamanho: usize },
+    IndiceForaDoAnel {
+        indice: usize,
+        tamanho: usize,
+    },
     /// A chave secreta não abre a chave pública daquele índice. É erro de quem
     /// chama, e vale falhar alto: assinar com o índice errado produziria uma
     /// assinatura inválida e um bug muito mais caro de achar.
@@ -250,7 +253,11 @@ pub fn assinar(
     // secreta torna possível.
     z[indice] = u - c[indice] * x;
 
-    Ok(Assinatura { c0: c[0], z, imagem: img })
+    Ok(Assinatura {
+        c0: c[0],
+        z,
+        imagem: img,
+    })
 }
 
 /// Dá a volta no anel e confere se cai de volta em `c0`.
@@ -319,7 +326,11 @@ mod testes {
         let hp = hp(b"assembleia-2026");
         for i in 0..7 {
             let s = assinar(b"cedula", &g, &hp, &anel, i, &xs[i]).unwrap();
-            assert!(verificar(b"cedula", &g, &hp, &anel, &s), "ramo {} não fechou", i);
+            assert!(
+                verificar(b"cedula", &g, &hp, &anel, &s),
+                "ramo {} não fechou",
+                i
+            );
         }
     }
 
@@ -415,7 +426,10 @@ mod testes {
         let anel = vec![chave_publica(&g, &x)];
         assert_eq!(
             assinar(b"m", &g, &hp, &anel, 5, &x),
-            Err(Erro::IndiceForaDoAnel { indice: 5, tamanho: 1 })
+            Err(Erro::IndiceForaDoAnel {
+                indice: 5,
+                tamanho: 1
+            })
         );
     }
 

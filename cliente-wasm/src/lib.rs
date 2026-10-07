@@ -43,7 +43,9 @@ fn de_hex(s: &str) -> Result<Vec<u8>, JsValue> {
     }
     (0..s.len())
         .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|_| JsValue::from_str("hex inválido")))
+        .map(|i| {
+            u8::from_str_radix(&s[i..i + 2], 16).map_err(|_| JsValue::from_str("hex inválido"))
+        })
         .collect()
 }
 
@@ -145,7 +147,9 @@ pub fn raiz_de_aptos(
     pesos: Vec<u32>,
     secoes: u32,
 ) -> Result<String, JsValue> {
-    Ok(hex(&arvore(&proposta_hex, &enderecos_xdr, &pesos, secoes)?.raiz()))
+    Ok(hex(
+        &arvore(&proposta_hex, &enderecos_xdr, &pesos, secoes)?.raiz()
+    ))
 }
 
 #[wasm_bindgen]
@@ -185,7 +189,9 @@ fn arvore(
     secoes: u32,
 ) -> Result<merkle::Arvore, JsValue> {
     if enderecos_xdr.len() != pesos.len() {
-        return Err(JsValue::from_str("endereços e pesos de tamanhos diferentes"));
+        return Err(JsValue::from_str(
+            "endereços e pesos de tamanhos diferentes",
+        ));
     }
     let es = enderecos(enderecos_xdr)?;
     let d = merkle::dividir(&de_hex(proposta_hex)?, &es, secoes);
@@ -235,7 +241,15 @@ pub fn cedula(
 ) -> Result<JsValue, JsValue> {
     let ident = de_hex(&endereco_xdr)?;
     let perguntas: Vec<PerguntaJs> = serde_wasm_bindgen::from_value(perguntas_js)?;
-    let c = montar(&de_hex(&proposta_hex)?, &ident, &h_hex, &perguntas, &escolhas, membros_mesa, limiar)?;
+    let c = montar(
+        &de_hex(&proposta_hex)?,
+        &ident,
+        &h_hex,
+        &perguntas,
+        &escolhas,
+        membros_mesa,
+        limiar,
+    )?;
     serde_wasm_bindgen::to_value(&c).map_err(Into::into)
 }
 
@@ -259,7 +273,16 @@ pub fn cedula_anonima(
     escolhas: Vec<u32>,
 ) -> Result<JsValue, JsValue> {
     let perguntas: Vec<PerguntaJs> = serde_wasm_bindgen::from_value(perguntas_js)?;
-    let js = anonima(&proposta_hex, &hp_hex, &h_hex, &anel_hex, indice, &secreta_hex, &perguntas, &escolhas)?;
+    let js = anonima(
+        &proposta_hex,
+        &hp_hex,
+        &h_hex,
+        &anel_hex,
+        indice,
+        &secreta_hex,
+        &perguntas,
+        &escolhas,
+    )?;
     serde_wasm_bindgen::to_value(&js).map_err(Into::into)
 }
 
@@ -317,7 +340,11 @@ pub fn anonima(
 ///
 /// **Byte a byte igual a `cripto::mensagem_cedula` do contrato.** Divergir aqui
 /// faria toda assinatura falhar sem dizer por quê.
-pub fn mensagem(proposta: &[u8], compromissos: &[String], escolhas: &[u32]) -> Result<Vec<u8>, JsValue> {
+pub fn mensagem(
+    proposta: &[u8],
+    compromissos: &[String],
+    escolhas: &[u32],
+) -> Result<Vec<u8>, JsValue> {
     let mut b = proposta.to_vec();
     b.extend_from_slice(&(compromissos.len() as u32).to_be_bytes());
     for c in compromissos {
@@ -355,7 +382,9 @@ pub fn montar(
     limiar: u32,
 ) -> Result<Cedula, JsValue> {
     if perguntas.len() != escolhas.len() {
-        return Err(JsValue::from_str("uma escolha por pergunta, na ordem da cédula"));
+        return Err(JsValue::from_str(
+            "uma escolha por pergunta, na ordem da cédula",
+        ));
     }
     let g = pedersen::gerador();
     let h = ponto_de(h_hex)?;
@@ -383,7 +412,9 @@ pub fn montar(
         // Aqui nasce o `r`, e é a única função do sistema inteiro em que ele
         // existe. Nada abaixo o devolve.
         let rs: Vec<Fr> = (0..pg.opcoes)
-            .map(|_| pedersen::acaso_fr().map_err(|e| JsValue::from_str(&format!("acaso: {:?}", e))))
+            .map(|_| {
+                pedersen::acaso_fr().map_err(|e| JsValue::from_str(&format!("acaso: {:?}", e)))
+            })
             .collect::<Result<_, JsValue>>()?;
         let cs: Vec<G1Affine> = (0..pg.opcoes)
             .map(|j| {

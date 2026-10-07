@@ -173,7 +173,11 @@ impl Arvore {
             let acima: Vec<Hash> = atual.chunks(2).map(|p| no(&p[0], &p[1])).collect();
             niveis.push(acima);
         }
-        Ok(Arvore { folhas, niveis, n_real })
+        Ok(Arvore {
+            folhas,
+            niveis,
+            n_real,
+        })
     }
 
     pub fn raiz(&self) -> Hash {
@@ -196,7 +200,10 @@ impl Arvore {
     /// O caminho da folha `indice` até a raiz.
     pub fn caminho(&self, indice: usize) -> Result<Caminho, Erro> {
         if indice >= self.n_real {
-            return Err(Erro::IndiceForaDaLista { indice, total: self.n_real });
+            return Err(Erro::IndiceForaDaLista {
+                indice,
+                total: self.n_real,
+            });
         }
         let mut irmaos = Vec::with_capacity(self.profundidade());
         let mut i = indice;
@@ -204,7 +211,10 @@ impl Arvore {
             irmaos.push(nivel[i ^ 1]);
             i /= 2;
         }
-        Ok(Caminho { indice: indice as u32, irmaos })
+        Ok(Caminho {
+            indice: indice as u32,
+            irmaos,
+        })
     }
 }
 
@@ -217,7 +227,11 @@ pub fn verificar(a: &Apto, caminho: &Caminho, raiz: &Hash) -> bool {
     let mut atual = folha(a);
     let mut i = caminho.indice as usize;
     for irmao in &caminho.irmaos {
-        atual = if i % 2 == 0 { no(&atual, irmao) } else { no(irmao, &atual) };
+        atual = if i % 2 == 0 {
+            no(&atual, irmao)
+        } else {
+            no(irmao, &atual)
+        };
         i /= 2;
     }
     // O índice tem de ter se esgotado: um índice maior que a árvore seria
@@ -236,8 +250,10 @@ mod testes {
 
     fn lista(n: usize) -> Vec<Apto> {
         (0..n)
-            .map(|i| {
-                Apto { endereco: (i as u64).to_be_bytes().to_vec(), peso: 1, secao: 0 }
+            .map(|i| Apto {
+                endereco: (i as u64).to_be_bytes().to_vec(),
+                peso: 1,
+                secao: 0,
             })
             .collect()
     }
@@ -259,7 +275,9 @@ mod testes {
             assert!(
                 maior - menor <= 1,
                 "{} em {} seções: {:?} — rodízio devia equilibrar",
-                n, secoes, contagem
+                n,
+                secoes,
+                contagem
             );
             assert_eq!(menor, n / secoes as usize);
         }
@@ -301,8 +319,15 @@ mod testes {
 
     #[test]
     fn a_secao_esta_presa_na_folha() {
-        let a = Apto { endereco: vec![7u8; 32], peso: 1, secao: 0 };
-        let b = Apto { secao: 1, ..a.clone() };
+        let a = Apto {
+            endereco: vec![7u8; 32],
+            peso: 1,
+            secao: 0,
+        };
+        let b = Apto {
+            secao: 1,
+            ..a.clone()
+        };
         assert_ne!(
             folha(&a),
             folha(&b),
@@ -329,10 +354,18 @@ mod testes {
         let aptos = lista(16);
         let arv = Arvore::montar(&aptos).unwrap();
         let raiz = arv.raiz();
-        let intruso = Apto { endereco: vec![0xEE; 32], peso: 1, secao: 0 };
+        let intruso = Apto {
+            endereco: vec![0xEE; 32],
+            peso: 1,
+            secao: 0,
+        };
         for i in 0..16 {
             let c = arv.caminho(i).unwrap();
-            assert!(!verificar(&intruso, &c, &raiz), "intruso passou no caminho {}", i);
+            assert!(
+                !verificar(&intruso, &c, &raiz),
+                "intruso passou no caminho {}",
+                i
+            );
         }
     }
 
@@ -348,9 +381,17 @@ mod testes {
         let (raiz, c) = (arv.raiz(), arv.caminho(3).unwrap());
 
         assert!(verificar(&aptos[3], &c, &raiz));
-        let mentindo = Apto { endereco: aptos[3].endereco.clone(), peso: 1000, secao: 0 };
+        let mentindo = Apto {
+            endereco: aptos[3].endereco.clone(),
+            peso: 1000,
+            secao: 0,
+        };
         assert!(!verificar(&mentindo, &c, &raiz), "peso inflado foi aceito");
-        let menos = Apto { endereco: aptos[3].endereco.clone(), peso: 0, secao: 0 };
+        let menos = Apto {
+            endereco: aptos[3].endereco.clone(),
+            peso: 0,
+            secao: 0,
+        };
         assert!(!verificar(&menos, &c, &raiz));
     }
 
@@ -400,7 +441,11 @@ mod testes {
     /// nem a folha-vazia pode ser reivindicada por alguém.
     #[test]
     fn dominios_nao_colidem() {
-        let a = Apto { endereco: vec![7u8; 32], peso: 3, secao: 0 };
+        let a = Apto {
+            endereco: vec![7u8; 32],
+            peso: 3,
+            secao: 0,
+        };
         let f = folha(&a);
         assert_ne!(f, no(&f, &f));
         assert_ne!(f, vazio());
@@ -437,13 +482,29 @@ mod testes {
         let a = lista(4);
         let mut b = a.clone();
         b.swap(0, 1);
-        assert_ne!(Arvore::montar(&a).unwrap().raiz(), Arvore::montar(&b).unwrap().raiz());
+        assert_ne!(
+            Arvore::montar(&a).unwrap().raiz(),
+            Arvore::montar(&b).unwrap().raiz()
+        );
     }
 
     #[test]
     fn profundidade_e_logaritmica() {
-        for (n, d) in [(1usize, 0usize), (2, 1), (3, 2), (4, 2), (5, 3), (256, 8), (257, 9)] {
-            assert_eq!(Arvore::montar(&lista(n)).unwrap().profundidade(), d, "n={}", n);
+        for (n, d) in [
+            (1usize, 0usize),
+            (2, 1),
+            (3, 2),
+            (4, 2),
+            (5, 3),
+            (256, 8),
+            (257, 9),
+        ] {
+            assert_eq!(
+                Arvore::montar(&lista(n)).unwrap().profundidade(),
+                d,
+                "n={}",
+                n
+            );
         }
     }
 
@@ -453,7 +514,10 @@ mod testes {
         let arv = Arvore::montar(&lista(5)).unwrap();
         assert_eq!(
             arv.caminho(5).unwrap_err(),
-            Erro::IndiceForaDaLista { indice: 5, total: 5 }
+            Erro::IndiceForaDaLista {
+                indice: 5,
+                total: 5
+            }
         );
         // o índice 5 existe na árvore preenchida (8 posições) mas não na lista
         assert!(arv.caminho(4).is_ok());
@@ -479,7 +543,11 @@ mod vetor {
                 let mut e = vec![0u8; 32];
                 e[..8].copy_from_slice(&(i as u64).to_be_bytes());
                 e[31] = 0xA7;
-                Apto { endereco: e, peso: 1, secao: 0 }
+                Apto {
+                    endereco: e,
+                    peso: 1,
+                    secao: 0,
+                }
             })
             .collect()
     }
@@ -498,8 +566,14 @@ mod vetor {
         println!("n .............. {}", N);
         println!("profundidade ... {}", arv.profundidade());
         println!("indice ......... {}", ALVO);
-        println!("endereco ....... 0x{}",
-            aptos[ALVO].endereco.iter().map(|b| format!("{:02x}", b)).collect::<String>());
+        println!(
+            "endereco ....... 0x{}",
+            aptos[ALVO]
+                .endereco
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>()
+        );
         println!("peso ........... {}", aptos[ALVO].peso);
         println!("raiz ........... 0x{}", para_hex(&arv.raiz()));
         for (i, s) in c.irmaos.iter().enumerate() {
