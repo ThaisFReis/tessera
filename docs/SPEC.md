@@ -9,7 +9,9 @@ para lá.
 
 ## §0 Regras para agentes
 
-**Approved:** _(pendente — o humano escreve `Approved: AAAA-MM-DD` aqui)_
+**Approved: 2026-10-07** — dado em conversa ("vamos ignorar a timeline e fazer
+o que falta"), depois de §11-A, §11-B e §11-C respondidas. Registrado por mim a
+pedido; a decisão é do humano.
 
 Vale o `CLAUDE.md` da raiz, com estas adições deste projeto:
 
