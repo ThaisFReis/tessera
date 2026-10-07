@@ -31,7 +31,7 @@ fn hex(b: &[u8]) -> String {
 }
 
 fn de_hex(s: &str) -> Result<Vec<u8>, String> {
-    if s.len() % 2 != 0 {
+    if !s.len().is_multiple_of(2) {
         return Err("hex de tamanho ímpar".into());
     }
     (0..s.len() / 2)
@@ -236,6 +236,9 @@ fn folhas_de(proposta: &[u8], aptos: &[String], secoes: u32) -> Result<Vec<merkl
         .collect())
 }
 
+/// A aridade é a da linha de comando: cada bandeira é um argumento. Agrupar num
+/// struct esconderia o que a CLI aceita.
+#[allow(clippy::too_many_arguments)]
 pub fn abrir(
     proposta: &str,
     pergunta: &[String],
@@ -630,9 +633,7 @@ pub fn mostrar_cedula(proposta: &str, identidade: &str) -> R {
     // Dizer "⚠ abaixo do mínimo" para quem seria a primeira é assustar sem
     // informar — o número só vira veredito na apuração.
     if conf == 0 {
-        tela::linha(&format!(
-            "Ninguém votou em segredo ainda. Você seria a 1ª, e a apuração",
-        ));
+        tela::linha("Ninguém votou em segredo ainda. Você seria a 1ª, e a apuração");
         tela::linha(&format!(
             "só acontece com {} ou mais — ou com ninguém em segredo.",
             e.sigilo_minimo

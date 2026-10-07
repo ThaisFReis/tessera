@@ -1,3 +1,6 @@
+// Uma sonda recebe os parâmetros da medição um a um, de propósito: o que ela
+// mede tem de ser legível na chamada, não escondido num struct.
+#![allow(clippy::too_many_arguments)]
 #![no_std]
 //! Smoke test das host functions BLS12-381 (CAP-0059) em Soroban.
 //!
@@ -250,7 +253,7 @@ impl BlsSmoke {
     /// compromisso da soma, com a soma das aleatoriedades.
     pub fn agregar(env: Env, cs: Vec<Bls12381G1Affine>) -> Bls12381G1Affine {
         let bls = env.crypto().bls12_381();
-        if cs.len() == 0 {
+        if cs.is_empty() {
             panic!("agregado vazio");
         }
         let mut acc = cs.get(0).unwrap();
@@ -454,7 +457,7 @@ impl BlsSmoke {
         let mut i = indice;
         for irmao in irmaos.iter() {
             let mut b = Bytes::from_slice(&env, &[0x01u8]);
-            if i % 2 == 0 {
+            if i.is_multiple_of(2) {
                 b.extend_from_array(&atual.to_array());
                 b.extend_from_array(&irmao.to_array());
             } else {

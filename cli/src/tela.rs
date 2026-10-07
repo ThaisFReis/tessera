@@ -154,11 +154,6 @@ pub fn recusa(s: &str) {
     println!("{}{}", MARGEM, c(RECUSA, &format!("✗ {}", s)));
 }
 
-pub fn atencao(s: &str) {
-    println!();
-    println!("{}{}", MARGEM, c(TEXTO, &format!("⚠  {}", s)));
-}
-
 pub fn centrado(s: &str) {
     let n = s.chars().count();
     let pad = (LARGURA.saturating_sub(n)) / 2;
@@ -265,7 +260,7 @@ mod testes {
             let n = rotulo.chars().count();
             let pontos = COLUNA_VALOR.saturating_sub(n + 1);
             let usado = n + 1 + pontos + 1 + valor.chars().count();
-            assert!(usado + 1 <= LARGURA, "{:?} estourou a largura", rotulo);
+            assert!(usado < LARGURA, "{:?} estourou a largura", rotulo);
         }
     }
 

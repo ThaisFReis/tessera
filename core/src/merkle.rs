@@ -227,7 +227,7 @@ pub fn verificar(a: &Apto, caminho: &Caminho, raiz: &Hash) -> bool {
     let mut atual = folha(a);
     let mut i = caminho.indice as usize;
     for irmao in &caminho.irmaos {
-        atual = if i % 2 == 0 {
+        atual = if i.is_multiple_of(2) {
             no(&atual, irmao)
         } else {
             no(irmao, &atual)

@@ -262,15 +262,15 @@ mod testes {
         let um = pedersen::escalar(1);
 
         let mut q = p.clone();
-        q.e0 = q.e0 + um;
+        q.e0 += um;
         assert!(!verificar(CTX, &g, &h, &c, &q), "e0 adulterado passou");
 
         let mut q = p.clone();
-        q.z0 = q.z0 + um;
+        q.z0 += um;
         assert!(!verificar(CTX, &g, &h, &c, &q), "z0 adulterado passou");
 
         let mut q = p.clone();
-        q.z1 = q.z1 + um;
+        q.z1 += um;
         assert!(!verificar(CTX, &g, &h, &c, &q), "z1 adulterado passou");
 
         let mut q = p.clone();

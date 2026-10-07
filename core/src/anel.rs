@@ -274,9 +274,9 @@ pub fn verificar(
     }
     let pre = preambulo(msg, anel);
     let mut c = s.c0;
-    for i in 0..n {
-        let a: G1Affine = (*g * s.z[i] + G1Projective::from(anel[i]) * c).into();
-        let b: G1Affine = (*hp * s.z[i] + G1Projective::from(s.imagem) * c).into();
+    for (z, p) in s.z.iter().zip(anel) {
+        let a: G1Affine = (*g * z + G1Projective::from(*p) * c).into();
+        let b: G1Affine = (*hp * z + G1Projective::from(s.imagem) * c).into();
         c = elo(&pre, &s.imagem, &a, &b);
     }
     c == s.c0
@@ -311,6 +311,9 @@ impl Assinatura {
 
 #[cfg(test)]
 mod testes {
+    // O índice é o assunto destes laços: ramo `i` do anel, membro `i` da
+    // lista. Trocar por iterador esconderia exatamente o que o teste afirma.
+    #![allow(clippy::needless_range_loop)]
     use super::*;
 
     fn membros(n: usize) -> (G1Affine, Vec<Fr>, Vec<G1Affine>) {

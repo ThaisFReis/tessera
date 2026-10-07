@@ -23,6 +23,17 @@
 //! revelaria todos os votos já dados, retroativamente e sem reparo. Trocamos um
 //! risco irreversível por um reversível.
 
+// `env.events().publish()` está depreciado em favor da macro `#[contractevent]`,
+// que muda o formato dos tópicos. **Esses eventos são interface congelada**
+// (§5): `app/src/rede.ts` lista as votações lendo `topic[0] == "abrir"` e
+// `topic[1]` como a proposta, e a janela útil do RPC é de 2.000 ledgers. Migrar
+// sem migrar o leitor junto apaga a lista de votações do dapp. Virou T-012.
+#![allow(deprecated)]
+// A aridade das entradas é a ABI, e a ABI é interface congelada (§5): `abrir`
+// tem 11 argumentos porque a proposta tem 11 campos. Reduzir exigiria um
+// struct, logo mudar o ABI, logo redeploy.
+#![allow(clippy::too_many_arguments)]
+
 mod cripto;
 mod tipos;
 
@@ -81,7 +92,7 @@ impl Tessera {
         {
             return Err(Erro::PropostaJaExiste);
         }
-        if perguntas.len() == 0 || perguntas.len() > MAX_PERGUNTAS {
+        if perguntas.is_empty() || perguntas.len() > MAX_PERGUNTAS {
             return Err(Erro::PerguntasForaDaFaixa);
         }
         // O que limita a CPU é o total de opções **confidenciais**, porque é
@@ -791,10 +802,6 @@ impl Tessera {
 
 // ===================== auxiliares ========================================
 
-/// Estende o TTL ao teto da rede. Aplicado a tudo que o verificador precisará
-/// depois do sétimo dia, e **não** às entradas `Votou`: estender 10.000 delas
-/// custaria ~2.070 XLM, e elas só impedem voto duplo *durante* a votação.
-
 /// O miolo de uma cédula: conferir tudo, e só depois somar.
 ///
 /// `identidade` é o que prende as provas a quem vota — o XDR do endereço no
@@ -827,7 +834,7 @@ fn conferir_e_somar(
     for (q, pg) in p.perguntas.iter().enumerate() {
         let q = q as u32;
         if !pg.confidencial {
-            conferir_bloco(&escolhas, off_publ, pg.opcoes, peso)?;
+            conferir_bloco(escolhas, off_publ, pg.opcoes, peso)?;
             off_publ += pg.opcoes;
             continue;
         }
@@ -903,6 +910,9 @@ fn conferir_e_somar(
     Ok(())
 }
 
+/// Estende o TTL ao teto da rede. Aplicado a tudo que o verificador precisará
+/// depois do sétimo dia, e **não** às entradas `Votou`: estender 10.000 delas
+/// custaria ~2.070 XLM, e elas só impedem voto duplo *durante* a votação.
 fn guardar_longo(env: &Env, k: &Chave) {
     let m = env.storage().max_ttl();
     env.storage().persistent().extend_ttl(k, m - 1, m);

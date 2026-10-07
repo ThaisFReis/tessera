@@ -90,40 +90,27 @@ fn para_desafio(env: &Env, buf: &Bytes) -> Bls12381Fr {
     Bls12381Fr::from_bytes(BytesN::from_array(env, &e))
 }
 
-/// O contexto que prende uma prova a esta proposta, a esta pessoa e a esta
+/// O contexto que prende uma prova a esta proposta, a esta identidade e a esta
 /// opção.
 ///
 /// **Sem isto, copiar o `C` e a prova de outra pessoa é um voto válido.** A
-/// prova convence de que `v ∈ {0,1}` e nada nela diz de quem é; `Votou` impede
-/// votar duas vezes, não impede votar com a cédula alheia.
-/// **O contexto amarra a prova a uma pergunta, não só a uma opção.**
+/// prova convence de que `v ∈ {0,1}` e nada nela diz de quem é; `Votou` e
+/// `ImagemUsada` impedem votar duas vezes, não impedem votar com a cédula
+/// alheia.
 ///
-/// Sem o índice da pergunta, a opção 0 da pergunta 1 e a opção 0 da pergunta 2
-/// produziriam o mesmo desafio de Fiat–Shamir — e uma disjuntiva feita para
-/// uma valeria para a outra. O eleitor copiaria a própria prova da pergunta 1
-/// para a 2 e marcaria a segunda sem provar nada sobre ela. Numa cédula de uma
+/// **O contexto amarra a prova a uma pergunta, não só a uma opção.** Sem o
+/// índice da pergunta, a opção 0 da pergunta 1 e a opção 0 da pergunta 2
+/// produziriam o mesmo desafio de Fiat–Shamir — e uma disjuntiva feita para uma
+/// valeria para a outra. O eleitor copiaria a própria prova da pergunta 1 para
+/// a 2 e marcaria a segunda sem provar nada sobre ela. Numa cédula de uma
 /// pergunta só isso não existia; numa cédula mista é a primeira coisa que
 /// quebra.
 ///
 /// A prova de soma da pergunta `q` usa `(q, u32::MAX)`, então ela também não
 /// migra entre perguntas.
-pub fn contexto(
-    env: &Env,
-    proposta: &BytesN<32>,
-    votante: &Address,
-    pergunta: u32,
-    opcao: u32,
-) -> Bytes {
-    contexto_de(env, proposta, &votante.clone().to_xdr(env), pergunta, opcao)
-}
-
-/// O mesmo contexto, com a identidade em bytes crus.
 ///
-/// No voto identificado a identidade é o XDR do endereço. No voto em anel não
-/// existe endereço de membro — a identidade é a **imagem de chave**, que é
-/// única por pessoa e por proposta, e não diz quem é. As duas servem ao mesmo
-/// propósito: impedir que o `C` e a prova de uma pessoa sejam copiados como
-/// voto de outra.
+/// `identidade` é o XDR do endereço no voto identificado e a **imagem de
+/// chave** no voto em anel — é o único ponto em que os dois modos divergem.
 pub fn contexto_de(
     env: &Env,
     proposta: &BytesN<32>,
@@ -150,7 +137,7 @@ pub fn desafio_cds(
     a1: &Bls12381G1Affine,
 ) -> Bls12381Fr {
     let mut buf = Bytes::from_slice(env, DST_CDS);
-    buf.extend_from_array(&(ctx.len() as u32).to_be_bytes());
+    buf.extend_from_array(&ctx.len().to_be_bytes());
     buf.append(ctx);
     buf.extend_from_array(&c.to_array());
     buf.extend_from_array(&a0.to_array());
@@ -219,7 +206,7 @@ pub fn verificar_soma(
     let bls = env.crypto().bls12_381();
 
     let mut buf = Bytes::from_slice(env, DST_SOMA);
-    buf.extend_from_array(&(ctx.len() as u32).to_be_bytes());
+    buf.extend_from_array(&ctx.len().to_be_bytes());
     buf.append(ctx);
     buf.extend_from_array(&d.to_array());
     buf.extend_from_array(&p.a.to_array());
@@ -267,7 +254,7 @@ pub fn verificar_aptidao(
     let mut i = indice;
     for irmao in irmaos.iter() {
         let mut b = Bytes::from_slice(env, &[DOM_NO]);
-        if i % 2 == 0 {
+        if i.is_multiple_of(2) {
             b.extend_from_array(&atual.to_array());
             b.extend_from_array(&irmao.to_array());
         } else {
@@ -311,6 +298,10 @@ pub fn calcular_hp(env: &Env, proposta: &BytesN<32>) -> Bls12381G1Affine {
 ///
 /// É também o que a `Proposta` guarda: conferir que a lista apresentada é a que
 /// foi fixada na abertura custa um hash, não guardar `n` pontos no estado.
+/// Conveniência que junta `digesto_anel` e `compor_anel`. O contrato chama as
+/// duas separadas — o digesto fica guardado — então aqui ela serve só aos
+/// testes, que precisam reproduzir o preâmbulo inteiro.
+#[cfg(test)]
 pub fn preambulo_anel(env: &Env, msg: &Bytes, anel: &Vec<Bls12381G1Affine>) -> BytesN<32> {
     compor_anel(env, msg, &digesto_anel(env, anel))
 }
@@ -322,7 +313,7 @@ pub fn preambulo_anel(env: &Env, msg: &Bytes, anel: &Vec<Bls12381G1Affine>) -> B
 /// digesto em vez dos `n` pontos é o que mantém a leitura de estado constante.
 pub fn digesto_anel(env: &Env, anel: &Vec<Bls12381G1Affine>) -> BytesN<32> {
     let mut buf = Bytes::from_slice(env, DST_CONJUNTO);
-    buf.extend_from_array(&(anel.len() as u32).to_be_bytes());
+    buf.extend_from_array(&anel.len().to_be_bytes());
     for p in anel.iter() {
         buf.extend_from_array(&p.to_array());
     }
@@ -332,7 +323,7 @@ pub fn digesto_anel(env: &Env, anel: &Vec<Bls12381G1Affine>) -> BytesN<32> {
 /// Junta a mensagem ao digesto do conjunto.
 pub fn compor_anel(env: &Env, msg: &Bytes, digesto: &BytesN<32>) -> BytesN<32> {
     let mut buf = Bytes::from_slice(env, DST_ANEL);
-    buf.extend_from_array(&(msg.len() as u32).to_be_bytes());
+    buf.extend_from_array(&msg.len().to_be_bytes());
     buf.append(msg);
     buf.extend_from_array(&digesto.to_array());
     env.crypto().sha256(&buf).into()
@@ -413,11 +404,11 @@ pub fn mensagem_cedula(
     escolhas: &Vec<u32>,
 ) -> Bytes {
     let mut b = Bytes::from_array(env, &proposta.to_array());
-    b.extend_from_array(&(compromissos.len() as u32).to_be_bytes());
+    b.extend_from_array(&compromissos.len().to_be_bytes());
     for c in compromissos.iter() {
         b.extend_from_array(&c.to_array());
     }
-    b.extend_from_array(&(escolhas.len() as u32).to_be_bytes());
+    b.extend_from_array(&escolhas.len().to_be_bytes());
     for e in escolhas.iter() {
         b.extend_from_array(&e.to_be_bytes());
     }

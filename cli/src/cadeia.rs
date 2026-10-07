@@ -145,121 +145,6 @@ impl Cadeia {
         })
     }
 
-    /// **A mesa `k`-de-`n` assinando junto.**
-    ///
-    /// `require_auth` em `k` endereços distintos precisa de `k` entradas de
-    /// autorização assinadas — e uma `contract invoke` assina por uma conta só.
-    /// O caminho é montar sem assinar (`--build-only`), passar o envelope de
-    /// mão em mão (`tx sign`, uma vez por membro) e só então enviar.
-    ///
-    /// Na vida real esse envelope viaja entre as `k` pessoas; aqui ele passa
-    /// por `k` invocações da mesma ferramenta. A diferença é operacional, não
-    /// criptográfica: as assinaturas são as mesmas.
-    pub fn invocar_em_conjunto(
-        &self,
-        assinantes: &[String],
-        metodo: &str,
-        args: &[(&str, String)],
-    ) -> Result<Resposta, Erro> {
-        let fonte = assinantes.first().ok_or_else(|| Erro::Rede {
-            saida: "a mesa está vazia".into(),
-        })?;
-
-        let mut cmd = Command::new("stellar");
-        cmd.args([
-            "contract",
-            "invoke",
-            "--id",
-            &self.contrato,
-            "--source",
-            fonte,
-            "--network",
-            &self.rede,
-            "--build-only",
-            "--",
-        ]);
-        cmd.arg(metodo);
-        for (k, v) in args {
-            cmd.arg(format!("--{}", k));
-            cmd.arg(v);
-        }
-        let s = cmd.output().map_err(|e| Erro::Comando(e.to_string()))?;
-        if !s.status.success() {
-            return Err(Erro::Rede {
-                saida: String::from_utf8_lossy(&s.stderr).to_string(),
-            });
-        }
-        let bruto = String::from_utf8_lossy(&s.stdout).trim().to_string();
-
-        // `--build-only` entrega um envelope SEM footprint nem taxa de
-        // recurso, e a rede o recusa com `TxMalformed`. A simulação é o passo
-        // que os preenche — e é também o que monta as entradas de autorização
-        // que cada membro vai assinar.
-        let s = Command::new("stellar")
-            .args([
-                "tx",
-                "simulate",
-                &bruto,
-                "--source",
-                fonte,
-                "--network",
-                &self.rede,
-            ])
-            .output()
-            .map_err(|e| Erro::Comando(e.to_string()))?;
-        if !s.status.success() {
-            return Err(Erro::Rede {
-                saida: String::from_utf8_lossy(&s.stderr).to_string(),
-            });
-        }
-        let mut envelope = String::from_utf8_lossy(&s.stdout).trim().to_string();
-
-        for membro in assinantes {
-            envelope = Cadeia::assinar(&envelope, membro, &self.rede)?;
-        }
-
-        let s = Command::new("stellar")
-            .args(["tx", "send", &envelope, "--network", &self.rede])
-            .output()
-            .map_err(|e| Erro::Comando(e.to_string()))?;
-        let err = String::from_utf8_lossy(&s.stderr).to_string();
-        if !s.status.success() {
-            return Err(Erro::Rede {
-                saida: format!("{}{}", String::from_utf8_lossy(&s.stdout), err),
-            });
-        }
-        let saida = String::from_utf8_lossy(&s.stdout).to_string();
-        Ok(Resposta {
-            valor: saida.clone(),
-            tx: extrair_tx(&err).or_else(|| extrair_hash_json(&saida)),
-        })
-    }
-
-    fn assinar(envelope: &str, identidade: &str, rede: &str) -> Result<String, Erro> {
-        let s = Command::new("stellar")
-            .args([
-                "tx",
-                "sign",
-                envelope,
-                "--sign-with-key",
-                identidade,
-                "--network",
-                rede,
-            ])
-            .output()
-            .map_err(|e| Erro::Comando(e.to_string()))?;
-        if !s.status.success() {
-            return Err(Erro::Rede {
-                saida: format!(
-                    "{} não conseguiu assinar: {}",
-                    identidade,
-                    String::from_utf8_lossy(&s.stderr)
-                ),
-            });
-        }
-        Ok(String::from_utf8_lossy(&s.stdout).trim().to_string())
-    }
-
     /// Taxa e ledger vêm do Horizon, não da CLI: a `stellar contract invoke`
     /// não os imprime, e a demo mostra os dois.
     ///
@@ -295,14 +180,6 @@ impl Cadeia {
         let v: serde_json::Value = serde_json::from_slice(&s.stdout).ok()?;
         v["_embedded"]["records"][0]["sequence"].as_u64()
     }
-}
-
-fn extrair_hash_json(saida: &str) -> Option<String> {
-    let v: serde_json::Value = serde_json::from_str(saida.trim()).ok()?;
-    v.get("hash")
-        .or_else(|| v.get("txHash"))
-        .and_then(|h| h.as_str())
-        .map(|s| s.to_string())
 }
 
 fn extrair_tx(saida: &str) -> Option<String> {

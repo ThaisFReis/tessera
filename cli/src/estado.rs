@@ -178,20 +178,23 @@ impl Estado {
         self.perguntas.iter().filter(|p| p.confidencial).count()
     }
 
-    /// Todas as opções, de todas as perguntas, em ordem. É o formato do
-    /// resultado que o contrato devolve.
-    pub fn todas_as_opcoes(&self) -> Vec<&str> {
-        self.perguntas
-            .iter()
-            .flat_map(|p| p.opcoes.iter().map(|o| o.as_str()))
-            .collect()
-    }
-
     /// A cédula tem alguma pergunta pública? É o que distingue uma votação
     /// semiconfidencial de uma inteiramente sigilosa.
     pub fn e_mista(&self) -> bool {
         self.perguntas.iter().any(|p| !p.confidencial)
             && self.perguntas.iter().any(|p| p.confidencial)
+    }
+    /// Todas as opções, de todas as perguntas, em ordem. É o formato do
+    /// resultado que o contrato devolve.
+    ///
+    /// Só o teste a chama hoje: o binário lê o resultado por índice. Fica
+    /// porque é ela que documenta o formato — e o teste é quem o prende.
+    #[cfg(test)]
+    pub fn todas_as_opcoes(&self) -> Vec<&str> {
+        self.perguntas
+            .iter()
+            .flat_map(|p| p.opcoes.iter().map(|o| o.as_str()))
+            .collect()
     }
 }
 

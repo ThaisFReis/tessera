@@ -208,6 +208,9 @@ testnet; não existe configuração de mainnet em lugar nenhum.
 Rodam a cada tarefa:
 
 ```bash
+for d in core contrato cli cliente-wasm bls-smoke; do
+  (cd $d && cargo fmt --check && cargo clippy --all-targets -- -D warnings)
+done
 cd bls-smoke   && cargo test --lib
 cd core        && cargo test --lib
 cd contrato    && cargo test
@@ -228,12 +231,10 @@ python3 console/guarda.py
 | testes do app | ✅ 3 testes |
 | `npm run build` | ✅ |
 | `console/guarda.py` | ✅ |
-| `cargo fmt --check` | ❌ **falha nos 5 crates** — nunca foi rodado |
-| `cargo clippy` | ⚠️ 65 avisos (core 11, contrato 43, cli 11) |
+| `cargo fmt --check` | ✅ nos 5 crates — era falha de base, resolvida em T-002 |
+| `cargo clippy -D warnings` | ✅ nos 5 crates — eram 65 avisos, resolvidos em T-003 |
 
-As duas últimas linhas são falhas de base: não bloqueiam tarefa, mas nenhuma
-tarefa pode piorá-las. Arrumar virou T-002 e T-003 — não foram consertadas aqui
-porque `CLAUDE.md` proíbe adicionar portão em silêncio.
+A linha de base não tem mais falha nenhuma.
 
 Rodada ponta a ponta na testnet (lenta, sob demanda):
 
@@ -253,8 +254,8 @@ cd app && node scripts/folga.mjs                    # contenção de escrita
 |---|---|---|---|---|---|
 | T-000 | Spec de trabalho e mudança do protocolo | — | — | review | `docs/SPEC.md` no formato do `CLAUDE.md`; protocolo em `PROTOCOLO.md`; 19 citações no código repontadas; portões passam |
 | T-001 | README volta a dizer a verdade | — | — | review | PR #1 |
-| T-002 | `cargo fmt` passa | T-000 | §8 | todo | `cargo fmt --check` passa nos 5 crates; nenhum teste muda de resultado |
-| T-003 | `cargo clippy` sem avisos | T-002 | §8 | todo | 0 avisos nos 3 crates; `-D warnings` no portão |
+| T-002 | `cargo fmt` passa | T-000 | §8 | review | `cargo fmt --check` passa nos 5 crates; nenhum teste muda de resultado |
+| T-003 | `cargo clippy` sem avisos | T-002 | §8 | review | 0 avisos nos **5** crates; `-D warnings` no portão |
 | T-004 | Vídeo da demonstração | T-001 | §2 | todo | roteiro + gravação com `/bastidores` na segunda janela; nada encenado |
 | T-005 | Publicar o dapp | T-001 | §7 | todo | estático no ar; o README deixa de dizer "não publicado" |
 | T-006 | Atualizar os decks | T-001 | §2 | todo | slide 06 deixa de listar desvinculação como futura; seções aparecem |
@@ -263,6 +264,7 @@ cd app && node scripts/folga.mjs                    # contenção de escrita
 | T-009 | Assembleia sem mesa nenhuma | T-000 | §5, §10 | todo | `limiar == 0` aceito sse `mesa` vazia; redeploy; os 12 arquivos repontados; `/abrir` e `/apurar` param de exigir mesa |
 | T-010 | `/abrir` avisa quando a seção nasce pequena | T-009 | §10 | todo | recusa abrir com `aptos / secoes < TAU`, dizendo o tamanho que daria; teste do cálculo |
 | T-011 | Parar o churn de `test_snapshots/` | T-002 | §5 | todo | ou viram determinísticos, ou saem do git; nenhum diff futuro os carrega |
+| T-012 | Migrar os eventos para `#[contractevent]` | T-003 | §5 | todo | `env.events().publish()` sai; `app/src/rede.ts` lê o formato novo; a lista de votações continua funcionando |
 
 ---
 

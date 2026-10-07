@@ -5,6 +5,10 @@
 //! Soroban, em Wasm. O cruzamento provador↔verificador (smoke B3) acontece a
 //! cada `cargo test`, não uma vez num vetor congelado.
 
+// O índice é o assunto destes laços: membro `i` do eleitorado, opção `j` da
+// pergunta. Trocar por iterador esconderia o que cada asserção afirma.
+#![allow(clippy::needless_range_loop)]
+
 extern crate std;
 
 use super::*;
@@ -49,6 +53,16 @@ fn ctx(
 }
 
 // ---------- cenário ----------
+
+/// O que uma cédula montada entrega: compromissos, disjuntivas, provas de soma,
+/// as respostas públicas e os fatores `r` que ficam com quem votou.
+type Cedula = (
+    Vec<Bls12381G1Affine>,
+    Vec<ProvaCds>,
+    Vec<ProvaSoma>,
+    Vec<u32>,
+    Vetor<ArkFr>,
+);
 
 struct Cenario {
     env: Env,
@@ -195,19 +209,9 @@ impl Cenario {
         let mut ultimo = Ok(None);
         for i in 0..quantos {
             ultimo = self.endossar_um(i, totais, aberturas);
-            if ultimo.is_err() {
-                return ultimo;
-            }
+            ultimo.as_ref()?;
         }
         ultimo
-    }
-
-    fn mesa_sdk(&self, k: usize) -> Vec<Address> {
-        let mut v = Vec::new(&self.env);
-        for m in self.mesa.iter().take(k) {
-            v.push_back(m.clone());
-        }
-        v
     }
 
     /// Monta uma cédula honesta para a cédula desta proposta, qualquer que seja
@@ -217,17 +221,7 @@ impl Cenario {
     /// `escolhas[q]` é a opção marcada na pergunta `q`. As perguntas sigilosas
     /// viram compromisso + disjuntivas + **uma prova de soma própria**; as
     /// públicas viram resposta em claro.
-    fn cedula_mista(
-        &self,
-        i: usize,
-        escolhas: &[u32],
-    ) -> (
-        Vec<Bls12381G1Affine>,
-        Vec<ProvaCds>,
-        Vec<ProvaSoma>,
-        Vec<u32>,
-        Vetor<ArkFr>,
-    ) {
+    fn cedula_mista(&self, i: usize, escolhas: &[u32]) -> Cedula {
         let env = &self.env;
         let votante = &self.aptos[i];
 
@@ -299,17 +293,7 @@ impl Cenario {
     }
 
     /// Atalho para a cédula de uma pergunta só.
-    fn cedula(
-        &self,
-        i: usize,
-        escolha: u32,
-    ) -> (
-        Vec<Bls12381G1Affine>,
-        Vec<ProvaCds>,
-        Vec<ProvaSoma>,
-        Vec<u32>,
-        Vetor<ArkFr>,
-    ) {
+    fn cedula(&self, i: usize, escolha: u32) -> Cedula {
         self.cedula_mista(i, &[escolha])
     }
 
@@ -1283,9 +1267,8 @@ fn orcamento_de_votar_e_de_apurar() {
 ///    `Comparecimento`, `Resultado` — e nenhuma `Votou`.
 #[test]
 fn apurar_nao_cresce_com_o_comparecimento() {
-    /// Devolve `(custo de apurar, custo de uma leitura pura)`.
-    ///
-    /// `na_zero` votantes escolhem a opção 0, o resto escolhe a 1.
+    // Devolve `(custo de apurar, custo de uma leitura pura)`.
+    // `na_zero` votantes escolhem a opção 0, o resto escolhe a 1.
     let medir = |n: usize, na_zero: usize| -> (u64, u64) {
         let c = montar(64);
         let mut soma_r = [ArkFr::from(0u64); OPCOES as usize];
@@ -2044,7 +2027,7 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
     // ---- a cédula, montada pelo cliente do navegador ----
     const EU: usize = 1;
     let imagem = anel::imagem(&hp, &xs[EU]);
-    let ident = ponto::serializar(&imagem).to_vec();
+    let _ident = ponto::serializar(&imagem).to_vec();
     let perguntas_js = [
         PerguntaJs {
             opcoes: 3,

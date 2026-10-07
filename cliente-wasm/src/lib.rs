@@ -38,7 +38,7 @@ fn hex(b: &[u8]) -> String {
 }
 
 fn de_hex(s: &str) -> Result<Vec<u8>, JsValue> {
-    if s.len() % 2 != 0 {
+    if !s.len().is_multiple_of(2) {
         return Err(JsValue::from_str("hex de comprimento ímpar"));
     }
     (0..s.len())

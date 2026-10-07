@@ -436,8 +436,8 @@ mod testes {
         }];
         for escolha in escolhas {
             let c = montar(&h, &p32, &addr, &uma, &[escolha]).unwrap();
-            for j in 0..opcoes {
-                acumuladores[j].push(c.compromissos[j]);
+            for (acc, cj) in acumuladores.iter_mut().zip(&c.compromissos) {
+                acc.push(*cj);
             }
             // o que viaja para a mesa sao shares, nunca o r
             for (l, shares) in tessera_core::shamir::dividir(&c.acasos[0], limiar as usize, membros)
