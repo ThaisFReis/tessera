@@ -319,18 +319,42 @@ impl Tessera {
         if !p.anel {
             return Err(Erro::ModoErrado);
         }
-        if secao >= p.secoes {
-            return Err(Erro::SecaoInvalida);
-        }
         if env.ledger().sequence() >= p.abre_em {
             return Err(Erro::ComparecimentoEncerrado);
         }
-        conferir_aptidao(&env, &p, &votante, 1, secao, indice, &caminho)?;
 
         let kc = Chave::Compareceu(proposta.clone(), votante.clone());
         if env.storage().persistent().has(&kc) {
             return Err(Erro::JaCompareceu);
         }
+
+        // Na aberta, quem decide a seção é o contrato — por
+        // `H(proposta ‖ endereço) mod secoes`.
+        //
+        // **Ordem de chegada não serve, e descobrir isso custou uma rodada.** A
+        // seção nomeia a entrada `Anel(proposta, secao)` que a transação vai
+        // escrever, e o footprint é declarado na *simulação*. Se a seção só
+        // existisse na *aplicação*, cada comparecimento declararia uma entrada e
+        // escreveria outra — medido na testnet: uma por ledger, e duas de nove
+        // recusadas com `txFailed`.
+        //
+        // Derivar do endereço resolve porque o cliente calcula o mesmo antes de
+        // enviar. O preço é que dá para moer endereços até cair numa seção
+        // escolhida; numa votação aberta isso não tira nada de ninguém, já que
+        // escolher o próprio esconderijo não encolhe o de outra pessoa — e o
+        // piso de `TAU` continua valendo.
+        let secao = if e_aberta(&p.raiz_aptos) {
+            if !caminho.is_empty() {
+                return Err(Erro::VotacaoAberta);
+            }
+            secao_aberta(&env, &proposta, &votante, p.secoes)
+        } else {
+            if secao >= p.secoes {
+                return Err(Erro::SecaoInvalida);
+            }
+            conferir_aptidao(&env, &p, &votante, 1, secao, indice, &caminho)?;
+            secao
+        };
         // Validado aqui, uma vez. Depois disso o digesto do conjunto prende
         // estes pontos exatos, então a cédula não precisa revalidar os `n`.
         validar(&env, &chave_anel)?;
@@ -346,7 +370,7 @@ impl Tessera {
         env.storage().persistent().set(&ka, &anel);
         guardar_longo(&env, &ka);
 
-        env.storage().persistent().set(&kc, &true);
+        env.storage().persistent().set(&kc, &secao);
         guardar_longo(&env, &kc);
 
         env.events().publish(
@@ -768,6 +792,15 @@ impl Tessera {
             .has(&Chave::Compareceu(proposta, votante))
     }
 
+    /// Em que seção a pessoa caiu. Na votação aberta é o contrato que decide,
+    /// então quem vota precisa perguntar — e perguntar à cadeia, não ao
+    /// navegador, que pode ter sido trocado.
+    pub fn secao_de(env: Env, proposta: BytesN<32>, votante: Address) -> Option<u32> {
+        env.storage()
+            .persistent()
+            .get(&Chave::Compareceu(proposta, votante))
+    }
+
     /// **O anel**, na ordem em que as pessoas compareceram.
     ///
     /// Quem vota precisa dele inteiro para assinar: anonimato de anel é
@@ -798,6 +831,29 @@ impl Tessera {
             .get(&Instancia::GeradorH)
             .unwrap_or_else(|| calcular_h(&env))
     }
+}
+
+/// Uma `raiz_aptos` de 32 zeros quer dizer **votação aberta**: não há lista, e
+/// qualquer carteira comparece.
+///
+/// Zeros são seguros como sentinela porque a raiz real é um SHA-256 de folhas
+/// com separação de domínio — acertar 32 zeros exigiria inverter o hash.
+///
+/// O que a votação aberta perde está declarado e não é pouco: sem lista não há
+/// `aptos − compareceram`, logo não há voto obrigatório, e nada impede a mesma
+/// pessoa de comparecer com cinquenta carteiras. O que ela mantém é o que o
+/// projeto existe para provar: ninguém descobre a escolha de ninguém, e nada
+/// liga pessoa a cédula.
+/// `H(proposta ‖ endereço) mod secoes`, e o cliente calcula o mesmo.
+fn secao_aberta(env: &Env, proposta: &BytesN<32>, votante: &Address, secoes: u32) -> u32 {
+    let mut buf = Bytes::from_slice(env, &proposta.to_array());
+    buf.append(&votante.clone().to_xdr(env));
+    let h = env.crypto().sha256(&buf).to_array();
+    u32::from_be_bytes([h[0], h[1], h[2], h[3]]) % secoes
+}
+
+fn e_aberta(raiz: &BytesN<32>) -> bool {
+    raiz == &BytesN::from_array(raiz.env(), &[0u8; 32])
 }
 
 // ===================== auxiliares ========================================

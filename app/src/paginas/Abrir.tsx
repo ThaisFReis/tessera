@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CarteiraLocal } from "../carteira";
 import { guardarLista } from "../lista";
-import { abrir, enderecoXdr, ledgerAtual } from "../rede";
+import { abrir, enderecoXdr, ledgerAtual, RAIZ_ABERTA } from "../rede";
 import { carregar } from "../wasm";
 import { Aviso, Icone, LinkBastidores, Passos } from "../ui";
 import { useDiario } from "./comum";
@@ -17,6 +17,7 @@ export default function Abrir() {
   const [mesa, setMesa] = useState("");
   const [limiar, setLimiar] = useState(3);
   const [secoes, setSecoes] = useState(1);
+  const [aberta, setAberta] = useState(true);
   const [minCaderno, setMinCaderno] = useState(10);
   const [minVoto, setMinVoto] = useState(30);
   const [falha, setFalha] = useState("");
@@ -34,13 +35,17 @@ export default function Abrir() {
     setProgresso(0);
     diario({ tipo: "ato", txt: "abriu uma votação" });
     try {
-      const lista = linhas(aptos);
-      if (lista.length < 2) throw new Error("o eleitorado precisa de ao menos duas pessoas");
+      const lista = aberta ? [] : linhas(aptos);
+      if (!aberta && lista.length < 2) {
+        throw new Error("o eleitorado precisa de ao menos duas pessoas");
+      }
       const n = linhas(opcoes).length;
       if (n < 2) throw new Error("a pergunta precisa de ao menos duas opções");
 
-      if (secoes < 1 || secoes > lista.length) {
-        throw new Error(`as seções têm de estar entre 1 e ${lista.length}`);
+      if (secoes < 1 || (!aberta && secoes > lista.length)) {
+        throw new Error(
+          aberta ? "as seções precisam ser ao menos uma" : `as seções têm de estar entre 1 e ${lista.length}`,
+        );
       }
 
       const w = await carregar();
@@ -54,10 +59,14 @@ export default function Abrir() {
 
       const xdrs = lista.map(enderecoXdr);
       const pesos = new Uint32Array(lista.length).fill(1);
-      const raiz = w.raiz_de_aptos(proposta, xdrs, pesos, secoes);
-      diario({ tipo: "val", txt: `raiz de aptos = ${raiz}` });
-      diario({ tipo: "nota", txt: "32 bytes vão para o contrato. A lista não vai." });
-      if (secoes > 1) {
+      // 32 zeros é o sentinela de votação aberta: não há lista, e o contrato
+      // pula a prova de Merkle.
+      const raiz = aberta ? RAIZ_ABERTA : w.raiz_de_aptos(proposta, xdrs, pesos, secoes);
+      diario({ tipo: "val", txt: aberta ? "sem lista: votação aberta" : `raiz de aptos = ${raiz}` });
+      if (!aberta) {
+        diario({ tipo: "nota", txt: "32 bytes vão para o contrato. A lista não vai." });
+      }
+      if (!aberta && secoes > 1) {
         const d = Array.from(w.secoes_de(proposta, xdrs, secoes) as Uint32Array);
         const tam = Array.from({ length: secoes }, (_, s) => d.filter((x) => x === s).length);
         diario({ tipo: "nota", txt: `seções de ${tam.join(", ")} — sorteadas pela lista, não escolhidas` });
@@ -80,7 +89,7 @@ export default function Abrir() {
       setProgresso(2);
 
       // A lista fica aqui porque não cabe na rede — e quem vota precisa dela.
-      guardarLista(proposta, lista);
+      if (!aberta) guardarLista(proposta, lista);
       ir(`/votacao/${proposta}`);
     } catch (e) {
       const msg = String((e as Error).message ?? e);
@@ -108,20 +117,48 @@ export default function Abrir() {
       </section>
 
       <section>
-        <h2>O ELEITORADO</h2>
-        <label className="campo">
-          <span className="eyebrow">ENDEREÇOS APTOS</span>
-          <textarea
-            value={aptos}
-            onChange={(e) => setAptos(e.target.value)}
-            rows={6}
-            placeholder="um endereço G… por linha"
-          />
-          <span className="campo-ajuda">
-            A lista não vai para a rede — só a raiz de Merkle. Ela fica guardada neste navegador e
-            você precisa entregá-la a quem vota.
+        <h2>QUEM PODE VOTAR</h2>
+        <label className="escolha-modo">
+          <input type="radio" name="eleitorado" checked={aberta} onChange={() => setAberta(true)} />
+          <span>
+            <strong>qualquer pessoa</strong>
+            <span className="campo-ajuda">
+              Quem chegar vota, sem lista nenhuma. É o modo da demonstração aberta.
+            </span>
           </span>
         </label>
+        <label className="escolha-modo" style={{ marginTop: 9 }}>
+          <input type="radio" name="eleitorado" checked={!aberta} onChange={() => setAberta(false)} />
+          <span>
+            <strong>só quem está na lista</strong>
+            <span className="campo-ajuda">
+              A lista não vai para a rede — só a raiz de Merkle. Ela fica guardada neste navegador
+              e você precisa entregá-la a quem vota.
+            </span>
+          </span>
+        </label>
+
+        {aberta ? (
+          <Aviso tipo="nota">
+            <strong>Numa votação aberta o total não significa nada.</strong> Qualquer pessoa vota
+            quantas vezes quiser criando carteiras novas, e na testnet o friendbot as financia de
+            graça. Também não existe lista de quem faltou, logo não existe voto obrigatório.
+            <br />
+            O que continua valendo é o que importa: <strong>ninguém descobre a escolha de
+            ninguém, e nada liga uma pessoa à cédula dela</strong>. É sigilo que esta votação
+            demonstra, não contagem.
+          </Aviso>
+        ) : (
+          <label className="campo" style={{ marginTop: 20 }}>
+            <span className="eyebrow">ENDEREÇOS APTOS</span>
+            <textarea
+              value={aptos}
+              onChange={(e) => setAptos(e.target.value)}
+              rows={6}
+              placeholder="um endereço G… por linha"
+            />
+          </label>
+        )}
       </section>
 
       <section>
@@ -158,14 +195,25 @@ export default function Abrir() {
             de dez, a mesma cédula custa 37,2% e três entram por ledger.
           </p>
           <p>
-            <strong>Você não escolhe quem fica com quem.</strong> A divisão é sorteada a partir da
-            lista e do identificador da votação, e qualquer pessoa com a lista recalcula e confere.
-            Se o organizador escolhesse, poria um dissidente numa seção sozinho e leria o voto dele.
+            <strong>Você não escolhe quem fica com quem.</strong>{" "}
+            {aberta
+              ? "Na votação aberta o contrato distribui por ordem de chegada — ninguém pede a própria seção, e não adianta gerar carteiras tentando cair numa específica."
+              : "A divisão é sorteada a partir da lista e do identificador da votação, e qualquer pessoa com a lista recalcula e confere. Se o organizador escolhesse, poria um dissidente numa seção sozinho e leria o voto dele."}
           </p>
           <p>
             O preço é o conjunto de anonimato: ele passa a ser a sua seção, não a votação inteira.
             O resultado continua único — o acumulador não sabe de que seção veio cada cédula.
           </p>
+          {aberta && secoes > 1 && (
+            <Aviso tipo="nota">
+              <strong>Numa votação aberta, prefira uma seção só.</strong> Como não há lista, a
+              seção vem do endereço de quem chega — e isso não distribui parelho. Medido na
+              testnet: 18 pessoas em 3 seções caíram 9, 4 e 5, e as 4 da menor{" "}
+              <strong>não conseguiram votar</strong>, porque o contrato recusa anel abaixo de 5.
+              Com uma seção só, o anel é todo mundo que apareceu — que é o melhor anonimato
+              possível — e o custo só aperta acima de ~20 pessoas.
+            </Aviso>
+          )}
         </section>
       )}
 

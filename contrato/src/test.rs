@@ -2598,3 +2598,174 @@ fn trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez() {
         "o acumulador é por proposta: as três seções somam num resultado só"
     );
 }
+
+/// **A votação aberta: qualquer carteira comparece, e o contrato dá a seção.**
+///
+/// É o modo da demonstração pública, onde quem chega não estava em lista
+/// nenhuma. O que ele perde está declarado em §2 da spec e não é pouco: sem
+/// lista não existe `aptos − compareceram`, logo não existe voto obrigatório, e
+/// nada impede a mesma pessoa de voltar com outra carteira — na testnet o
+/// friendbot as financia de graça.
+///
+/// O que ele mantém é a tese: ninguém descobre a escolha de ninguém, e nada
+/// liga pessoa a cédula. Este teste prende as duas metades.
+#[test]
+fn na_votacao_aberta_qualquer_carteira_comparece_e_a_secao_vem_da_chegada() {
+    use tessera_core::anel;
+
+    const SECOES: u32 = 3;
+    const GENTE: usize = 9;
+
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(4_989_900);
+    let id = env.register(Tessera, ());
+    let cliente = TesseraClient::new(&env, &id);
+
+    let proposta: BytesN<32> = BytesN::from_array(&env, &[13u8; 32]);
+    let mut mesa_sdk = Vec::new(&env);
+    mesa_sdk.push_back(Address::generate(&env));
+    let mut perg = Vec::new(&env);
+    perg.push_back(Pergunta {
+        opcoes: 2,
+        confidencial: true,
+    });
+
+    // A raiz de 32 zeros é o sentinela: não há lista.
+    cliente.abrir(
+        &Address::generate(&env),
+        &proposta,
+        &perg,
+        &BytesN::from_array(&env, &[0u8; 32]),
+        &mesa_sdk,
+        &1u32,
+        &4_989_990u32,
+        &4_990_190u32,
+        &true,
+        &SECOES,
+    );
+
+    let g = pedersen::gerador();
+    let vazio: Vec<BytesN<32>> = Vec::new(&env);
+
+    // Ninguém estava em lista nenhuma, e todo mundo entra.
+    let mut quem: Vetor<Address> = Vetor::new();
+    let mut por_secao = [0usize; SECOES as usize];
+    for _ in 0..GENTE {
+        let a = Address::generate(&env);
+        let pk = anel::chave_publica(&g, &pedersen::acaso_fr().unwrap());
+        cliente.comparecer(&proposta, &a, &g1(&env, &pk), &vazio, &0u32, &0u32);
+        // A seção veio do endereço, não do que a pessoa pediu.
+        let s = cliente.secao_de(&proposta, &a).unwrap();
+        assert!(s < SECOES, "seção fora da faixa");
+        por_secao[s as usize] += 1;
+        quem.push(a);
+    }
+
+    // Cada anel tem exatamente quem o contrato mandou para ele.
+    for s in 0..SECOES {
+        assert_eq!(
+            cliente.anel(&proposta, &s).len() as usize,
+            por_secao[s as usize],
+            "o anel da seção {} não bate com quem foi mandado para lá",
+            s
+        );
+    }
+    assert_eq!(por_secao.iter().sum::<usize>(), GENTE);
+
+    // Pedir uma seção não adianta: o argumento é ignorado na aberta.
+    let teimoso = Address::generate(&env);
+    let pk = anel::chave_publica(&g, &pedersen::acaso_fr().unwrap());
+    cliente.comparecer(&proposta, &teimoso, &g1(&env, &pk), &vazio, &0u32, &2u32);
+    let dele = cliente.secao_de(&proposta, &teimoso).unwrap();
+    assert!(dele < SECOES);
+    // A seção é a do endereço dele, não a que ele pediu — e é reprodutível:
+    // comparecer de novo daria a mesma, que é o que faz o cliente conseguir
+    // declarar o footprint certo antes de enviar.
+    assert_eq!(cliente.secao_de(&proposta, &teimoso), Some(dele));
+
+    // Caminho de Merkle numa votação sem lista é erro, não é ignorado em
+    // silêncio: quem manda um está enganado sobre em que modo está votando.
+    let mut caminho = Vec::new(&env);
+    caminho.push_back(BytesN::from_array(&env, &[1u8; 32]));
+    assert_eq!(
+        cliente.try_comparecer(
+            &proposta,
+            &Address::generate(&env),
+            &g1(&env, &pk),
+            &caminho,
+            &0u32,
+            &0u32,
+        ),
+        Err(Ok(Erro::VotacaoAberta))
+    );
+
+    // E a mesma carteira continua não comparecendo duas vezes. Isto **não** é
+    // defesa contra sybil — basta outra carteira —, é só coerência do caderno.
+    assert_eq!(
+        cliente.try_comparecer(&proposta, &quem[0], &g1(&env, &pk), &vazio, &0u32, &0u32),
+        Err(Ok(Erro::JaCompareceu))
+    );
+}
+
+/// A votação fechada continua recusando quem não está na lista — o modo aberto
+/// não abriu o outro por acidente.
+#[test]
+fn a_votacao_fechada_nao_virou_aberta() {
+    use tessera_core::anel;
+
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(4_989_900);
+    let id = env.register(Tessera, ());
+    let cliente = TesseraClient::new(&env, &id);
+
+    let proposta: BytesN<32> = BytesN::from_array(&env, &[17u8; 32]);
+    let aptos: Vetor<Address> = (0..4).map(|_| Address::generate(&env)).collect();
+    let folhas: Vetor<merkle::Apto> = aptos
+        .iter()
+        .map(|a| merkle::Apto {
+            endereco: bytes_de(&a.clone().to_xdr(&env)),
+            peso: 1,
+            secao: 0,
+        })
+        .collect();
+    let arvore = merkle::Arvore::montar(&folhas).unwrap();
+
+    let mut mesa_sdk = Vec::new(&env);
+    mesa_sdk.push_back(Address::generate(&env));
+    let mut perg = Vec::new(&env);
+    perg.push_back(Pergunta {
+        opcoes: 2,
+        confidencial: true,
+    });
+    cliente.abrir(
+        &Address::generate(&env),
+        &proposta,
+        &perg,
+        &BytesN::from_array(&env, &arvore.raiz()),
+        &mesa_sdk,
+        &1u32,
+        &4_989_990u32,
+        &4_990_190u32,
+        &true,
+        &1u32,
+    );
+
+    let g = pedersen::gerador();
+    let pk = anel::chave_publica(&g, &pedersen::acaso_fr().unwrap());
+    let vazio: Vec<BytesN<32>> = Vec::new(&env);
+
+    // Sem caminho: na fechada isso é falta de prova, não votação aberta.
+    assert_eq!(
+        cliente.try_comparecer(
+            &proposta,
+            &Address::generate(&env),
+            &g1(&env, &pk),
+            &vazio,
+            &0u32,
+            &0u32,
+        ),
+        Err(Ok(Erro::NaoEstaNaListaDeAptos))
+    );
+}
