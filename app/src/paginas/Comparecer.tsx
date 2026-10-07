@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CarteiraLocal } from "../carteira";
 import { guardarChaveDeAnel, guardarLista, lerLista } from "../lista";
-import { comparecer, ehAberta, enderecoXdr, lerProposta, lerSecao, secaoAberta } from "../rede";
+import { comparecer, ehAberta, enderecoXdr, lerProposta, lerSecao, lerSecoes } from "../rede";
 import { carregar } from "../wasm";
 import { Aviso, Icone, LinkBastidores, Passos, Trilha } from "../ui";
 import { useDiario } from "./comum";
@@ -64,8 +64,10 @@ export default function Comparecer() {
 
       // Na votação aberta não há lista, logo não há caminho de Merkle — e a
       // seção não é pedida: o contrato dá, por ordem de chegada.
+      // Na aberta a seção é a de agora; quem entrar no meio empurra. Por isso a
+      // janela no footprint, logo abaixo.
       const caminho = ehAberta(prop)
-        ? { irmaos: [] as string[], indice: 0, secao: await secaoAberta(id, meu, prop.secoes) }
+        ? { irmaos: [] as string[], indice: 0, secao: Math.max(0, (await lerSecoes(id)) - 1) }
         : (w.caminho_de(id, lista.map(enderecoXdr), new Uint32Array(lista.length).fill(1), prop.secoes, indice) as {
             irmaos: string[];
             indice: number;
@@ -82,7 +84,13 @@ export default function Comparecer() {
       diario({ tipo: "val", txt: `chave pública = ${chave.publica.slice(0, 24)}…` });
 
       setProgresso(2);
-      await comparecer(c, id, chave.publica, caminho.irmaos, caminho.indice, caminho.secao, diario, Math.max(lista.length, 40));
+      await comparecer(
+        c, id, chave.publica, caminho.irmaos, caminho.indice, caminho.secao, diario,
+        Math.max(lista.length, 40),
+        // Três seções além da prevista: cobre uma rajada de 3× o limite
+        // entrando entre a simulação e a aplicação.
+        ehAberta(prop) ? 3 : 0,
+      );
       // Na aberta quem decide a seção é o contrato: pergunta a ele, não ao
       // palpite do cliente.
       const secao = (await lerSecao(id, meu)) ?? caminho.secao;

@@ -17,6 +17,7 @@ export default function Abrir() {
   const [mesa, setMesa] = useState("");
   const [limiar, setLimiar] = useState(3);
   const [secoes, setSecoes] = useState(1);
+  const [limite, setLimite] = useState(10);
   const [aberta, setAberta] = useState(true);
   const [minCaderno, setMinCaderno] = useState(10);
   const [minVoto, setMinVoto] = useState(30);
@@ -88,7 +89,7 @@ export default function Abrir() {
       setProgresso(1);
       await abrir(
         c, proposta, [{ opcoes: n, confidencial: true }], raiz, membros,
-        k, abre, fecha, anel, secoes, diario,
+        k, abre, fecha, anel, aberta ? 1 : secoes, aberta ? limite : 0, diario,
       );
       setProgresso(2);
 
@@ -183,41 +184,57 @@ export default function Abrir() {
       {anel && (
         <section>
           <h2>AS SEÇÕES</h2>
-          <label className="campo campo-estreito">
-            <span className="eyebrow">QUANTAS</span>
-            <input
-              type="number"
-              value={secoes}
-              min={1}
-              onChange={(e) => setSecoes(Number(e.target.value))}
-            />
-          </label>
-          <p>
-            Verificar um anel custa <strong>10.822.850 instruções por membro</strong>. Com 30
-            pessoas num anel só, cada cédula usa 91,4% do teto de CPU de uma transação e só uma
-            entra por ledger — medido: 18 de 30 cédulas em 646 s, o resto expirou. Em três seções
-            de dez, a mesma cédula custa 37,2% e três entram por ledger.
-          </p>
-          <p>
-            <strong>Você não escolhe quem fica com quem.</strong>{" "}
-            {aberta
-              ? "Na votação aberta o contrato distribui por ordem de chegada — ninguém pede a própria seção, e não adianta gerar carteiras tentando cair numa específica."
-              : "A divisão é sorteada a partir da lista e do identificador da votação, e qualquer pessoa com a lista recalcula e confere. Se o organizador escolhesse, poria um dissidente numa seção sozinho e leria o voto dele."}
-          </p>
+          {aberta ? (
+            <>
+              <label className="campo campo-estreito">
+                <span className="eyebrow">PESSOAS POR SEÇÃO</span>
+                <input
+                  type="number"
+                  value={limite}
+                  min={5}
+                  onChange={(e) => setLimite(Number(e.target.value))}
+                />
+              </label>
+              <p>
+                Você não adivinha quanta gente vem: diz o tamanho da seção e o contrato conta.{" "}
+                <strong>A seção enche e a próxima abre sozinha.</strong>
+              </p>
+              <p>
+                Verificar um anel custa <strong>10.822.850 instruções por membro</strong>. Com 30
+                pessoas num anel só, cada cédula usa 91,4% do teto de CPU de uma transação e só
+                uma entra por ledger — medido: 18 de 30 em 646 s, o resto expirou. Em seções de
+                dez, a mesma cédula custa 37,2% e três entram por ledger.
+              </p>
+              {limite < 5 && (
+                <Aviso tipo="erro">
+                  Abaixo de cinco o contrato recusa a cédula: um anel pequeno demais não esconde
+                  quem está nele. Use cinco ou mais.
+                </Aviso>
+              )}
+            </>
+          ) : (
+            <>
+              <label className="campo campo-estreito">
+                <span className="eyebrow">QUANTAS</span>
+                <input
+                  type="number"
+                  value={secoes}
+                  min={1}
+                  onChange={(e) => setSecoes(Number(e.target.value))}
+                />
+              </label>
+              <p>
+                <strong>Você não escolhe quem fica com quem.</strong> A divisão é sorteada a
+                partir da lista e do identificador da votação, e qualquer pessoa com a lista
+                recalcula e confere. Se o organizador escolhesse, poria um dissidente numa seção
+                sozinho e leria o voto dele.
+              </p>
+            </>
+          )}
           <p>
             O preço é o conjunto de anonimato: ele passa a ser a sua seção, não a votação inteira.
             O resultado continua único — o acumulador não sabe de que seção veio cada cédula.
           </p>
-          {aberta && secoes > 1 && (
-            <Aviso tipo="nota">
-              <strong>Numa votação aberta, prefira uma seção só.</strong> Como não há lista, a
-              seção vem do endereço de quem chega — e isso não distribui parelho. Medido na
-              testnet: 18 pessoas em 3 seções caíram 9, 4 e 5, e as 4 da menor{" "}
-              <strong>não conseguiram votar</strong>, porque o contrato recusa anel abaixo de 5.
-              Com uma seção só, o anel é todo mundo que apareceu — que é o melhor anonimato
-              possível — e o custo só aperta acima de ~20 pessoas.
-            </Aviso>
-          )}
         </section>
       )}
 

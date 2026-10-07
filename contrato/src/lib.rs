@@ -82,6 +82,7 @@ impl Tessera {
         fecha_em: u32,
         anel: bool,
         secoes: u32,
+        limite_secao: u32,
     ) -> Result<(), Erro> {
         governanca.require_auth();
 
@@ -158,6 +159,12 @@ impl Tessera {
         if secoes == 0 || (!anel && secoes != 1) {
             return Err(Erro::SecaoInvalida);
         }
+        // O limite só governa a votação aberta, onde ninguém sabe quem vem.
+        // Na fechada a lista é conhecida e a divisão sai dela na abertura.
+        let aberta = e_aberta(&raiz_aptos);
+        if limite_secao > 0 && (!aberta || secoes != 1) {
+            return Err(Erro::SecaoInvalida);
+        }
         let n_perguntas = perguntas.len();
         let p = Proposta {
             perguntas,
@@ -168,10 +175,14 @@ impl Tessera {
             fecha_em,
             anel,
             secoes,
+            limite_secao,
         };
         if anel {
             // Um anel por seção, e cada um nasce vazio: sem esta escrita, o
             // primeiro `comparecer` daquela seção não teria onde se somar.
+            let kn = Chave::Caderno(proposta.clone());
+            env.storage().persistent().set(&kn, &0u32);
+            guardar_longo(&env, &kn);
             for s in 0..secoes {
                 let k = Chave::Anel(proposta.clone(), s);
                 env.storage()
@@ -356,11 +367,23 @@ impl Tessera {
         // escolhida; numa votação aberta isso não tira nada de ninguém, já que
         // escolher o próprio esconderijo não encolhe o de outra pessoa — e o
         // piso de `TAU` continua valendo.
+        let kn = Chave::Caderno(proposta.clone());
+        let caderno: u32 = env.storage().persistent().get(&kn).unwrap_or(0);
+
         let secao = if e_aberta(&p.raiz_aptos) {
             if !caminho.is_empty() {
                 return Err(Erro::VotacaoAberta);
             }
-            secao_aberta(&env, &proposta, &votante, p.secoes)
+            // **Enche e abre a próxima.** A seção vem da ordem de chegada, que
+            // é o que deixa o organizador parar de adivinhar quanta gente vem.
+            //
+            // Isso exige do cliente uma coisa que não é óbvia: a seção só existe
+            // na *aplicação*, mas o footprint — que nomeia `Anel(proposta, s)` —
+            // é declarado na *simulação*. Quem manda uma cédula precisa declarar
+            // uma **janela** de seções, não só a prevista, senão uma rajada de
+            // gente faz cada transação escrever onde não declarou. Medido: sem a
+            // janela, uma por ledger e recusas com `txFailed`.
+            caderno.checked_div(p.limite_secao).unwrap_or(0)
         } else {
             if secao >= p.secoes {
                 return Err(Erro::SecaoInvalida);
@@ -372,18 +395,22 @@ impl Tessera {
         // estes pontos exatos, então a cédula não precisa revalidar os `n`.
         validar(&env, &chave_anel)?;
 
+        // Com split automático a seção nova não existia na abertura: ela nasce
+        // vazia com quem chega primeiro nela.
         let ka = Chave::Anel(proposta.clone(), secao);
         let mut anel: Vec<Bls12381G1Affine> = env
             .storage()
             .persistent()
             .get(&ka)
-            .ok_or(Erro::ModoErrado)?;
+            .unwrap_or_else(|| Vec::new(&env));
         anel.push_back(chave_anel);
         let tamanho = anel.len();
         env.storage().persistent().set(&ka, &anel);
         guardar_longo(&env, &ka);
 
         env.storage().persistent().set(&kc, &secao);
+        env.storage().persistent().set(&kn, &(caderno + 1));
+        guardar_longo(&env, &kn);
         guardar_longo(&env, &kc);
 
         env.events().publish(
@@ -420,7 +447,7 @@ impl Tessera {
         if !p.anel {
             return Err(Erro::ModoErrado);
         }
-        if secao >= p.secoes {
+        if secao >= quantas_secoes(&env, &proposta, &p) {
             return Err(Erro::SecaoInvalida);
         }
         if env.ledger().sequence() < p.abre_em {
@@ -466,7 +493,7 @@ impl Tessera {
         // esconde atrás de quem, e uma seção minúscula entregaria o voto de
         // quem caiu nela. Aqui a recusa vale mais que o aviso: o mesmo princípio
         // do PROTOCOLO §6.6, que prefere falhar a vazar.
-        if p.secoes > 1 && anel.len() < TAU {
+        if quantas_secoes(&env, &proposta, &p) > 1 && anel.len() < TAU {
             return Err(Erro::AnonimatoInsuficiente);
         }
 
@@ -805,6 +832,18 @@ impl Tessera {
             .has(&Chave::Compareceu(proposta, votante))
     }
 
+    /// Quantas seções existem agora. Na aberta cresce com o comparecimento.
+    pub fn secoes(env: Env, proposta: BytesN<32>) -> u32 {
+        match env
+            .storage()
+            .persistent()
+            .get::<Chave, Proposta>(&Chave::Proposta(proposta.clone()))
+        {
+            Some(p) => quantas_secoes(&env, &proposta, &p),
+            None => 0,
+        }
+    }
+
     /// Em que seção a pessoa caiu. Na votação aberta é o contrato que decide,
     /// então quem vota precisa perguntar — e perguntar à cadeia, não ao
     /// navegador, que pode ter sido trocado.
@@ -857,12 +896,25 @@ impl Tessera {
 /// pessoa de comparecer com cinquenta carteiras. O que ela mantém é o que o
 /// projeto existe para provar: ninguém descobre a escolha de ninguém, e nada
 /// liga pessoa a cédula.
-/// `H(proposta ‖ endereço) mod secoes`, e o cliente calcula o mesmo.
-fn secao_aberta(env: &Env, proposta: &BytesN<32>, votante: &Address, secoes: u32) -> u32 {
-    let mut buf = Bytes::from_slice(env, &proposta.to_array());
-    buf.append(&votante.clone().to_xdr(env));
-    let h = env.crypto().sha256(&buf).to_array();
-    u32::from_be_bytes([h[0], h[1], h[2], h[3]]) % secoes
+/// Quantas seções existem **agora**.
+///
+/// Na fechada é o que foi fixado na abertura. Na aberta cresce com o caderno:
+/// `teto(compareceram / limite)`, mínimo 1. `p.secoes` sozinho mentiria, porque
+/// ele fica parado em 1 enquanto as seções abrem.
+fn quantas_secoes(env: &Env, proposta: &BytesN<32>, p: &Proposta) -> u32 {
+    if p.limite_secao == 0 {
+        return p.secoes;
+    }
+    let n: u32 = env
+        .storage()
+        .persistent()
+        .get(&Chave::Caderno(proposta.clone()))
+        .unwrap_or(0);
+    if n == 0 {
+        1
+    } else {
+        n.div_ceil(p.limite_secao)
+    }
 }
 
 fn e_aberta(raiz: &BytesN<32>) -> bool {

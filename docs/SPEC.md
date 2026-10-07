@@ -127,7 +127,7 @@ pergunta.
 | INV-05 | O caderno e a urna não se ligam | `contrato` `o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem` |
 | INV-06 | A mesma pessoa não vota duas vezes, e a recusa não revela quem é | `contrato` `ninguem_vota_duas_vezes`; `core` `a_mesma_pessoa_produz_a_mesma_imagem` |
 | INV-07 | A imagem de chave não atravessa propostas | `core` `a_imagem_nao_atravessa_propostas` |
-| INV-08 | A seção está presa na folha de Merkle: o votante não escolhe a sua | `core` `a_secao_esta_presa_na_folha`; `contrato` `trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez` |
+| INV-08 | **Na votação fechada**, a seção está presa na folha de Merkle: o votante não escolhe a sua | `core` `a_secao_esta_presa_na_folha`; `contrato` `trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez` |
 | INV-09 | A divisão em seções não depende da ordem da lista nem de quem organiza | `core` `a_divisao_nao_depende_da_ordem_em_que_a_lista_chega`, `a_divisao_e_equilibrada_e_ninguem_fica_sozinho` |
 | INV-10 | Peso inflado não chega na raiz | `core` `peso_inflado_nao_chega_na_raiz`; `contrato` recusa com `PesoNaoUnitario` |
 | INV-10b | Mesa vazia exige limiar zero, e limiar zero exige mesa vazia — meio-termo não existe | `contrato` `assembleia_sem_mesa_abre_e_nao_apura` |
@@ -182,7 +182,7 @@ Ver [`SOURCES.md`](SOURCES.md) para a tabela com datas. Resumo:
 | @stellar/stellar-sdk | 14.6.1 |
 | matemática | `arkworks`, o mesmo crate do host Soroban |
 
-Contrato na testnet: `CBYKJOBOIKSLXFLYQHYNFEJER643TY6KFVHLVTNUQNNDO5JRJPYDI2B6`
+Contrato na testnet: `CDJ3VMFKEZP3TN6KF3REUXTVW2R7AT5FMMLX3OKADDJOAV2V5D4F7OLC`
 
 `[VERIFY]` em aberto: nenhum.
 
@@ -269,6 +269,7 @@ cd app && node scripts/folga.mjs                    # contenção de escrita
 | T-007 | "O modo" em `/abrir` | T-001 | §4 | todo | a tela não oferece votação que `/votar` recusa |
 | T-008 | `/apurar` junta as parcelas da mesa | T-005 | §4 | todo | apuração pelo dapp, sem CLI |
 | T-009 | Assembleia sem mesa nenhuma | T-000 | §5, §10 | review | `limiar == 0` aceito sse `mesa` vazia; redeploy; os 12 arquivos repontados; `/abrir` e `/apurar` param de exigir mesa |
+| T-014 | Limite por seção, com split automático na aberta | T-013 | §4, §5 | blocked | §11-D — contrato e testes prontos; a rajada ainda não entra | `abrir` troca `secoes` por `limite_secao`; a aberta enche e abre a próxima; o cliente declara uma janela de anéis no footprint; rajada de 20 com limite 10 entra |
 | T-010 | `/abrir` avisa quando a seção nasce pequena | T-013 | §10 | todo | recusa abrir com `aptos / secoes < TAU`, dizendo o tamanho que daria; teste do cálculo |
 | T-011 | Parar o churn de `test_snapshots/` | T-002 | §5 | todo | ou viram determinísticos, ou saem do git; nenhum diff futuro os carrega |
 | T-013 | Votação aberta e votação fechada | T-003 | §2, §4, §5 | review | `raiz_aptos` de 32 zeros = aberta; `comparecer` pula Merkle; seção por ordem de chegada; a tela diz o que cada modo não garante; redeploy junto de T-009 |
@@ -400,4 +401,29 @@ aberto.
 §11-A, §11-B e §11-C foram respondidas em 2026-10-07 e viraram DEC-003, DEC-004
 e DEC-005.
 
-Nenhuma pergunta em aberto.
+### §11-D — a rajada não abre seção nova (bloqueia T-014)
+
+O split automático funciona **sequencialmente**: com limite 2, a terceira pessoa
+abre a seção 1, declarando no footprint a janela `Anel(proposta, 0..3)`.
+Verificado na testnet.
+
+Sob rajada, não. Vinte pessoas de uma vez com limite 10 dão **exatamente 10
+aceitas** — as que cabem na seção 0 — e 10 recusadas com `txFailed`. As que
+precisariam abrir a seção 1 são justamente as que falham.
+
+O que já foi descartado:
+
+- **não é a janela do footprint**: o caso sequencial usa a mesma janela e passa;
+- **não é orçamento de escrita**: a folga cobre 50 pontos e a seção tem 10;
+- **não é orçamento de leitura**: subir `diskReadBytes` junto não mudou o número
+  (10 de 20 nas duas vezes).
+
+O diagnóstico que falta é pequeno e eu não consegui rodar — o DNS do friendbot
+caiu (`EAI_AGAIN`) no meio: **seis simultâneos com limite 2**, que força três
+seções a nascer ao mesmo tempo. Se as seis entrarem, o problema é de escala e
+não de mecanismo; se repetir o padrão "só a primeira seção", o mecanismo tem um
+buraco que o caso sequencial não mostra.
+
+Enquanto isso, a votação aberta funciona com **uma seção só**
+(`limite_secao = 0`), que é o padrão recomendado em DEC-006 e o que a tela
+sugere.

@@ -143,6 +143,7 @@ fn montar_janela(
         &fecha_em,
         &false,
         &1u32,
+        &0u32,
     );
 
     let h = ponto::de_hex(&{
@@ -924,6 +925,7 @@ fn a_janela_precisa_ter_duracao() {
             &300u32,
             &false,
             &1u32,
+            &0u32,
         ),
         Err(Ok(Erro::PrazoNoPassado))
     );
@@ -1008,7 +1010,8 @@ fn abrir_recusa_configuracao_invalida() {
             &0u32,
             &1000u32,
             &false,
-            &1u32
+            &1u32,
+            &0u32
         ),
         Err(Ok(Erro::OpcoesForaDaFaixa))
     );
@@ -1023,7 +1026,8 @@ fn abrir_recusa_configuracao_invalida() {
             &0u32,
             &1000u32,
             &false,
-            &1u32
+            &1u32,
+            &0u32
         ),
         Err(Ok(Erro::OpcoesForaDaFaixa))
     );
@@ -1038,7 +1042,8 @@ fn abrir_recusa_configuracao_invalida() {
             &0u32,
             &1000u32,
             &false,
-            &1u32
+            &1u32,
+            &0u32
         ),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
@@ -1055,7 +1060,8 @@ fn abrir_recusa_configuracao_invalida() {
             &0u32,
             &1000u32,
             &false,
-            &1u32
+            &1u32,
+            &0u32
         ),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
@@ -1073,7 +1079,8 @@ fn abrir_recusa_configuracao_invalida() {
             &0u32,
             &1000u32,
             &false,
-            &1u32
+            &1u32,
+            &0u32
         ),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
@@ -1090,20 +1097,23 @@ fn abrir_recusa_configuracao_invalida() {
             &0u32,
             &1000u32,
             &false,
-            &1u32
+            &1u32,
+            &0u32
         )
         .is_ok());
 
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &4u32, &0u32, &1000u32, &false, &1u32),
+        cliente
+            .try_abrir(&gov, &id, &ok, &raiz, &mesa, &4u32, &0u32, &1000u32, &false, &1u32, &0u32),
         Err(Ok(Erro::LimiarInvalido))
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &0u32, &0u32, &1000u32, &false, &1u32),
+        cliente
+            .try_abrir(&gov, &id, &ok, &raiz, &mesa, &0u32, &0u32, &1000u32, &false, &1u32, &0u32),
         Err(Ok(Erro::LimiarInvalido))
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &5u32, &false, &1u32),
+        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &5u32, &false, &1u32, &0u32),
         Err(Ok(Erro::PrazoNoPassado))
     );
 
@@ -1112,15 +1122,18 @@ fn abrir_recusa_configuracao_invalida() {
     repetida.push_back(m.clone());
     repetida.push_back(m);
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &repetida, &2u32, &0u32, &1000u32, &false, &1u32),
+        cliente.try_abrir(
+            &gov, &id, &ok, &raiz, &repetida, &2u32, &0u32, &1000u32, &false, &1u32, &0u32
+        ),
         Err(Ok(Erro::MembroRepetido))
     );
 
     cliente.abrir(
-        &gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32,
+        &gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32, &0u32,
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32),
+        cliente
+            .try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32, &0u32),
         Err(Ok(Erro::PropostaJaExiste))
     );
 }
@@ -1735,6 +1748,7 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
         &4_990_190u32,
         &true,
         &1u32,
+        &0u32,
     );
 
     let g = pedersen::gerador();
@@ -1998,6 +2012,7 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
         &4_990_190u32,
         &true,
         &1u32,
+        &0u32,
     );
 
     let g = pedersen::gerador();
@@ -2217,6 +2232,7 @@ fn ate_quantas_pessoas_cabe_um_anel() {
             &4_990_190u32,
             &true,
             &1u32,
+            &0u32,
         );
 
         let g = pedersen::gerador();
@@ -2409,6 +2425,7 @@ fn trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez() {
         &4_990_190u32,
         &true,
         &SECOES,
+        &0u32,
     );
 
     let g = pedersen::gerador();
@@ -2643,6 +2660,7 @@ fn na_votacao_aberta_qualquer_carteira_comparece_e_a_secao_vem_da_chegada() {
         &4_990_190u32,
         &true,
         &SECOES,
+        &0u32,
     );
 
     let g = pedersen::gerador();
@@ -2750,6 +2768,7 @@ fn a_votacao_fechada_nao_virou_aberta() {
         &4_990_190u32,
         &true,
         &1u32,
+        &0u32,
     );
 
     let g = pedersen::gerador();
@@ -2811,6 +2830,7 @@ fn assembleia_sem_mesa_abre_e_nao_apura() {
         &4_990_190u32,
         &true,
         &1u32,
+        &0u32,
     );
     assert_eq!(cliente.proposta(&proposta).unwrap().mesa.len(), 0);
 
@@ -2830,6 +2850,7 @@ fn assembleia_sem_mesa_abre_e_nao_apura() {
                 &4_990_190u32,
                 &true,
                 &1u32,
+                &0u32,
             ),
             Err(Ok(Erro::LimiarInvalido)),
             "mesa e limiar têm de concordar: {} membros, limiar {}",
@@ -2868,5 +2889,121 @@ fn assembleia_sem_mesa_abre_e_nao_apura() {
         cliente.try_apurar(&proposta, &gov, &totais, &aberturas),
         Err(Ok(Erro::NaoEMembroDaMesa)),
         "sem mesa, endossar tem de ser impossível para qualquer um"
+    );
+}
+
+/// **O split automático: a seção enche e a próxima abre.**
+///
+/// Obrigar quem organiza a adivinhar `secoes` é pedir que ele acerte quanta
+/// gente vem — que é justamente o que ele não sabe numa votação aberta. Com
+/// limite por seção, ele diz o tamanho e o contrato conta.
+///
+/// O que este teste prende é a aritmética da divisão e o nascimento da seção
+/// nova. O que ele **não** alcança é a rajada de verdade, porque aqui as
+/// chamadas são sequenciais: a seção só existe na aplicação, e o footprint é
+/// declarado na simulação. Quem manda a transação tem de declarar uma janela de
+/// seções, e isso só a testnet mede — ver `app/scripts/rodada-30.mjs`.
+#[test]
+fn a_secao_enche_e_a_proxima_abre() {
+    use tessera_core::anel;
+
+    const LIMITE: u32 = 4;
+    const GENTE: usize = 14;
+
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(4_989_900);
+    let id = env.register(Tessera, ());
+    let cliente = TesseraClient::new(&env, &id);
+
+    let proposta: BytesN<32> = BytesN::from_array(&env, &[29u8; 32]);
+    let sem_mesa: Vec<Address> = Vec::new(&env);
+    let mut perg = Vec::new(&env);
+    perg.push_back(Pergunta {
+        opcoes: 2,
+        confidencial: true,
+    });
+
+    cliente.abrir(
+        &Address::generate(&env),
+        &proposta,
+        &perg,
+        &BytesN::from_array(&env, &[0u8; 32]),
+        &sem_mesa,
+        &0u32,
+        &4_989_990u32,
+        &4_990_190u32,
+        &true,
+        &1u32,
+        &LIMITE,
+    );
+    // Começa com uma seção. Nenhuma outra foi criada à toa.
+    assert_eq!(cliente.secoes(&proposta), 1);
+
+    let g = pedersen::gerador();
+    let vazio: Vec<BytesN<32>> = Vec::new(&env);
+    for i in 0..GENTE {
+        let a = Address::generate(&env);
+        let pk = anel::chave_publica(&g, &pedersen::acaso_fr().unwrap());
+        cliente.comparecer(&proposta, &a, &g1(&env, &pk), &vazio, &0u32, &0u32);
+
+        let esperada = i as u32 / LIMITE;
+        assert_eq!(
+            cliente.secao_de(&proposta, &a),
+            Some(esperada),
+            "a {}ª pessoa devia cair na seção {}",
+            i + 1,
+            esperada
+        );
+        // O número de seções acompanha o caderno, não fica parado em 1.
+        assert_eq!(
+            cliente.secoes(&proposta),
+            (i as u32 / LIMITE) + 1,
+            "o contador de seções não acompanhou o comparecimento"
+        );
+    }
+
+    // 14 com limite 4 dão 4, 4, 4, 2.
+    let tamanhos: Vetor<u32> = (0..cliente.secoes(&proposta))
+        .map(|s| cliente.anel(&proposta, &s).len())
+        .collect();
+    assert_eq!(tamanhos.as_slice(), &[4u32, 4, 4, 2]);
+
+    // A última nasceu com 2, abaixo de `TAU` — e é por isso que a tela exige
+    // limite >= 5: com limite menor, a sobra da última seção não vota.
+    assert!(tamanhos.as_slice().last().unwrap() < &TAU);
+}
+
+/// Limite por seção só faz sentido na votação aberta: na fechada a lista é
+/// conhecida e a divisão sai dela na abertura.
+#[test]
+fn limite_por_secao_nao_vale_na_fechada() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let id = env.register(Tessera, ());
+    let cliente = TesseraClient::new(&env, &id);
+    let mut perg = Vec::new(&env);
+    perg.push_back(Pergunta {
+        opcoes: 2,
+        confidencial: true,
+    });
+    let sem_mesa: Vec<Address> = Vec::new(&env);
+
+    assert_eq!(
+        cliente.try_abrir(
+            &Address::generate(&env),
+            &BytesN::from_array(&env, &[31u8; 32]),
+            &perg,
+            &BytesN::from_array(&env, &[7u8; 32]),
+            &sem_mesa,
+            &0u32,
+            &100u32,
+            &200u32,
+            &true,
+            &1u32,
+            &5u32,
+        ),
+        Err(Ok(Erro::SecaoInvalida)),
+        "limite por seção numa votação com lista devia ser recusado"
     );
 }

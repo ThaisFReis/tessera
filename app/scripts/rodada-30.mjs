@@ -60,7 +60,7 @@ const HORIZON = "https://horizon-testnet.stellar.org";
 const FRIENDBOT = "https://friendbot.stellar.org";
 const PASSPHRASE = Networks.TESTNET;
 const CONTRATO = process.env.TESSERA_CONTRATO ??
-  "CBYKJOBOIKSLXFLYQHYNFEJER643TY6KFVHLVTNUQNNDO5JRJPYDI2B6";
+  "CDJ3VMFKEZP3TN6KF3REUXTVW2R7AT5FMMLX3OKADDJOAV2V5D4F7OLC";
 
 const N = Number(process.env.N ?? 30);
 const OPCOES = 2;
@@ -76,6 +76,10 @@ const FOLGA = Number(process.env.FOLGA ?? 96 * 40 + 1024);
 const SECOES = Number(process.env.SECOES ?? 1);
 /** ABERTA=1 abre sem lista: raiz de 32 zeros, qualquer carteira comparece. */
 const ABERTA = process.env.ABERTA === "1";
+/** Pessoas por seção na aberta. 0 = uma seção só. */
+const LIMITE = Number(process.env.LIMITE ?? 0);
+/** Quantas seções além da prevista declarar no footprint. */
+const JANELA = Number(process.env.JANELA ?? 3);
 
 const servidor = new rpc.Server(RPC);
 const contrato = new Contract(CONTRATO);
@@ -91,10 +95,17 @@ const xdrDe = (g) => bytesHex(new Address(g).toScVal().toXDR());
 const dorme = (ms) => new Promise((r) => setTimeout(r, ms));
 /** O mesmo que `secao_aberta` faz no contrato: o cliente precisa saber antes de
  *  enviar, porque a seção nomeia a entrada que a transação vai escrever. */
-async function secaoAberta(id, g, secoes) {
-  const b = Buffer.concat([hexBytes(id), hexBytes(xdrDe(g))]);
-  const h = await crypto.subtle.digest("SHA-256", b);
-  return new DataView(h).getUint32(0, false) % secoes;
+/** As chaves de `Chave::Anel(proposta, s)` para somar ao footprint. */
+function chavesDeAnel(id, de, ate) {
+  const ks = [];
+  for (let s = de; s <= ate; s++) {
+    ks.push(xdr.LedgerKey.contractData(new xdr.LedgerKeyContractData({
+      contract: new Address(CONTRATO).toScAddress(),
+      key: xdr.ScVal.scvVec([xdr.ScVal.scvSymbol("Anel"), bN(id), u32(s)]),
+      durability: xdr.ContractDataDurability.persistent(),
+    })));
+  }
+  return ks;
 }
 
 let passo = 0;
@@ -143,7 +154,7 @@ async function ler(metodo, ...args) {
  * Como `enviar` do outro script, mas **não lança**: devolve o que aconteceu.
  * O ponto deste teste é ver as falhas, não parar na primeira.
  */
-async function tentar(par, metodo, args, lance = TAXA_INCLUSAO, folga = 0) {
+async function tentar(par, metodo, args, lance = TAXA_INCLUSAO, folga = 0, extras = []) {
   const t0 = Date.now();
   try {
     const conta = await servidor.getAccount(par.publicKey());
@@ -156,12 +167,24 @@ async function tentar(par, metodo, args, lance = TAXA_INCLUSAO, folga = 0) {
     }
     const cpu = Number(sim.cost?.cpuInsns ?? 0);
     let pronta = rpc.assembleTransaction(bruta, sim).build();
-    if (folga > 0) {
+    if (folga > 0 || extras.length > 0) {
       const dados = new SorobanDataBuilder(
         pronta.toEnvelope().v1().tx().ext().sorobanData().toXDR("base64"),
       );
       const r = dados.build().resources();
-      dados.setResources(r.instructions(), r.diskReadBytes(), r.writeBytes() + folga);
+      // Toda entrada declarada é **carregada**, não só a usada: declarar as
+      // seções vizinhas aumenta a leitura junto da escrita. Só subir
+      // `writeBytes` deixou 10 de 20 em `txFailed`.
+      dados.setResources(
+        r.instructions(),
+        r.diskReadBytes() + folga,
+        r.writeBytes() + folga,
+      );
+      if (extras.length) {
+        const atuais = dados.getReadWrite();
+        const vistas = new Set(atuais.map((k) => k.toXDR("base64")));
+        dados.setReadWrite([...atuais, ...extras.filter((k) => !vistas.has(k.toXDR("base64")))]);
+      }
       pronta = TransactionBuilder.cloneFrom(pronta, {
         fee: (BigInt(pronta.fee) + BigInt(folga) * 400n).toString(),
         sorobanData: dados.build(),
@@ -254,7 +277,7 @@ async function main() {
     vec([nativeToScVal({ opcoes: OPCOES, confidencial: true },
       { type: { opcoes: ["symbol", "u32"], confidencial: ["symbol", "bool"] } })]),
     bN(raiz), vec(mesa.map(addr)), u32(1), u32(abreEm), u32(fechaEm),
-    xdr.ScVal.scvBool(true), u32(SECOES),
+    xdr.ScVal.scvBool(true), u32(ABERTA ? 1 : SECOES), u32(ABERTA ? LIMITE : 0),
   ]);
   if (ABERTA) diz("aberta: raiz de 32 zeros, sem lista");
   if (!r1.ok) throw new Error(`abrir falhou — ${r1.fase}: ${r1.erro}`);
@@ -271,18 +294,20 @@ async function main() {
   }
   const tentativas = new Array(N).fill(1);
   const rc = await Promise.all(membros.map(async (m, i) => {
+    const prevista = ABERTA ? Math.max(0, (await ler("secoes", bN(id))) - 1) : 0;
     const c = ABERTA
-      ? { irmaos: [], indice: 0, secao: await secaoAberta(id, m.publicKey(), SECOES) }
+      ? { irmaos: [], indice: 0, secao: prevista }
       : wasm.caminho_de(id, enderecos, pesos, SECOES, i);
+    const extras = ABERTA && LIMITE > 0 ? chavesDeAnel(id, prevista, prevista + JANELA) : [];
     const args = [bN(id), addr(m.publicKey()), bN(chaves[i].publica),
                   vec(c.irmaos.map(bN)), u32(c.indice), u32(c.secao)];
-    let r = await tentar(m, "comparecer", args, TAXA_INCLUSAO, FOLGA);
+    let r = await tentar(m, "comparecer", args, TAXA_INCLUSAO, FOLGA, extras);
     for (let t = 0; !r.ok && t < RETENTATIVAS; t++) {
       // `JaCompareceu` significa que uma tentativa anterior entrou: não insiste.
       if (String(r.erro).includes("#28")) break;
       await dorme(1000 + Math.floor(Math.random() * 4000));
       tentativas[i]++;
-      r = await tentar(m, "comparecer", args, TAXA_INCLUSAO, FOLGA);
+      r = await tentar(m, "comparecer", args, TAXA_INCLUSAO, FOLGA, extras);
     }
     return r;
   }));
@@ -301,18 +326,19 @@ async function main() {
   }
   process.stdout.write("\r" + " ".repeat(40) + "\r");
 
+  const nSecoes = ABERTA && LIMITE > 0 ? await ler("secoes", bN(id)) : SECOES;
   if (ABERTA) {
     // Quem decide a seção é o contrato: pergunta a ele, um por um.
     for (let i = 0; i < N; i++) {
       const v = await ler("secao_de", bN(id), addr(membros[i].publicKey()));
       divisao[i] = v ?? -1; // -1 = não compareceu; não entra na contagem
     }
-    const tam = Array.from({ length: SECOES }, (_, s) => divisao.filter((x) => x === s).length);
+    const tam = Array.from({ length: nSecoes }, (_, s) => divisao.filter((x) => x === s).length);
     diz(`o contrato distribuiu por ordem de chegada: ${tam.join(", ")}`);
   }
 
   const aneis = [];
-  for (let s = 0; s < SECOES; s++) {
+  for (let s = 0; s < nSecoes; s++) {
     aneis.push((await ler("anel", bN(id), u32(s))).map(bytesHex));
   }
   diz(`anéis congelados: ${aneis.map((a) => a.length).join(", ")}`);

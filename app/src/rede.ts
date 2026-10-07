@@ -18,7 +18,7 @@ export const REDE = {
   horizon: "https://horizon-testnet.stellar.org",
   friendbot: "https://friendbot.stellar.org",
   passphrase: Networks.TESTNET,
-  contrato: "CBYKJOBOIKSLXFLYQHYNFEJER643TY6KFVHLVTNUQNNDO5JRJPYDI2B6",
+  contrato: "CDJ3VMFKEZP3TN6KF3REUXTVW2R7AT5FMMLX3OKADDJOAV2V5D4F7OLC",
   explorer: "https://stellar.expert/explorer/testnet",
 };
 
@@ -193,18 +193,39 @@ export const RAIZ_ABERTA = "0".repeat(64);
 export const ehAberta = (p: PropostaRede) => bytesParaHex(p.raiz_aptos) === RAIZ_ABERTA;
 
 /**
- * A seção numa votação **aberta**: `H(proposta ‖ endereço) mod secoes`.
+ * As chaves de ledger dos anéis `[primeira, ultima]`, para somar ao footprint.
  *
- * O cliente precisa calcular o mesmo que o contrato **antes de enviar**, porque
- * a seção nomeia a entrada `Anel(proposta, secao)` que a transação vai escrever
- * — e o footprint é declarado na simulação. Derivar isso de ordem de chegada
- * custou uma rodada: uma por ledger, e recusas com `txFailed`.
+ * **É isto que faz o split automático funcionar sob rajada.** A seção só existe
+ * na aplicação — ela vem de `caderno / limite` —, mas o footprint é declarado
+ * na simulação. Quem comparece sozinho acerta a previsão; vinte comparecendo
+ * juntos, não. Declarando uma janela, a transação pode escrever em qualquer
+ * seção da faixa sem ter declarado uma e escrito outra.
+ *
+ * Sem isso, o medido foi uma por ledger e recusas com `txFailed`.
  */
-export async function secaoAberta(id: string, g: string, secoes: number): Promise<number> {
-  const bytes = new Uint8Array([...hexParaBytes(id), ...hexParaBytes(enderecoXdr(g))]);
-  const h = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
-  return new DataView(h.buffer).getUint32(0, false) % secoes;
+function chavesDeAnel(id: string, primeira: number, ultima: number): xdr.LedgerKey[] {
+  const chaves: xdr.LedgerKey[] = [];
+  for (let s = primeira; s <= ultima; s++) {
+    chaves.push(
+      xdr.LedgerKey.contractData(
+        new xdr.LedgerKeyContractData({
+          contract: new Address(REDE.contrato).toScAddress(),
+          key: xdr.ScVal.scvVec([
+            xdr.ScVal.scvSymbol("Anel"),
+            bytesN(id),
+            u32(s),
+          ]),
+          durability: xdr.ContractDataDurability.persistent(),
+        }),
+      ),
+    );
+  }
+  return chaves;
 }
+
+/** Quantas seções existem agora. Na aberta cresce com o comparecimento. */
+export const lerSecoes = async (id: string): Promise<number> =>
+  ((await ler("secoes", bytesN(id))) as number | undefined) ?? 1;
 
 /** Em que seção a pessoa caiu, segundo a cadeia. */
 export const lerSecao = async (id: string, g: string): Promise<number | null> =>
@@ -332,13 +353,14 @@ async function enviar(
   diario?: Diario,
   resumo?: string,
   folga = 0,
+  extras: xdr.LedgerKey[] = [],
 ): Promise<string> {
   diario?.({ tipo: "cmd", txt: `${metodo}()` });
   if (resumo) diario?.({ tipo: "val", txt: resumo });
 
   for (let lance = 0; ; lance++) {
     try {
-      return await uma(carteira, metodo, args, TAXA_INCLUSAO * 4 ** lance, diario, folga);
+      return await uma(carteira, metodo, args, TAXA_INCLUSAO * 4 ** lance, diario, folga, extras);
     } catch (e) {
       // Taxa curta não é erro do voto: a transação não entrou em ledger nenhum.
       // Re-simular junto com o lance maior também renova o footprint.
@@ -366,6 +388,7 @@ async function uma(
   lance: number,
   diario?: Diario,
   folga = 0,
+  extras: xdr.LedgerKey[] = [],
 ): Promise<string> {
   const conta = await servidor.getAccount(carteira.endereco());
   const bruta = new TransactionBuilder(conta, {
@@ -401,13 +424,28 @@ async function uma(
 
   let pronta = rpc.assembleTransaction(bruta, sim).build();
 
-  if (folga > 0) {
+  if (folga > 0 || extras.length > 0) {
     const dados = new SorobanDataBuilder(
       pronta.toEnvelope().v1().tx().ext().sorobanData().toXDR("base64"),
     );
     const r = dados.build().resources();
     // `diskReadBytes`, não `readBytes`: o protocolo 23 renomeou.
-    dados.setResources(r.instructions(), r.diskReadBytes(), r.writeBytes() + folga);
+    // Toda entrada declarada é **carregada**, não só a usada: declarar as
+    // seções vizinhas aumenta a leitura junto da escrita. Só subir
+    // `writeBytes` deixou 10 de 20 em `txFailed`.
+    dados.setResources(
+      r.instructions(),
+      r.diskReadBytes() + folga,
+      r.writeBytes() + folga,
+    );
+    if (extras.length) {
+      // As que a simulação já previu continuam; estas são as seções vizinhas,
+      // que a transação pode acabar escrevendo se gente entrar no meio.
+      const atuais = dados.getReadWrite();
+      const vistas = new Set(atuais.map((k) => k.toXDR("base64")));
+      const novas = extras.filter((k) => !vistas.has(k.toXDR("base64")));
+      dados.setReadWrite([...atuais, ...novas]);
+    }
     pronta = TransactionBuilder.cloneFrom(pronta, {
       fee: (BigInt(pronta.fee) + BigInt(folga) * STROOPS_POR_BYTE).toString(),
       sorobanData: dados.build(),
@@ -463,6 +501,7 @@ export const abrir = (
   fecha_em: number,
   anel: boolean,
   secoes: number,
+  limiteSecao: number,
   d?: Diario,
 ) =>
   enviar(
@@ -486,11 +525,16 @@ export const abrir = (
       u32(fecha_em),
       xdr.ScVal.scvBool(anel),
       u32(secoes),
+      u32(limiteSecao),
     ],
     d,
     `proposta ${id.slice(0, 8)}… · ${perguntas.length} pergunta${perguntas.length === 1 ? "" : "s"} · ` +
       `mesa ${limiar} de ${mesa.length} · ${anel ? "caderno separado da urna" : "voto identificado"}` +
-      (secoes > 1 ? ` · ${secoes} seções` : ""),
+      (limiteSecao > 0
+        ? ` · seções de ${limiteSecao}, abrindo sozinhas`
+        : secoes > 1
+          ? ` · ${secoes} seções`
+          : ""),
   );
 
 /** O caderno: identificado, e é o único ato em que o nome da pessoa aparece. */
@@ -504,6 +548,8 @@ export const comparecer = (
   d?: Diario,
   /** O tamanho do eleitorado: é o teto do anel, e dimensiona a folga. */
   aptos = 40,
+  /** Quantas seções além da prevista declarar. Cobre quem entrar no meio. */
+  janela = 0,
 ) =>
   enviar(
     c,
@@ -512,6 +558,7 @@ export const comparecer = (
     d,
     `proposta ${id.slice(0, 8)}… · seção ${secao} · folha ${indice} · caminho com ${caminho.length} irmão${caminho.length === 1 ? "" : "s"}`,
     folgaDoCaderno(aptos),
+    janela > 0 ? chavesDeAnel(id, secao, secao + janela) : [],
   );
 
 /**

@@ -153,6 +153,11 @@ pub enum Chave {
     /// primeira cédula dela chega. A cédula traz a lista inteira e o contrato
     /// compara — 32 bytes de estado em vez de `n` pontos relidos a cada voto.
     DigestoAnel(BytesN<32>, u32),
+    /// Quantas pessoas já compareceram. Entrada de tamanho fixo, de propósito:
+    /// é ela que decide a seção na votação aberta, e um `u32` não muda de
+    /// tamanho, então o footprint declarado continua valendo quando várias
+    /// pessoas comparecem no mesmo instante.
+    Caderno(BytesN<32>),
     /// Uma imagem de chave já usada. **Não é um endereço**: é `I = x·Hp`, que
     /// identifica a pessoa dentro desta proposta e em nenhuma outra.
     ImagemUsada(BytesN<32>, BytesN<32>),
@@ -210,8 +215,10 @@ pub struct Proposta {
     /// É o desenho da urna: o caderno diz quem faltou — e voto obrigatório
     /// precisa disso —, a cédula não diz de quem é, e nada liga os dois.
     pub anel: bool,
-    /// Em quantas seções o eleitorado foi dividido. `1` é a votação sem
-    /// seções — um anel só, com todo mundo que compareceu.
+    /// Quantas seções existem **agora**.
+    ///
+    /// Na fechada é fixo: sai da lista na abertura. Na aberta cresce sozinho —
+    /// a seção enche até `limite_secao` e a próxima abre.
     ///
     /// A seção existe porque verificar um anel custa 10.822.850 instruções por
     /// membro: um anel de 30 usa 91,4% do teto de CPU de uma transação, e só
@@ -222,6 +229,12 @@ pub struct Proposta {
     /// votação inteira. O resultado continua único — o acumulador é por
     /// proposta e não sabe de que seção veio cada cédula.
     pub secoes: u32,
+    /// Quantas pessoas cabem numa seção antes de a próxima abrir. `0` é uma
+    /// seção só, sem limite.
+    ///
+    /// Só tem efeito na votação aberta: na fechada a lista é conhecida e a
+    /// divisão sai dela na abertura, presa na folha de Merkle.
+    pub limite_secao: u32,
 }
 
 /// Prova disjuntiva de Cramer–Damgård–Schoenmakers: `v ∈ {0,1}`.
