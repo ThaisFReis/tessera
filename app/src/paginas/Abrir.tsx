@@ -76,15 +76,19 @@ export default function Abrir() {
       // Ledger da testnet ≈ 6 s.
       const abre = agora + Math.round((minCaderno * 60) / 6);
       const fecha = abre + Math.round((minVoto * 60) / 6);
+      // Mesa vazia exige limiar zero, e limiar zero exige mesa vazia.
       const membros = linhas(mesa);
-      if (!membros.length) throw new Error("o contrato exige ao menos um membro de mesa");
-      if (limiar < 1 || limiar > membros.length) {
+      const k = membros.length === 0 ? 0 : limiar;
+      if (membros.length > 0 && (k < 1 || k > membros.length)) {
         throw new Error(`o limiar tem de estar entre 1 e ${membros.length}`);
+      }
+      if (membros.length === 0) {
+        diario({ tipo: "nota", txt: "sem mesa: ninguém poderá apurar, e é isso que se quis" });
       }
       setProgresso(1);
       await abrir(
         c, proposta, [{ opcoes: n, confidencial: true }], raiz, membros,
-        limiar, abre, fecha, anel, secoes, diario,
+        k, abre, fecha, anel, secoes, diario,
       );
       setProgresso(2);
 
@@ -225,28 +229,32 @@ export default function Abrir() {
             value={mesa}
             onChange={(e) => setMesa(e.target.value)}
             rows={3}
-            placeholder="um endereço por linha"
+            placeholder="um endereço por linha — deixe vazio para não haver mesa"
           />
         </label>
-        <label className="campo campo-estreito">
-          <span className="eyebrow">LIMIAR</span>
-          <input
-            type="number"
-            value={limiar}
-            min={1}
-            onChange={(e) => setLimiar(Number(e.target.value))}
-          />
-        </label>
+        {mesa.trim() && (
+          <label className="campo campo-estreito">
+            <span className="eyebrow">LIMIAR</span>
+            <input
+              type="number"
+              value={limiar}
+              min={1}
+              onChange={(e) => setLimiar(Number(e.target.value))}
+            />
+          </label>
+        )}
         <p>
-          O contrato exige mesa: <code>limiar == 0 || limiar &gt; mesa</code> é{" "}
-          <code>LimiarInvalido</code>. Mas, <strong>numa cédula em anel, o dapp não reparte o fator
-          de aleatoriedade com ninguém</strong> — a mesa existe no contrato e não recebe parcela.
-          Logo ninguém reconstrói a abertura, ninguém apura, e ninguém abre um voto.
+          {mesa.trim()
+            ? "Quem está aqui pode reunir as parcelas e publicar o total — e o contrato recusa qualquer total que não abra o acumulado."
+            : "Deixe vazio e ninguém poderá apurar."}
         </p>
         <p>
-          Assembleia aberta sem mesa nenhuma seria o desenho limpo, e exige mudar o contrato. Está
-          anotado.
+          <strong>Numa cédula em anel o fator de aleatoriedade não é repartido com ninguém</strong>,
+          nem com a mesa. Então, em anel, mesa é só decoração: ninguém reconstrói a abertura e
+          ninguém publica total. Sem mesa, o contrato diz isso em vez de a tela pedir desculpas —
+          qualquer total afirmado cai em <code>AberturaNaoFecha</code>.
         </p>
+        <p>O preço é este: o sigilo é absoluto, e o resultado é impossível.</p>
       </section>
 
       <section>

@@ -532,7 +532,7 @@ cd cli && cargo build --release && cd ..
 ```
 
 ```bash
-export TESSERA_CONTRATO=CBAFYF5BCTIVPUUO67Y76GF2T2GKYD5JDFLXLBUYRC4QLPN5GZXRWN56
+export TESSERA_CONTRATO=CBYKJOBOIKSLXFLYQHYNFEJER643TY6KFVHLVTNUQNNDO5JRJPYDI2B6
 python3 console/ponte.py
 ```
 
@@ -674,7 +674,7 @@ Nada fora desta tabela deve ser afirmado em quadro.
 
 | | |
 |---|---|
-| Contrato (testnet) | `CBAFYF5BCTIVPUUO67Y76GF2T2GKYD5JDFLXLBUYRC4QLPN5GZXRWN56` |
+| Contrato (testnet) | `CBYKJOBOIKSLXFLYQHYNFEJER643TY6KFVHLVTNUQNNDO5JRJPYDI2B6` |
 | Wasm otimizado | 22.584 B = **29,2 KB** |
 | Testes | **112** · bls-smoke 13, core 49, contrato 25, cli 25 |
 | `votar`, custo | **9.805.000 + 13.501.500 por opção sigilosa** |

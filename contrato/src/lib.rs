@@ -109,7 +109,20 @@ impl Tessera {
         if conf_opcoes > MAX_OPCOES {
             return Err(Erro::PerguntasForaDaFaixa);
         }
-        if limiar == 0 || limiar > mesa.len() {
+        // **Mesa vazia com limiar zero é a assembleia sem mesa nenhuma.**
+        //
+        // Antes o contrato a recusava, e a tela tinha de explicar uma exigência
+        // sem função: numa cédula em anel a mesa não recebe parcela nenhuma,
+        // então ela existia no estado e não servia para nada.
+        //
+        // Sem mesa ninguém endossa (`NaoEMembroDaMesa` recusa todo mundo), logo
+        // ninguém reconstrói a abertura, logo nenhum total é publicado. O sigilo
+        // é absoluto e o resultado é impossível — e isso é o desenho, não um
+        // defeito. Ver DEC-003.
+        //
+        // O `!=` é um ou-exclusivo: limiar zero exige mesa vazia, e mesa vazia
+        // exige limiar zero. Meio-termo não existe.
+        if (limiar == 0) != mesa.is_empty() || limiar > mesa.len() {
             return Err(Erro::LimiarInvalido);
         }
         if fecha_em <= env.ledger().sequence() {

@@ -18,7 +18,7 @@ export const REDE = {
   horizon: "https://horizon-testnet.stellar.org",
   friendbot: "https://friendbot.stellar.org",
   passphrase: Networks.TESTNET,
-  contrato: "CBAFYF5BCTIVPUUO67Y76GF2T2GKYD5JDFLXLBUYRC4QLPN5GZXRWN56",
+  contrato: "CBYKJOBOIKSLXFLYQHYNFEJER643TY6KFVHLVTNUQNNDO5JRJPYDI2B6",
   explorer: "https://stellar.expert/explorer/testnet",
 };
 

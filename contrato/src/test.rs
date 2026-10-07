@@ -2769,3 +2769,104 @@ fn a_votacao_fechada_nao_virou_aberta() {
         Err(Ok(Erro::NaoEstaNaListaDeAptos))
     );
 }
+
+/// **A assembleia sem mesa nenhuma.**
+///
+/// Numa cédula em anel a mesa não recebe parcela: ela existia no estado e não
+/// servia para nada, e a tela tinha de explicar uma exigência sem função. Agora
+/// `limiar == 0` é aceito se — e só se — a mesa for vazia.
+///
+/// O que isso compra é coerência: sem mesa ninguém endossa, logo ninguém
+/// reconstrói a abertura, logo nenhum total é publicado. O sigilo é absoluto e
+/// o resultado é impossível, e o contrato diz isso em vez de a tela pedir
+/// desculpas.
+#[test]
+fn assembleia_sem_mesa_abre_e_nao_apura() {
+    use tessera_core::anel;
+
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(4_989_900);
+    let id = env.register(Tessera, ());
+    let cliente = TesseraClient::new(&env, &id);
+
+    let proposta: BytesN<32> = BytesN::from_array(&env, &[23u8; 32]);
+    let sem_mesa: Vec<Address> = Vec::new(&env);
+    let mut perg = Vec::new(&env);
+    perg.push_back(Pergunta {
+        opcoes: 2,
+        confidencial: true,
+    });
+    let gov = Address::generate(&env);
+
+    // Abre: mesa vazia, limiar zero.
+    cliente.abrir(
+        &gov,
+        &proposta,
+        &perg,
+        &BytesN::from_array(&env, &[0u8; 32]),
+        &sem_mesa,
+        &0u32,
+        &4_989_990u32,
+        &4_990_190u32,
+        &true,
+        &1u32,
+    );
+    assert_eq!(cliente.proposta(&proposta).unwrap().mesa.len(), 0);
+
+    // Os meios-termos continuam recusados, nos dois sentidos.
+    let mut uma = Vec::new(&env);
+    uma.push_back(Address::generate(&env));
+    for (mesa, limiar) in [(sem_mesa.clone(), 1u32), (uma.clone(), 0u32)] {
+        assert_eq!(
+            cliente.try_abrir(
+                &gov,
+                &BytesN::from_array(&env, &[99u8; 32]),
+                &perg,
+                &BytesN::from_array(&env, &[0u8; 32]),
+                &mesa,
+                &limiar,
+                &4_989_990u32,
+                &4_990_190u32,
+                &true,
+                &1u32,
+            ),
+            Err(Ok(Erro::LimiarInvalido)),
+            "mesa e limiar têm de concordar: {} membros, limiar {}",
+            mesa.len(),
+            limiar
+        );
+    }
+
+    // Alguém comparece e vota: a votação funciona inteira.
+    let g = pedersen::gerador();
+    let x = pedersen::acaso_fr().unwrap();
+    let votante = Address::generate(&env);
+    let vazio: Vec<BytesN<32>> = Vec::new(&env);
+    cliente.comparecer(
+        &proposta,
+        &votante,
+        &g1(&env, &anel::chave_publica(&g, &x)),
+        &vazio,
+        &0u32,
+        &0u32,
+    );
+    assert_eq!(cliente.anel(&proposta, &0u32).len(), 1);
+
+    // E ninguém endossa, porque não há de quem ser membro.
+    env.ledger().set_sequence_number(4_990_200);
+    let mut totais = Vec::new(&env);
+    totais.push_back(1u32);
+    totais.push_back(0u32);
+    // Uma abertura por opção confidencial, não por pergunta — senão a recusa
+    // vem de `ArgumentoMalFormado` e o teste não prova nada sobre a mesa.
+    let mut aberturas = Vec::new(&env);
+    for _ in 0..2 {
+        aberturas.push_back(escalar(&env, &pedersen::acaso_fr().unwrap()));
+    }
+    assert_eq!(
+        cliente.try_apurar(&proposta, &gov, &totais, &aberturas),
+        Err(Ok(Erro::NaoEMembroDaMesa)),
+        "sem mesa, endossar tem de ser impossível para qualquer um"
+    );
+}

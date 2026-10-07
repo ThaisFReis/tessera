@@ -130,6 +130,7 @@ pergunta.
 | INV-08 | A seção está presa na folha de Merkle: o votante não escolhe a sua | `core` `a_secao_esta_presa_na_folha`; `contrato` `trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez` |
 | INV-09 | A divisão em seções não depende da ordem da lista nem de quem organiza | `core` `a_divisao_nao_depende_da_ordem_em_que_a_lista_chega`, `a_divisao_e_equilibrada_e_ninguem_fica_sozinho` |
 | INV-10 | Peso inflado não chega na raiz | `core` `peso_inflado_nao_chega_na_raiz`; `contrato` recusa com `PesoNaoUnitario` |
+| INV-10b | Mesa vazia exige limiar zero, e limiar zero exige mesa vazia — meio-termo não existe | `contrato` `assembleia_sem_mesa_abre_e_nao_apura` |
 | INV-11 | Uma mesa que mente no total é recusada **na hora**, não denunciada depois | `contrato` `mesa_que_mente_no_total_e_recusada` |
 | INV-12 | Abaixo de `TAU` cédulas confidenciais, a apuração trava em vez de vazar | `contrato` `abaixo_de_tau_a_apuracao_trava_em_vez_de_vazar` |
 | INV-13 | Um anel de 20 cabe numa transação | `contrato` `ate_quantas_pessoas_cabe_um_anel` (assere o teto) |
@@ -181,7 +182,7 @@ Ver [`SOURCES.md`](SOURCES.md) para a tabela com datas. Resumo:
 | @stellar/stellar-sdk | 14.6.1 |
 | matemática | `arkworks`, o mesmo crate do host Soroban |
 
-Contrato na testnet: `CBAFYF5BCTIVPUUO67Y76GF2T2GKYD5JDFLXLBUYRC4QLPN5GZXRWN56`
+Contrato na testnet: `CBYKJOBOIKSLXFLYQHYNFEJER643TY6KFVHLVTNUQNNDO5JRJPYDI2B6`
 
 `[VERIFY]` em aberto: nenhum.
 
@@ -267,8 +268,8 @@ cd app && node scripts/folga.mjs                    # contenção de escrita
 | T-006 | Atualizar os decks | T-001 | §2 | todo | slide 06 deixa de listar desvinculação como futura; seções aparecem |
 | T-007 | "O modo" em `/abrir` | T-001 | §4 | todo | a tela não oferece votação que `/votar` recusa |
 | T-008 | `/apurar` junta as parcelas da mesa | T-005 | §4 | todo | apuração pelo dapp, sem CLI |
-| T-009 | Assembleia sem mesa nenhuma | T-000 | §5, §10 | todo | `limiar == 0` aceito sse `mesa` vazia; redeploy; os 12 arquivos repontados; `/abrir` e `/apurar` param de exigir mesa |
-| T-010 | `/abrir` avisa quando a seção nasce pequena | T-009 | §10 | todo | recusa abrir com `aptos / secoes < TAU`, dizendo o tamanho que daria; teste do cálculo |
+| T-009 | Assembleia sem mesa nenhuma | T-000 | §5, §10 | review | `limiar == 0` aceito sse `mesa` vazia; redeploy; os 12 arquivos repontados; `/abrir` e `/apurar` param de exigir mesa |
+| T-010 | `/abrir` avisa quando a seção nasce pequena | T-013 | §10 | todo | recusa abrir com `aptos / secoes < TAU`, dizendo o tamanho que daria; teste do cálculo |
 | T-011 | Parar o churn de `test_snapshots/` | T-002 | §5 | todo | ou viram determinísticos, ou saem do git; nenhum diff futuro os carrega |
 | T-013 | Votação aberta e votação fechada | T-003 | §2, §4, §5 | review | `raiz_aptos` de 32 zeros = aberta; `comparecer` pula Merkle; seção por ordem de chegada; a tela diz o que cada modo não garante; redeploy junto de T-009 |
 | T-012 | Migrar os eventos para `#[contractevent]` | T-003 | §5 | todo | `env.events().publish()` sai; `app/src/rede.ts` lê o formato novo; a lista de votações continua funcionando |
