@@ -18,7 +18,7 @@ export const REDE = {
   horizon: "https://horizon-testnet.stellar.org",
   friendbot: "https://friendbot.stellar.org",
   passphrase: Networks.TESTNET,
-  contrato: "CB6WIY45JYIR6EN6NC3WOAEOHYSKMXHKPDEXCHNY3O4C2O2RJ4RBQIJ6",
+  contrato: "CBYKJOBOIKSLXFLYQHYNFEJER643TY6KFVHLVTNUQNNDO5JRJPYDI2B6",
   explorer: "https://stellar.expert/explorer/testnet",
 };
 
@@ -187,6 +187,28 @@ export type PropostaRede = {
 
 export const lerProposta = (id: string) =>
   ler("proposta", bytesN(id)) as Promise<PropostaRede | null>;
+
+/** A raiz de 32 zeros é o sentinela de votação aberta. */
+export const RAIZ_ABERTA = "0".repeat(64);
+export const ehAberta = (p: PropostaRede) => bytesParaHex(p.raiz_aptos) === RAIZ_ABERTA;
+
+/**
+ * A seção numa votação **aberta**: `H(proposta ‖ endereço) mod secoes`.
+ *
+ * O cliente precisa calcular o mesmo que o contrato **antes de enviar**, porque
+ * a seção nomeia a entrada `Anel(proposta, secao)` que a transação vai escrever
+ * — e o footprint é declarado na simulação. Derivar isso de ordem de chegada
+ * custou uma rodada: uma por ledger, e recusas com `txFailed`.
+ */
+export async function secaoAberta(id: string, g: string, secoes: number): Promise<number> {
+  const bytes = new Uint8Array([...hexParaBytes(id), ...hexParaBytes(enderecoXdr(g))]);
+  const h = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  return new DataView(h.buffer).getUint32(0, false) % secoes;
+}
+
+/** Em que seção a pessoa caiu, segundo a cadeia. */
+export const lerSecao = async (id: string, g: string): Promise<number | null> =>
+  ((await ler("secao_de", bytesN(id), endereco(g))) as number | null) ?? null;
 
 export const lerAnel = async (id: string, secao: number): Promise<string[]> =>
   ((await ler("anel", bytesN(id), u32(secao))) as Uint8Array[]).map(bytesParaHex);

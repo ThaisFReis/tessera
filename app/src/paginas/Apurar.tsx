@@ -50,7 +50,7 @@ export default function Apurar() {
           <h2>ESTA VOTAÇÃO NÃO APURA, E ISSO É O DESENHO</h2>
           <div className="painel">
             <p>
-              Ela foi aberta sem mesa. Ninguém recebeu parcela de abertura, então ninguém
+              Ela foi aberta sem mesa nenhuma. Ninguém recebeu parcela de abertura, então ninguém
               reconstrói a soma dos fatores que escondem os votos — e sem ela nenhum total pode ser
               publicado.
             </p>

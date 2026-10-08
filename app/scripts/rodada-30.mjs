@@ -60,7 +60,7 @@ const HORIZON = "https://horizon-testnet.stellar.org";
 const FRIENDBOT = "https://friendbot.stellar.org";
 const PASSPHRASE = Networks.TESTNET;
 const CONTRATO = process.env.TESSERA_CONTRATO ??
-  "CB6WIY45JYIR6EN6NC3WOAEOHYSKMXHKPDEXCHNY3O4C2O2RJ4RBQIJ6";
+  "CBYKJOBOIKSLXFLYQHYNFEJER643TY6KFVHLVTNUQNNDO5JRJPYDI2B6";
 
 const N = Number(process.env.N ?? 30);
 const OPCOES = 2;
@@ -74,6 +74,8 @@ const TAXA_INCLUSAO = Number(process.env.TAXA_INCLUSAO ?? 1_000_000);
 const FOLGA = Number(process.env.FOLGA ?? 96 * 40 + 1024);
 /** Em quantas seções dividir. 1 reproduz o anel único. */
 const SECOES = Number(process.env.SECOES ?? 1);
+/** ABERTA=1 abre sem lista: raiz de 32 zeros, qualquer carteira comparece. */
+const ABERTA = process.env.ABERTA === "1";
 
 const servidor = new rpc.Server(RPC);
 const contrato = new Contract(CONTRATO);
@@ -87,6 +89,13 @@ const vec = (v) => xdr.ScVal.scvVec(v);
 const addr = (g) => new Address(g).toScVal();
 const xdrDe = (g) => bytesHex(new Address(g).toScVal().toXDR());
 const dorme = (ms) => new Promise((r) => setTimeout(r, ms));
+/** O mesmo que `secao_aberta` faz no contrato: o cliente precisa saber antes de
+ *  enviar, porque a seção nomeia a entrada que a transação vai escrever. */
+async function secaoAberta(id, g, secoes) {
+  const b = Buffer.concat([hexBytes(id), hexBytes(xdrDe(g))]);
+  const h = await crypto.subtle.digest("SHA-256", b);
+  return new DataView(h).getUint32(0, false) % secoes;
+}
 
 let passo = 0;
 const diz = (s) => console.log(`  ${s}`);
@@ -222,8 +231,11 @@ async function main() {
   const pesos = membros.map(() => 1);
   // O id nasce antes da raiz: a divisão em seções é derivada dele.
   const id = bytesHex(Keypair.random().rawPublicKey().subarray(0, 32));
-  const raiz = wasm.raiz_de_aptos(id, enderecos, pesos, SECOES);
-  const divisao = Array.from(wasm.secoes_de(id, enderecos, SECOES));
+  const raiz = ABERTA ? "0".repeat(64) : wasm.raiz_de_aptos(id, enderecos, pesos, SECOES);
+  // Na aberta a seção vem do contrato; aqui guardamos o que ele devolver.
+  const divisao = ABERTA
+    ? new Array(N).fill(0)
+    : Array.from(wasm.secoes_de(id, enderecos, SECOES));
   diz(`raiz de aptos = ${raiz.slice(0, 16)}…`);
   if (SECOES > 1) {
     const tam = Array.from({ length: SECOES }, (_, s) => divisao.filter((x) => x === s).length);
@@ -244,6 +256,7 @@ async function main() {
     bN(raiz), vec(mesa.map(addr)), u32(1), u32(abreEm), u32(fechaEm),
     xdr.ScVal.scvBool(true), u32(SECOES),
   ]);
+  if (ABERTA) diz("aberta: raiz de 32 zeros, sem lista");
   if (!r1.ok) throw new Error(`abrir falhou — ${r1.fase}: ${r1.erro}`);
   diz(`proposta ${id.slice(0, 12)}… · comparecimento até ${abreEm} · votação até ${fechaEm}`);
 
@@ -258,7 +271,9 @@ async function main() {
   }
   const tentativas = new Array(N).fill(1);
   const rc = await Promise.all(membros.map(async (m, i) => {
-    const c = wasm.caminho_de(id, enderecos, pesos, SECOES, i);
+    const c = ABERTA
+      ? { irmaos: [], indice: 0, secao: await secaoAberta(id, m.publicKey(), SECOES) }
+      : wasm.caminho_de(id, enderecos, pesos, SECOES, i);
     const args = [bN(id), addr(m.publicKey()), bN(chaves[i].publica),
                   vec(c.irmaos.map(bN)), u32(c.indice), u32(c.secao)];
     let r = await tentar(m, "comparecer", args, TAXA_INCLUSAO, FOLGA);
@@ -285,6 +300,16 @@ async function main() {
     await dorme(15000);
   }
   process.stdout.write("\r" + " ".repeat(40) + "\r");
+
+  if (ABERTA) {
+    // Quem decide a seção é o contrato: pergunta a ele, um por um.
+    for (let i = 0; i < N; i++) {
+      const v = await ler("secao_de", bN(id), addr(membros[i].publicKey()));
+      divisao[i] = v ?? -1; // -1 = não compareceu; não entra na contagem
+    }
+    const tam = Array.from({ length: SECOES }, (_, s) => divisao.filter((x) => x === s).length);
+    diz(`o contrato distribuiu por ordem de chegada: ${tam.join(", ")}`);
+  }
 
   const aneis = [];
   for (let s = 0; s < SECOES; s++) {

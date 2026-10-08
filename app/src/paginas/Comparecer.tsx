@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CarteiraLocal } from "../carteira";
 import { guardarChaveDeAnel, guardarLista, lerLista } from "../lista";
-import { comparecer, enderecoXdr, lerProposta } from "../rede";
+import { comparecer, ehAberta, enderecoXdr, lerProposta, lerSecao, secaoAberta } from "../rede";
 import { carregar } from "../wasm";
 import { Aviso, Icone, LinkBastidores, Passos, Trilha } from "../ui";
 import { useDiario } from "./comum";
@@ -16,12 +16,23 @@ const PASSOS = ["Montando o seu caminho de Merkle", "Criando a chave de particip
 export default function Comparecer() {
   const { id = "" } = useParams();
   const [lista, setLista] = useState<string[]>(() => lerLista(id) ?? []);
+  const [aberta, setAberta] = useState<boolean | null>(null);
   const [colada, setColada] = useState("");
   const [falha, setFalha] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const [progresso, setProgresso] = useState(0);
   const diario = useDiario("comparecer", id);
   const ir = useNavigate();
+
+  useEffect(() => {
+    let vivo = true;
+    lerProposta(id)
+      .then((p) => vivo && setAberta(p ? ehAberta(p) : null))
+      .catch(() => vivo && setAberta(null));
+    return () => {
+      vivo = false;
+    };
+  }, [id]);
 
   function aceitarColada() {
     const l = colada.split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
@@ -39,7 +50,7 @@ export default function Comparecer() {
       const c = await CarteiraLocal.abrir();
       const meu = c.endereco();
       const indice = lista.indexOf(meu);
-      if (indice < 0) {
+      if (aberta === false && indice < 0) {
         throw new Error(
           `${meu} não está na lista de aptos desta votação. O contrato recusaria com NaoEstaNaListaDeAptos.`,
         );
@@ -50,26 +61,36 @@ export default function Comparecer() {
       // que não diz por quê.
       const prop = await lerProposta(id);
       if (!prop) throw new Error("Esta votação não foi encontrada.");
-      const xdrs = lista.map(enderecoXdr);
-      const caminho = w.caminho_de(id, xdrs, new Uint32Array(lista.length).fill(1), prop.secoes, indice) as {
-        irmaos: string[];
-        indice: number;
-        secao: number;
-      };
+
+      // Na votação aberta não há lista, logo não há caminho de Merkle — e a
+      // seção não é pedida: o contrato dá, por ordem de chegada.
+      const caminho = ehAberta(prop)
+        ? { irmaos: [] as string[], indice: 0, secao: await secaoAberta(id, meu, prop.secoes) }
+        : (w.caminho_de(id, lista.map(enderecoXdr), new Uint32Array(lista.length).fill(1), prop.secoes, indice) as {
+            irmaos: string[];
+            indice: number;
+            secao: number;
+          });
       diario({ tipo: "val", txt: `caminho de Merkle com ${caminho.irmaos.length} irmão${caminho.irmaos.length === 1 ? "" : "s"}` });
       if (prop.secoes > 1) {
         diario({ tipo: "val", txt: `seção ${caminho.secao} de ${prop.secoes} — sorteada pela lista` });
       }
 
       setProgresso(1);
-      const chave = { ...(w.nova_chave_de_anel() as { secreta: string; publica: string }), secao: caminho.secao };
+      const chave = w.nova_chave_de_anel() as { secreta: string; publica: string };
       diario({ tipo: "nota", txt: "a chave secreta do anel fica nesta aba, e só aqui" });
       diario({ tipo: "val", txt: `chave pública = ${chave.publica.slice(0, 24)}…` });
 
       setProgresso(2);
-      await comparecer(c, id, chave.publica, caminho.irmaos, caminho.indice, caminho.secao, diario, lista.length);
+      await comparecer(c, id, chave.publica, caminho.irmaos, caminho.indice, caminho.secao, diario, Math.max(lista.length, 40));
+      // Na aberta quem decide a seção é o contrato: pergunta a ele, não ao
+      // palpite do cliente.
+      const secao = (await lerSecao(id, meu)) ?? caminho.secao;
+      if (secao !== caminho.secao) {
+        diario({ tipo: "val", txt: `o contrato pôs você na seção ${secao}, por ordem de chegada` });
+      }
       // Sem ela não há voto depois. Perder esta aba é perder o voto.
-      guardarChaveDeAnel(id, chave);
+      guardarChaveDeAnel(id, { ...chave, secao });
       ir(`/votacao/${id}`);
     } catch (e) {
       const msg = String((e as Error).message ?? e);
@@ -106,7 +127,21 @@ export default function Comparecer() {
             votou — a cédula vem depois, de outra chave.
           </p>
 
-          {lista.length === 0 ? (
+          {aberta === null ? (
+            <p className="campo-ajuda" style={{ marginTop: 29 }}>Lendo a votação…</p>
+          ) : aberta ? (
+            <div className="stage-enter">
+              <p className="review-note" style={{ marginTop: 29 }}>
+                <Icone nome="users" /> Votação aberta: não há lista, e você entra como chegou.
+              </p>
+              <div className="ballot-action">
+                <button className="primary-button" onClick={enviar} disabled={ocupado}>
+                  {ocupado ? "Comparecendo…" : "Confirmar minha presença"} <Icone nome="arrow" />
+                </button>
+              </div>
+              {ocupado && <Passos passos={PASSOS} atual={progresso} />}
+            </div>
+          ) : lista.length === 0 ? (
             <div className="stage-enter">
               <label className="campo" style={{ marginTop: 29 }}>
                 <span className="eyebrow">A LISTA DE APTOS</span>

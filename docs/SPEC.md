@@ -58,11 +58,17 @@ foi auditado por terceiros.
 |---|---|
 | "o compromisso publicado é perfeitamente ocultante" | propriedade do compromisso de Pedersen; `PROTOCOLO §3` |
 | "o anonimato do anel é computacional, **não** perfeito" | repousa em DDH/XDH; dito explicitamente no README e na landing |
-| "quem faltou é público, de quem é cada cédula não é" | `contrato/src/test.rs::o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem`; interseção caderno ∩ urna = 0 em `app/scripts/rodada-anel.mjs` |
+| "quem faltou é público, de quem é cada cédula não é" | **só na votação fechada** — `contrato/src/test.rs::o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem`; interseção caderno ∩ urna = 0 em `app/scripts/rodada-anel.mjs` |
+| "o sigilo da escolha e a desvinculação valem nos dois modos" | o anel e o compromisso não dependem da lista; DEC-006 |
 | custo em instruções de qualquer operação | o teste que o mede, citado junto do número |
 | "roda na testnet" | hash da transação, verificável no explorer |
 | "não há servidor que veja o fator de aleatoriedade" | o dapp é estático; as provas nascem no navegador |
 | "ninguém pode abrir uma cédula em anel" | ela não reparte o fator com a mesa; `AberturaNaoFecha` recusa qualquer total afirmado |
+
+**Proibido afirmar na votação aberta:** que há voto obrigatório, que existe
+lista de quem faltou, ou que o total significa alguma coisa — qualquer pessoa
+vota quantas vezes quiser criando carteiras, e na testnet o friendbot as
+financia de graça. O que a votação aberta demonstra é **sigilo**, não contagem.
 
 **Proibido afirmar:** que o dapp está publicado (não está), que houve auditoria,
 que há garantia contra coação, que **não existe vínculo nenhum fora do ledger**
@@ -124,6 +130,7 @@ pergunta.
 | INV-08 | A seção está presa na folha de Merkle: o votante não escolhe a sua | `core` `a_secao_esta_presa_na_folha`; `contrato` `trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez` |
 | INV-09 | A divisão em seções não depende da ordem da lista nem de quem organiza | `core` `a_divisao_nao_depende_da_ordem_em_que_a_lista_chega`, `a_divisao_e_equilibrada_e_ninguem_fica_sozinho` |
 | INV-10 | Peso inflado não chega na raiz | `core` `peso_inflado_nao_chega_na_raiz`; `contrato` recusa com `PesoNaoUnitario` |
+| INV-10b | Mesa vazia exige limiar zero, e limiar zero exige mesa vazia — meio-termo não existe | `contrato` `assembleia_sem_mesa_abre_e_nao_apura` |
 | INV-11 | Uma mesa que mente no total é recusada **na hora**, não denunciada depois | `contrato` `mesa_que_mente_no_total_e_recusada` |
 | INV-12 | Abaixo de `TAU` cédulas confidenciais, a apuração trava em vez de vazar | `contrato` `abaixo_de_tau_a_apuracao_trava_em_vez_de_vazar` |
 | INV-13 | Um anel de 20 cabe numa transação | `contrato` `ate_quantas_pessoas_cabe_um_anel` (assere o teto) |
@@ -175,7 +182,7 @@ Ver [`SOURCES.md`](SOURCES.md) para a tabela com datas. Resumo:
 | @stellar/stellar-sdk | 14.6.1 |
 | matemática | `arkworks`, o mesmo crate do host Soroban |
 
-Contrato na testnet: `CB6WIY45JYIR6EN6NC3WOAEOHYSKMXHKPDEXCHNY3O4C2O2RJ4RBQIJ6`
+Contrato na testnet: `CBYKJOBOIKSLXFLYQHYNFEJER643TY6KFVHLVTNUQNNDO5JRJPYDI2B6`
 
 `[VERIFY]` em aberto: nenhum.
 
@@ -261,9 +268,10 @@ cd app && node scripts/folga.mjs                    # contenção de escrita
 | T-006 | Atualizar os decks | T-001 | §2 | todo | slide 06 deixa de listar desvinculação como futura; seções aparecem |
 | T-007 | "O modo" em `/abrir` | T-001 | §4 | todo | a tela não oferece votação que `/votar` recusa |
 | T-008 | `/apurar` junta as parcelas da mesa | T-005 | §4 | todo | apuração pelo dapp, sem CLI |
-| T-009 | Assembleia sem mesa nenhuma | T-000 | §5, §10 | todo | `limiar == 0` aceito sse `mesa` vazia; redeploy; os 12 arquivos repontados; `/abrir` e `/apurar` param de exigir mesa |
-| T-010 | `/abrir` avisa quando a seção nasce pequena | T-009 | §10 | todo | recusa abrir com `aptos / secoes < TAU`, dizendo o tamanho que daria; teste do cálculo |
+| T-009 | Assembleia sem mesa nenhuma | T-000 | §5, §10 | review | `limiar == 0` aceito sse `mesa` vazia; redeploy; os 12 arquivos repontados; `/abrir` e `/apurar` param de exigir mesa |
+| T-010 | `/abrir` avisa quando a seção nasce pequena | T-013 | §10 | todo | recusa abrir com `aptos / secoes < TAU`, dizendo o tamanho que daria; teste do cálculo |
 | T-011 | Parar o churn de `test_snapshots/` | T-002 | §5 | todo | ou viram determinísticos, ou saem do git; nenhum diff futuro os carrega |
+| T-013 | Votação aberta e votação fechada | T-003 | §2, §4, §5 | review | `raiz_aptos` de 32 zeros = aberta; `comparecer` pula Merkle; seção por ordem de chegada; a tela diz o que cada modo não garante; redeploy junto de T-009 |
 | T-012 | Migrar os eventos para `#[contractevent]` | T-003 | §5 | todo | `env.events().publish()` sai; `app/src/rede.ts` lê o formato novo; a lista de votações continua funcionando |
 
 ---
@@ -354,6 +362,36 @@ declarado daria falsa garantia contra organizador de má-fé, e contra erro o
 aviso no cliente resolve igual.
 
 **Consequências.** Nenhuma mudança de ABI. Abre T-010.
+
+---
+
+### DEC-006: Votação aberta e fechada, e a seção derivada do endereço (2026-10-07, T-013)
+
+**Contexto.** O dapp é para ficar aberto, e quem chega não está em lista
+nenhuma. `comparecer` exigia prova de Merkle contra a `raiz_aptos` fixada em
+`abrir`, então qualquer visitante era recusado com `NaoEstaNaListaDeAptos`.
+
+**Decisão.** `raiz_aptos` de 32 zeros passa a significar **votação aberta**:
+`comparecer` pula a prova e o contrato atribui a seção por
+`H(proposta ‖ endereço) mod secoes`.
+
+**Alternativas.** Atribuir por **ordem de chegada** — tentada, implantada e
+**medida como errada**. A seção nomeia a entrada `Anel(proposta, secao)` que a
+transação escreve, e o footprint é declarado na *simulação*; se a seção só
+existe na *aplicação*, cada transação declara uma entrada e escreve outra. Na
+testnet: 1 comparecimento por ledger e 2 de 9 recusados com `txFailed`. Derivar
+do endereço devolveu 18 de 18 em 3 ledgers, com 18 transações.
+
+**Consequências.** Dá para moer endereços até cair numa seção escolhida; numa
+votação aberta isso não tira nada de ninguém, porque escolher o próprio
+esconderijo não encolhe o de outra pessoa, e o piso de `TAU` continua valendo.
+
+E a divisão por hash **não equilibra**: 18 pessoas em 3 seções deram 9, 4, 5 —
+a de 4 ficou abaixo de `TAU` e aquelas 4 pessoas não votaram (`#19`). Então
+**votação aberta deve usar uma seção só**, a menos que se saiba que virá muita
+gente: o anel passa a ser quem apareceu, que é o melhor anonimato possível, e o
+custo só aperta acima de ~20. §2 ganha a proibição de afirmar contagem no modo
+aberto.
 
 ---
 

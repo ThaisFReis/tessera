@@ -103,6 +103,9 @@ pub enum Erro {
     ModoErrado = 31,
     /// Seção fora da faixa `0..secoes`, ou `secoes = 0`.
     SecaoInvalida = 32,
+    /// Numa votação aberta não há lista: o caminho de Merkle tem de vir vazio,
+    /// e a seção quem decide é o contrato.
+    VotacaoAberta = 33,
 }
 
 #[contracttype]
@@ -124,6 +127,8 @@ pub enum Chave {
     /// e a cédula inteira de quem abriu o voto por `votar_publico()`.
     TotalPublico(BytesN<32>, u32, u32),
     /// `(confidenciais, públicas)`. É o que a regra de `TAU` consulta.
+    ///
+    /// **Conta cédulas, não presenças.** Quem conta presenças é `Caderno`.
     Comparecimento(BytesN<32>),
     Resultado(BytesN<32>),
     /// `Endosso(proposta, digest, membro)`: um membro da mesa endossou esta
@@ -134,6 +139,10 @@ pub enum Chave {
     Endossos(BytesN<32>, BytesN<32>),
     /// **O caderno.** Um registro por membro que compareceu, identificado e
     /// público — é dele que sai a lista de quem faltou.
+    ///
+    /// Guarda a **seção** da pessoa, não um `bool`: na votação aberta quem
+    /// decide a seção é o contrato, por ordem de chegada, e sem isto quem vota
+    /// não teria como saber qual anel é o dela depois de trocar de navegador.
     Compareceu(BytesN<32>, Address),
     /// As chaves de anel de quem compareceu **naquela seção**, na ordem em que
     /// chegaram. Cresce durante o comparecimento e congela quando a votação
