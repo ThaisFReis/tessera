@@ -42,8 +42,8 @@ repositório público legível.
 - mainnet;
 - ser um aplicativo de governança ou uma DAO (é um módulo que uma governança
   existente chama);
-- resistência à coação (ver §4, INV-12 — está declarado como limite, não
-  resolvido);
+- resistência à coação **durante** o voto: quem olha a sua tela vê a sua
+  escolha, e nenhum protocolo conserta isso. O *depois* está resolvido — ver §2;
 - voto ponderado com pesos públicos distintos (o contrato **recusa**).
 
 ---
@@ -63,6 +63,7 @@ foi auditado por terceiros.
 | custo em instruções de qualquer operação | o teste que o mede, citado junto do número |
 | "roda na testnet" | hash da transação, verificável no explorer |
 | "não há servidor que veja o fator de aleatoriedade" | o dapp é estático; as provas nascem no navegador |
+| "depois de votar, nem quem votou reabre a própria cédula" | `r` não é persistido em nenhum cliente; `cli` `nenhum_comando_grava_recibo` lê o próprio fonte, e `queimar_sobrescreve_antes_de_remover` |
 | "ninguém pode abrir uma cédula em anel" | ela não reparte o fator com a mesa; `AberturaNaoFecha` recusa qualquer total afirmado |
 
 **Proibido afirmar na votação aberta:** que há voto obrigatório, que existe
@@ -122,6 +123,7 @@ pergunta.
 |---|---|---|
 | INV-01 | O ledger **nunca** recebe texto cifrado do voto, só o compromisso | desenho; não existe caminho que cifre — ver §3 |
 | INV-02 | Nenhum arquivo gravado contém o fator `r` | `cli` `o_json_nao_tem_lugar_para_aleatoriedade`; `console/embutir.py` (lista `PROIBIDO`) |
+| INV-02b | Nenhum cliente persiste o fator `r`: depois de votar, nem quem votou reabre a própria cédula | `cli` `nenhum_comando_grava_recibo`, `queimar_sobrescreve_antes_de_remover` |
 | INV-03 | O diário nunca grava nome de segredo junto de um valor | `app/scripts/diario.test.mjs` |
 | INV-04 | Uma chave efêmera assina **uma cédula**, nunca duas | `app/scripts/usoUnico.test.mjs` |
 | INV-05 | O caderno e a urna não se ligam | `contrato` `o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem` |
@@ -270,6 +272,7 @@ cd app && node scripts/folga.mjs                    # contenção de escrita
 | T-008 | `/apurar` junta as parcelas da mesa | T-005 | §4 | todo | apuração pelo dapp, sem CLI |
 | T-009 | Assembleia sem mesa nenhuma | T-000 | §5, §10 | review | `limiar == 0` aceito sse `mesa` vazia; redeploy; os 12 arquivos repontados; `/abrir` e `/apurar` param de exigir mesa |
 | T-014 | Limite por seção, com split automático na aberta | T-013 | §4, §5 | blocked | §11-D — contrato e testes prontos; a rajada ainda não entra | `abrir` troca `secoes` por `limite_secao`; a aberta enche e abre a próxima; o cliente declara uma janela de anéis no footprint; rajada de 20 com limite 10 entra |
+| T-015 | O texto da coação descreve o código, não a v1 | T-001 | §2 | review | README e UX param de afirmar que quem vota consegue provar o voto depois; o que sobra de ameaça fica escrito |
 | T-010 | `/abrir` avisa quando a seção nasce pequena | T-013 | §10 | todo | recusa abrir com `aptos / secoes < TAU`, dizendo o tamanho que daria; teste do cálculo |
 | T-011 | Parar o churn de `test_snapshots/` | T-002 | §5 | todo | ou viram determinísticos, ou saem do git; nenhum diff futuro os carrega |
 | T-013 | Votação aberta e votação fechada | T-003 | §2, §4, §5 | review | `raiz_aptos` de 32 zeros = aberta; `comparecer` pula Merkle; seção por ordem de chegada; a tela diz o que cada modo não garante; redeploy junto de T-009 |

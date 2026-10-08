@@ -375,10 +375,21 @@ sigilo além do que entrega é pior que um honesto.
   esconde o voto, então ninguém reconstrói a abertura — e ninguém publica total.
   Não é promessa, é o contrato: qualquer total afirmado cai em
   `AberturaNaoFecha`. O sigilo é absoluto e o resultado é impossível.
-- **Resistência à coação.** Quem vota conhece o próprio fator de aleatoriedade e
-  *consegue* provar o voto a um terceiro. O protocolo remove o registro público
-  permanente; não remove a capacidade de alguém se auto-incriminar. É a lacuna
-  mais séria da v1.
+- **Resistência à coação, enquanto você vota.** Quem estiver olhando a sua tela
+  vê a sua escolha, e nenhum protocolo conserta isso. O que o Tessera garante é
+  o **depois**: o fator `r` que esconde o voto nasce na sua aba e morre com ela,
+  nenhum cliente o grava, e nenhum comando lê um arquivo desses.
+
+  A v1 gravava um recibo com os `r_j` e pedia que a pessoa o apagasse. Era pior
+  que inútil: quem coage simplesmente manda não apagar, e nenhum comando lia o
+  arquivo — ele não servia para conferir voto nem para apurar. Hoje `votar` não
+  grava, e `queimar` existe só para limpar sobras de rodadas antigas,
+  sobrescrevendo antes de remover. Dois testes travam isso, e um deles lê o
+  próprio fonte de `comandos.rs`, porque ausência não se prova de outro jeito.
+
+  **O que continua em aberto:** um cliente adulterado pode guardar o `r` sem
+  você saber. Rodar o seu é a defesa, e é por isso que o dapp é estático e o
+  `core` é o mesmo crate em todos os caminhos.
 - **Mesa que não destrói suas cópias.** O limiar `k`-de-`n` está implementado
   em `core/src/shamir.rs` e protege abaixo de `k` conluios: a mesa soma as
   shares localmente e nenhum `r` individual se junta em lugar algum. Acima de

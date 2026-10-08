@@ -157,6 +157,7 @@ function Urna({ id, demo }: { id: string; demo: boolean }) {
       <p>A presença é pública. A cédula usa outra chave para separar sua escolha da sua identidade.</p>
       {quantidade > 0 && <p>{quantidade} participantes no conjunto{demo ? " · dados ilustrativos" : ""}.</p>}
       <p>A prova de participação usa o grupo de quem compareceu. Esta cédula não compartilha com a mesa o segredo que permitiria abri-la individualmente; a apuração deste modo ainda não está disponível.</p>
+      <p>Depois de enviar, <strong>nem você consegue voltar ao próprio voto</strong>. O número que o esconde nasce nesta aba, vai para a cédula e morre aqui — nada o grava, nem no navegador nem em arquivo. Quem quiser que você prove em quem votou precisa estar olhando a sua tela agora.</p>
       <p>Na testnet, o serviço que financia a chave de uso único pode ver seu IP. Preserve a chave de participação neste navegador.</p>
     </details>
     {demo && <p className="demo-note">Prévia interativa · nenhuma transação real</p>}

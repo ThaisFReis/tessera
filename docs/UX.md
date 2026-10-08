@@ -338,7 +338,7 @@ O PLANO.md tem os 6 passos. Aqui está como filmá-los para que *sintam* algo. A
 | 0:00–0:20 | A pergunta da assembleia. Uma frase: "Dona Marta quer rejeitar as contas. O presidente aprovou o empréstimo do filho dela." | o problema é de gente, não de cripto |
 | 0:20–0:50 | A cédula. Trocar APROVAR ↔ REJEITAR **três vezes** e deixar o hex mudar inteiro. Sem narração nesse trecho. | *entendi o sigilo sem ninguém me explicar* |
 | 0:50–1:10 | Marcar "registrar publicamente", o contador cair, o aviso de mínimo aparecer | este sistema pensou no que eu não pensei |
-| 1:10–1:35 | Conferência. O aviso de coação. Apagar a chave. "Agora nem você consegue provar em que votou." | é honesto sobre o próprio limite |
+| 1:10–1:35 | Conferência. O aviso de coação. "O `r` morreu com a aba — nem você consegue provar em que votou." | é honesto sobre o próprio limite |
 | 1:35–2:10 | Cinco votos entrando. A grade de blocos indistinguíveis. | a imagem do pitch |
 | 2:10–2:40 | Apuração: mesa afirma, contrato confere, verificador refaz. REJEITADO 31 a 19. | a cadeia de confiança sem confiar na mesa |
 | 2:40–3:10 | **Mesa mentindo. Recusa na hora.** | isto é real |
@@ -357,7 +357,7 @@ Duas regras de montagem:
 - **Não escreva "100% anônimo".** É falso (N1) e um jurado pega em dez segundos.
 - **Não ponha barra de progresso em operação de 5 segundos.** A finalidade da Stellar é um recurso; esconda-a atrás de um spinner e você joga o recurso fora.
 - **Não anime o compromisso "sendo criptografado".** Cadeado fechando, partícula voando: é a estética que faz parecer brinquedo. O hex mudando já é a melhor animação possível, porque é verdadeira.
-- **Não esconda o aviso de coação atrás de "saiba mais".** É a lacuna mais séria do protocolo. Enterrá-la na interface é mentir por omissão de layout.
+- **Não esconda o aviso de coação atrás de "saiba mais".** O protocolo protege o *depois* — o `r` morre com a aba e nenhum cliente o grava —, e não protege o *durante*: quem olha a sua tela vê a sua escolha. Enterrar isso na interface é mentir por omissão de layout.
 - **Não faça modal de confirmação.** Ver §4.3.
 
 ---
