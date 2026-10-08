@@ -97,6 +97,7 @@ foi auditado por terceiros.
 | "uma cédula que não abre não trava as outras" | INV-19, INV-21 |
 | "omitir uma cédula honesta não gruda" | INV-21 — só um conjunto estritamente maior substitui o guardado, e qualquer pessoa consegue incluí-la |
 | "a assinatura da baliza se autovalida: um relé que minta é recusado" | INV-24, vetor congelado da rodada 6.000.000 |
+| "o piso de `τ` protege o conjunto de anonimato, e abrir cédula por cédula não o afrouxa" | INV-12 e INV-25; `PROTOCOLO §6.6` — o piso é sobre o anel, não sobre quantas cédulas abriram |
 | "não existe segredo durável que possa vazar depois" | INV-23 — a chave é publicada de propósito no instante da rodada; nenhum cliente guarda o `r` |
 
 **Proibido afirmar na votação aberta:** que há voto obrigatório, que existe
@@ -179,6 +180,7 @@ pergunta.
 | INV-06 | A mesma pessoa não vota duas vezes, e a recusa não revela quem é | `contrato` `ninguem_vota_duas_vezes`; `core` `a_mesma_pessoa_produz_a_mesma_imagem` |
 | INV-07 | A imagem de chave não atravessa propostas | `core` `a_imagem_nao_atravessa_propostas` |
 | INV-08 | **Na votação fechada**, a seção está presa na folha de Merkle: o votante não escolhe a sua | `core` `a_secao_esta_presa_na_folha`; `contrato` `trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez` |
+| INV-25 | O piso de `τ` é conferido contra o **anel**, nunca contra o subconjunto que abriu — sabotar não trava | `contrato` `sabotar_o_proprio_criptograma_nao_derruba_o_piso` |
 | INV-18 | Nenhum resultado, **nem parcial**, existe no contrato antes de `fecha_em` | `contrato` `antes_do_fechamento_nao_existe_placar` — relógio do ledger, sem suposição |
 | INV-19 | Uma cédula que não abre perde o próprio voto e **não** impede a apuração das outras | `contrato` `a_cedula_que_nao_abre_perde_so_o_proprio_voto` |
 | INV-20 | A lista de compromissos apresentada na apuração é exatamente o conjunto de cédulas da seção — omitir e inventar são recusados | `contrato` `a_cadeia_recusa_omissao_e_invencao` |
@@ -387,7 +389,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-007 | "O modo" em `/abrir` | T-001 | §4 | todo | a tela não oferece votação que `/votar` recusa |
 | T-016 | O placar aparece no dapp quando existe | T-013 | §2 | review | `/apurar` e `/votacao` leem `resultado()`; sem mesa, explicam por que nunca haverá |
 | T-017 | `core/relogio`: a fechadura de tempo | T-016 | §5, §6 | todo | cifra e decifra o fator para uma rodada; INV-24 com o vetor congelado da rodada 6.000.000; recusa assinatura que não confere **antes** de decifrar; roda offline; `core` não faz rede |
-| T-018 | Contrato: subconjunto, cadeia e regra monotônica | T-017 | §4, §5, §7 | todo | criptograma no evento `anonimo`; `Cadeia(proposta, secao)` de 32 bytes que não cresce; `apurar` por seção com lista ordenada + bitmap, conferindo a cadeia e o MSM de dois termos; INV-18 a INV-22 com teste cada; rodada presa a `fecha_em` (INV-22); bump de ABI e redeploy com os arquivos repontados; custo medido e citado junto do número |
+| T-018 | Contrato: subconjunto, cadeia e regra monotônica | T-017 | §4, §5, §7 | todo | criptograma no evento `anonimo`; `Cadeia(proposta, secao)` de 32 bytes que não cresce; `apurar` por seção com lista ordenada + bitmap, conferindo a cadeia e o MSM de dois termos; INV-18 a INV-22 com teste cada; rodada presa a `fecha_em` (INV-22); bump de ABI e redeploy com os arquivos repontados; custo medido e citado junto do número; `τ` conferido contra o anel da seção e **não** contra o subconjunto aberto (INV-25, DEC-011) |
 | T-019 | Decifrar no navegador e buscar a rodada | T-017, T-018 | §3, §5 | todo | `cliente-wasm` exporta decifrar; `app/src/rede.ts` busca a assinatura e a **valida** antes de usar; nenhuma página importa o SDK nem o relé direto |
 | T-020 | O placar aparece sozinho quando a janela fecha | T-019 | §2, §4 | todo | antes de `fecha_em` a tela não mostra nada, nem parcial; depois, apura e publica sem ninguém clicar; diz quantas de quantas cédulas abriram; o diário conta o que aconteceu |
 | T-021 | Rodada ponta a ponta na testnet | T-020 | §8 | todo | `app/scripts/rodada-relogio.mjs`: cédulas, fim da janela, apuração automática, e **uma cédula sabotada que não trava o placar**; hash das transações no PR |
@@ -632,6 +634,39 @@ para explicar num vídeo de hackathon, sem ganho.
 **Consequências.** §5 e §6 atualizados; o endereço da testnet em §6 é substituído
 no PR de T-018.
 
+### DEC-011: O `τ` fica, e o piso é sobre o anel (2026-10-07, T-018)
+
+**Contexto.** Eu levantei na §11-H que a apuração por cédula de DEC-009 tiraria a
+razão original do `τ`: ele existia para que um total **agregado** não
+determinasse o voto de ninguém, e agora cada cédula é aberta de propósito.
+Resposta do humano: o `τ` protege.
+
+Protege, e eu tinha superestimado o problema. Lendo o `PROTOCOLO §6.6` inteiro:
+o teorema da partição já cobre o caso, porque abrir cédula por cédula é só mais
+informação pública — e ela **não encolhe o conjunto de anonimato**. Com 10 no
+anel e 2 cédulas abertas, cada uma das duas continua podendo ser de qualquer um
+dos 10. O que protege uma pessoa é o tamanho do anel, que é onde o piso já é
+imposto quando há seções.
+
+**Decisão.** O `τ` fica, enunciado como piso do **conjunto de anonimato**. No
+caminho novo de apuração ele é conferido contra o tamanho do anel da seção, e
+**nunca** contra o subconjunto que abriu. O portão `conf > 0 && conf < TAU`
+continua valendo para quem apura com mesa. A INV-12 fica como está — "abaixo de
+`τ` a apuração trava em vez de vazar" continua verdadeiro — e entra a INV-25 para
+prender o ponto de conferência.
+
+**Alternativas.** Conferir `τ` contra as cédulas **abertas**: parece a leitura
+natural e é um buraco. Uma coligação sabotaria o próprio criptograma, as abertas
+cairiam abaixo de `τ` e a apuração travaria — a falha de liveness induzível de
+fora que a remoção de `votar_publico` havia fechado, de volta por outro caminho,
+contra a exigência explícita de que ninguém consiga travar o placar. Tirar o `τ`:
+recusada pelo humano, e sem motivo.
+
+**Consequências.** `PROTOCOLO §6.6` ganhou a subseção que diz por que o piso não
+muda de lugar; §2 ganhou a afirmação; §4 ganhou INV-25; T-018 ganhou o critério
+de aceitação. O caso de **uma seção só** com anel abaixo de `τ` continua como
+DEC-005 decidiu — aviso do organizador, não recusa —, e o aviso é T-010.
+
 ---
 
 ## §11 Perguntas em aberto
@@ -736,6 +771,11 @@ Quatro coisas eu não decido:
 
 Minha recomendação está em §6 do estudo: A agora, B só se A sair rápido, e o
 deck afirmando a peça medida em vez de prometer o placar automático.
+
+### §11-H — o `τ` perde a razão original — **respondida** (2026-10-07)
+
+Resposta do humano: *"o τ protege"*. Virou DEC-011, e ela mudou um critério de
+aceitação de T-018 — não era só redação.
 
 ### §11-G — interoperar com o `tlock` publicado? (não bloqueia)
 

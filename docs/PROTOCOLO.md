@@ -737,6 +737,31 @@ só no contrato.
 > junto, não depois — sem ela o recurso é uma armadilha. O que fica para a v1.1
 > é a **abstenção** por pergunta, que precisa de uma disjuntiva a mais.
 
+#### Abrir cédula por cédula não move o piso
+
+Acrescentado quando a apuração deixou de ser tudo-ou-nada (`SPEC` DEC-009): o
+resultado passa a sair de um **subconjunto** das cédulas, cada uma aberta
+individualmente. Isso é informação pública nova, então o teorema do começo desta
+seção se aplica a ela — e o que ele diz é que o piso **não** muda de lugar.
+
+O piso protege o **conjunto de anonimato**, que é o anel: quem poderia ter
+depositado aquela cédula. Abrir cédula por cédula revela conteúdos anônimos e
+não encolhe o anel — com 10 no anel e 2 cédulas abertas, cada uma das duas
+continua podendo ser de qualquer um dos 10. Logo o piso é sobre o **anel**, não
+sobre quantas abriram.
+
+E tem de ser, porque o contrário reabriria exatamente a porta que a subseção
+seguinte fechou: se `apurar` exigisse `τ` cédulas **abertas**, uma coligação
+sabotaria o próprio criptograma, o número de abertas cairia abaixo de `τ`, e a
+apuração travaria. Seria a falha de liveness induzível de fora de volta, agora
+por outro caminho — e o requisito novo é que ninguém consiga travar o placar.
+
+Então: a conferência de `τ` do caminho novo é contra o tamanho do anel da seção,
+que é onde o contrato já a faz quando há seções
+(`contrato/src/lib.rs`, `AnonimatoInsuficiente`), e **nunca** contra o
+subconjunto que abriu. O portão `conf > 0 && conf < TAU` continua valendo para
+quem apura com mesa.
+
 #### Por que isto é quórum, e não recusa
 
 Esta seção defendia a troca como *"converte uma quebra de privacidade numa
