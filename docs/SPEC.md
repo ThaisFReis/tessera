@@ -269,7 +269,8 @@ cd app && node scripts/folga.mjs                    # contenção de escrita
 | T-005 | Publicar o dapp | T-001 | §7 | todo | estático no ar; o README deixa de dizer "não publicado" |
 | T-006 | Atualizar os decks | T-001 | §2 | todo | slide 06 deixa de listar desvinculação como futura; seções aparecem |
 | T-007 | "O modo" em `/abrir` | T-001 | §4 | todo | a tela não oferece votação que `/votar` recusa |
-| T-008 | `/apurar` junta as parcelas da mesa | T-005 | §4 | todo | apuração pelo dapp, sem CLI |
+| T-016 | O placar aparece no dapp quando existe | T-013 | §2 | review | `/apurar` e `/votacao` leem `resultado()`; sem mesa, explicam por que nunca haverá |
+| T-008 | `/apurar` junta as parcelas da mesa | — | §4, §11 | blocked | §11-E — exige transporte das parcelas, e as três saídas quebram um princípio declarado |
 | T-009 | Assembleia sem mesa nenhuma | T-000 | §5, §10 | review | `limiar == 0` aceito sse `mesa` vazia; redeploy; os 12 arquivos repontados; `/abrir` e `/apurar` param de exigir mesa |
 | T-014 | Limite por seção, com split automático na aberta | T-013 | §4, §5 | blocked | §11-D — contrato e testes prontos; a rajada ainda não entra | `abrir` troca `secoes` por `limite_secao`; a aberta enche e abre a próxima; o cliente declara uma janela de anéis no footprint; rajada de 20 com limite 10 entra |
 | T-015 | O texto da coação descreve o código, não a v1 | T-001 | §2 | review | README e UX param de afirmar que quem vota consegue provar o voto depois; o que sobra de ameaça fica escrito |
@@ -426,6 +427,34 @@ caiu (`EAI_AGAIN`) no meio: **seis simultâneos com limite 2**, que força três
 seções a nascer ao mesmo tempo. Se as seis entrarem, o problema é de escala e
 não de mecanismo; se repetir o padrão "só a primeira seção", o mecanismo tem um
 buraco que o caso sequencial não mostra.
+
+### §11-E — o dapp pode *mostrar* o placar, mas não *produzir* (bloqueia T-008)
+
+Publicar um total exige apresentar `R = Σrᵢ`, e o contrato confere contra o
+acumulado. Quem sabe `R` é quem recebeu parcelas de Shamir — a mesa.
+
+No dapp, `cedula_anonima` chama `montar(..., 0, 0)`: **zero membros, nenhuma
+parcela**. Não por escolha de desenho, por falta de **transporte**: as parcelas
+precisam chegar aos membros da mesa, e o dapp não tem servidor.
+
+As três saídas, e por que nenhuma serve:
+
+1. **Parcelas cifradas no ledger.** Contradiz a tese do projeto frontalmente:
+   registro permanente mais cifra é "legível quando a chave vazar", que é
+   exatamente o que o slide 03 ataca e o que motivou escolher Pedersen.
+2. **Um servidor.** Contradiz "não existe servidor que pudesse ver o `r`,
+   porque não existe servidor", que é afirmação de §2.
+3. **Entrega fora de banda.** Quem vota baixa a parcela e a leva à mesa. É
+   honesto e não é fluxo de dapp.
+
+Então T-016 fez o que é possível: o dapp **lê** `resultado()` e mostra o placar
+assim que o contrato o aceitar. Quem apura é a CLI.
+
+**O que falta decidir:** para o vídeo mostrar um placar saindo, a votação
+precisa ter mesa e as cédulas precisam repartir. Hoje nenhum caminho do dapp faz
+isso. Vale mudar `cedula_anonima` para repartir — aceitando que `k` membros em
+conluio abrem **uma cédula anônima**, sem saber de quem é — ou o placar do vídeo
+sai da CLI?
 
 Enquanto isso, a votação aberta funciona com **uma seção só**
 (`limite_secao = 0`), que é o padrão recomendado em DEC-006 e o que a tela

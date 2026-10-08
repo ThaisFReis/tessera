@@ -223,6 +223,16 @@ function chavesDeAnel(id: string, primeira: number, ultima: number): xdr.LedgerK
   return chaves;
 }
 
+/**
+ * O placar, quando existe.
+ *
+ * Só existe depois que alguém reuniu a abertura e o contrato conferiu contra o
+ * acumulado. Numa votação sem mesa isso nunca acontece, e é isso que `/apurar`
+ * explica.
+ */
+export const lerResultado = async (id: string): Promise<number[] | null> =>
+  ((await ler("resultado", bytesN(id))) as number[] | undefined) ?? null;
+
 /** Quantas seções existem agora. Na aberta cresce com o comparecimento. */
 export const lerSecoes = async (id: string): Promise<number> =>
   ((await ler("secoes", bytesN(id))) as number | undefined) ?? 1;

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { lerComparecimento, lerProposta, REDE, type PropostaRede } from "../rede";
+import { lerComparecimento, lerProposta, lerResultado, REDE, type PropostaRede } from "../rede";
 import { Carregando, Estado, Icone } from "../ui";
 
 /* ORGANIZADOR / QUALQUER PESSOA: a apuração.
@@ -10,6 +10,7 @@ export default function Apurar() {
   const { id = "" } = useParams();
   const [p, setP] = useState<PropostaRede | null>(null);
   const [cedulas, setCedulas] = useState(0);
+  const [placar, setPlacar] = useState<number[] | null>(null);
   const [falha, setFalha] = useState("");
 
   useEffect(() => {
@@ -18,9 +19,11 @@ export default function Apurar() {
       try {
         const prop = await lerProposta(id);
         const [conf] = await lerComparecimento(id);
+        const r = await lerResultado(id);
         if (!vivo) return;
         setP(prop);
         setCedulas(conf);
+        setPlacar(r);
       } catch (e) {
         if (vivo) setFalha(String((e as Error).message ?? e));
       }
@@ -45,7 +48,30 @@ export default function Apurar() {
         <h1>{id.slice(0, 16)}…</h1>
       </header>
 
-      {p.mesa.length === 0 ? (
+      {placar ? (
+        <section>
+          <h2>O PLACAR</h2>
+          <div className="painel">
+            <dl className="fatos">
+              {placar.map((n, i) => (
+                <div key={i}>
+                  <dt>OPÇÃO {i + 1}</dt>
+                  <dd className="valor-mono">{n}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+          <p>
+            Estes números não vieram da mesa: vieram do <strong>contrato</strong>. Ele conferiu a
+            abertura contra o acumulado de todas as cédulas antes de gravá-los, e teria recusado
+            com <code>AberturaNaoFecha</code> qualquer total que não fechasse.
+          </p>
+          <p>
+            A correspondência entre opção e nome está com quem organizou: a proposta na rede só
+            guarda quantidades.
+          </p>
+        </section>
+      ) : p.mesa.length === 0 ? (
         <section>
           <h2>ESTA VOTAÇÃO NÃO APURA, E ISSO É O DESENHO</h2>
           <div className="painel">

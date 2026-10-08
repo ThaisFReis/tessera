@@ -7,6 +7,7 @@ import {
   lerProposta,
   ledgerAtual,
   REDE,
+  lerResultado,
   type PropostaRede,
 } from "../rede";
 import { Carregando, Estado, Icone } from "../ui";
@@ -27,6 +28,7 @@ export default function Votacao() {
   const [p, setP] = useState<PropostaRede | null>(null);
   const [anel, setAnel] = useState<number[]>([]);
   const [cedulas, setCedulas] = useState(0);
+  const [placar, setPlacar] = useState<number[] | null>(null);
   const [ledger, setLedger] = useState(0);
   const [falha, setFalha] = useState("");
 
@@ -47,7 +49,11 @@ export default function Votacao() {
           if (vivo) setAnel(por.map((a) => a.length));
         }
         const [conf] = await lerComparecimento(id);
-        if (vivo) setCedulas(conf);
+        const r = await lerResultado(id);
+        if (vivo) {
+          setCedulas(conf);
+          setPlacar(r);
+        }
       } catch (e) {
         if (vivo) setFalha(String((e as Error).message ?? e));
       }
@@ -98,7 +104,21 @@ export default function Votacao() {
           {f === "agendada" && <p>A janela ainda não começou. Volte quando o ledger passar de {p.abre_em}.</p>}
         </section>
       )}
-      {f === "encerrada" && (
+      {f === "encerrada" && placar && (
+        <section>
+          <h2>O PLACAR</h2>
+          <dl className="fatos">
+            {placar.map((n, i) => (
+              <div key={i}><dt>OPÇÃO {i + 1}</dt><dd className="valor-mono">{n}</dd></div>
+            ))}
+          </dl>
+          <p>
+            O contrato conferiu a abertura contra o acumulado antes de gravar. Ver{" "}
+            <Link to={`/apurar/${id}`}>a apuração</Link>.
+          </p>
+        </section>
+      )}
+      {f === "encerrada" && !placar && (
         <section>
           <h2>A URNA FECHOU</h2>
           <Link className="secondary-button" to={`/apurar/${id}`}>Ver a apuração <Icone nome="arrow" /></Link>
