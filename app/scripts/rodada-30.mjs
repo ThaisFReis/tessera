@@ -60,7 +60,7 @@ const HORIZON = "https://horizon-testnet.stellar.org";
 const FRIENDBOT = "https://friendbot.stellar.org";
 const PASSPHRASE = Networks.TESTNET;
 const CONTRATO = process.env.TESSERA_CONTRATO ??
-  "CDJ3VMFKEZP3TN6KF3REUXTVW2R7AT5FMMLX3OKADDJOAV2V5D4F7OLC";
+  "CCQHRQZP3R3QMMKEEOOOS7XXINR7WGSMTKGNR4GD6BDNLC6JSPUZIDHZ";
 
 const N = Number(process.env.N ?? 30);
 const OPCOES = 2;
@@ -89,6 +89,9 @@ const bytesHex = (b) => Buffer.from(b).toString("hex");
 const bN = (h) => xdr.ScVal.scvBytes(hexBytes(h));
 const fr = (h) => nativeToScVal(BigInt("0x" + h), { type: "u256" });
 const u32 = (n) => xdr.ScVal.scvU32(n);
+const u64 = (n) => xdr.ScVal.scvU64(new xdr.Uint64(BigInt(n)));
+// Sem fechadura de tempo nestas cargas: o criptograma vai vazio.
+const semCripto = () => xdr.ScVal.scvBytes(new Uint8Array(0));
 const vec = (v) => xdr.ScVal.scvVec(v);
 const addr = (g) => new Address(g).toScVal();
 const xdrDe = (g) => bytesHex(new Address(g).toScVal().toXDR());
@@ -278,6 +281,7 @@ async function main() {
       { type: { opcoes: ["symbol", "u32"], confidencial: ["symbol", "bool"] } })]),
     bN(raiz), vec(mesa.map(addr)), u32(1), u32(abreEm), u32(fechaEm),
     xdr.ScVal.scvBool(true), u32(ABERTA ? 1 : SECOES), u32(ABERTA ? LIMITE : 0),
+    u64(0), u64(0),
   ]);
   if (ABERTA) diz("aberta: raiz de 32 zeros, sem lista");
   if (!r1.ok) throw new Error(`abrir falhou — ${r1.fase}: ${r1.erro}`);
@@ -373,6 +377,7 @@ async function main() {
         { a: hexBytes(p.a), z: BigInt("0x" + p.z) },
         { type: { a: ["symbol", null], z: ["symbol", "u256"] } }))),
       vec(c.cedula.escolhas.map(u32)),
+      semCripto(),
     ];
     let r = await tentar(efemeras[k], "votar_anonimo", argsVoto);
     for (let t = 0; !r.ok && r.naoEntrou && t < RETENTATIVAS; t++) {

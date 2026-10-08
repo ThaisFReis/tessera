@@ -266,7 +266,7 @@ tabela em [`SOURCES.md`](SOURCES.md)):
 Nenhuma dependência nova: `ark-bls12-381 0.5` com a feature `curve`, que já está
 no `core`, entrega pareamento e *hash-to-curve* em G1 (medido).
 
-Contrato na testnet: `CDJ3VMFKEZP3TN6KF3REUXTVW2R7AT5FMMLX3OKADDJOAV2V5D4F7OLC`
+Contrato na testnet: `CCQHRQZP3R3QMMKEEOOOS7XXINR7WGSMTKGNR4GD6BDNLC6JSPUZIDHZ`
 — **substituído no redeploy de T-018.**
 
 `[VERIFY]` em aberto: nenhum.

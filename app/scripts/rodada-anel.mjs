@@ -38,7 +38,7 @@ const HORIZON = "https://horizon-testnet.stellar.org";
 const FRIENDBOT = "https://friendbot.stellar.org";
 const PASSPHRASE = Networks.TESTNET;
 const CONTRATO = process.env.TESSERA_CONTRATO ??
-  "CDJ3VMFKEZP3TN6KF3REUXTVW2R7AT5FMMLX3OKADDJOAV2V5D4F7OLC";
+  "CCQHRQZP3R3QMMKEEOOOS7XXINR7WGSMTKGNR4GD6BDNLC6JSPUZIDHZ";
 
 const ELEITORADO = 10;
 const COMPARECEM = 7;
@@ -58,6 +58,9 @@ const bN = (h) => xdr.ScVal.scvBytes(hexBytes(h));
 // rodar. Foi o que custou duas rodadas de testnet para achar.
 const fr = (h) => nativeToScVal(BigInt("0x" + h), { type: "u256" });
 const u32 = (n) => xdr.ScVal.scvU32(n);
+const u64 = (n) => xdr.ScVal.scvU64(new xdr.Uint64(BigInt(n)));
+// Sem fechadura de tempo nestas cargas: o criptograma vai vazio.
+const semCripto = () => xdr.ScVal.scvBytes(new Uint8Array(0));
 const vec = (v) => xdr.ScVal.scvVec(v);
 const addr = (g) => new Address(g).toScVal();
 // 44 bytes: SCV_ADDRESS ‖ ACCOUNT ‖ ED25519 ‖ chave. `toScAddress()` dá 40 e
@@ -176,7 +179,10 @@ async function main() {
     u32(abreEm),
     u32(fechaEm),
     xdr.ScVal.scvBool(true),
-    u32(1),
+    u32(1),      // secoes
+    u32(0),      // limite_secao
+    u64(0),      // fim_tempo
+    u64(0),      // rodada
   ]);
   diz(`proposta ${id.slice(0, 12)}…`);
   diz(`comparecimento até o ledger ${abreEm} · votação até ${fechaEm}`);
@@ -231,6 +237,7 @@ async function main() {
       vec(c.cedula.provas.map(provaCds)),
       vec(c.cedula.provas_soma.map(provaSoma)),
       vec(c.cedula.escolhas.map(u32)),
+      semCripto(),
     ]);
     diz(`cédula ${i + 1} de ${COMPARECEM} · de ${par.publicKey().slice(0, 8)}… · imagem ${c.imagem.slice(0, 12)}…`);
     if (i === 0) diz(`   cpu ${r.cpu} · taxa ${r.taxa} stroops · anel de ${anel.length}`);
@@ -259,6 +266,7 @@ async function main() {
       vec(repetida.cedula.provas.map(provaCds)),
       vec(repetida.cedula.provas_soma.map(provaSoma)),
       vec(repetida.cedula.escolhas.map(u32)),
+      semCripto(),
     ]);
     throw new Error("a segunda cédula da mesma pessoa passou");
   } catch (e) {

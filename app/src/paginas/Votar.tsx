@@ -112,7 +112,7 @@ function Urna({ id, demo }: { id: string; demo: boolean }) {
         setProgresso(1);
         const efemera = await CarteiraEfemera.nascer();
         setProgresso(2);
-        const hash = await votarAnonimo(efemera, id, guardada.secao, anel, c.imagem, c.c0, c.z, c.cedula.compromissos, c.cedula.provas, c.cedula.provas_soma, c.cedula.escolhas, diario);
+        const hash = await votarAnonimo(efemera, id, guardada.secao, anel, c.imagem, c.c0, c.z, c.cedula.compromissos, c.cedula.provas, c.cedula.provas_soma, c.cedula.escolhas, "", diario);
         if (!montada.current) return;
         // A cédula entrou: a chave de anel deixa de ser útil e passa a ser só
         // o vínculo entre você e ela. Morre aqui.

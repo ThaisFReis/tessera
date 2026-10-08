@@ -31,7 +31,7 @@ const HORIZON = "https://horizon-testnet.stellar.org";
 const FRIENDBOT = "https://friendbot.stellar.org";
 const PASSPHRASE = Networks.TESTNET;
 const CONTRATO = process.env.TESSERA_CONTRATO ??
-  "CDJ3VMFKEZP3TN6KF3REUXTVW2R7AT5FMMLX3OKADDJOAV2V5D4F7OLC";
+  "CCQHRQZP3R3QMMKEEOOOS7XXINR7WGSMTKGNR4GD6BDNLC6JSPUZIDHZ";
 
 const N = Number(process.env.N ?? 15);
 /** Bytes a mais de escrita declarada. 96 por membro do anel, com sobra. */
@@ -45,6 +45,9 @@ const hexBytes = (h) => Buffer.from(h, "hex");
 const bytesHex = (b) => Buffer.from(b).toString("hex");
 const bN = (h) => xdr.ScVal.scvBytes(hexBytes(h));
 const u32 = (n) => xdr.ScVal.scvU32(n);
+const u64 = (n) => xdr.ScVal.scvU64(new xdr.Uint64(BigInt(n)));
+// Sem fechadura de tempo nestas cargas: o criptograma vai vazio.
+const semCripto = () => xdr.ScVal.scvBytes(new Uint8Array(0));
 const vec = (v) => xdr.ScVal.scvVec(v);
 const addr = (g) => new Address(g).toScVal();
 const xdrDe = (g) => bytesHex(new Address(g).toScVal().toXDR());
@@ -144,6 +147,7 @@ async function rodada(rotulo, folga) {
       { type: { opcoes: ["symbol", "u32"], confidencial: ["symbol", "bool"] } })]),
     bN(raiz), vec([addr(membros[0].publicKey())]),
     u32(1), u32(agora + 120), u32(agora + 400), xdr.ScVal.scvBool(true),
+    u32(1), u32(0), u64(0), u64(0),
   ], 0);
   if (!r1.ok) throw new Error(`abrir: ${r1.fase} ${r1.erro}`);
 

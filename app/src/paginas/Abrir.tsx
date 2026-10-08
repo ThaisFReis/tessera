@@ -89,7 +89,9 @@ export default function Abrir() {
       setProgresso(1);
       await abrir(
         c, proposta, [{ opcoes: n, confidencial: true }], raiz, membros,
-        k, abre, fecha, anel, aberta ? 1 : secoes, aberta ? limite : 0, diario,
+        k, abre, fecha, anel, aberta ? 1 : secoes, aberta ? limite : 0,
+        // Sem fechadura de tempo ainda: a tela que a oferece é T-020.
+        0, 0, diario,
       );
       setProgresso(2);
 

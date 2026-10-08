@@ -18,7 +18,7 @@ export const REDE = {
   horizon: "https://horizon-testnet.stellar.org",
   friendbot: "https://friendbot.stellar.org",
   passphrase: Networks.TESTNET,
-  contrato: "CDJ3VMFKEZP3TN6KF3REUXTVW2R7AT5FMMLX3OKADDJOAV2V5D4F7OLC",
+  contrato: "CCQHRQZP3R3QMMKEEOOOS7XXINR7WGSMTKGNR4GD6BDNLC6JSPUZIDHZ",
   explorer: "https://stellar.expert/explorer/testnet",
 };
 
@@ -85,6 +85,9 @@ const ERROS: Record<number, string> = {
   22: "SomaDiferenteDoPeso", 23: "TotalDiferenteDoComparecimento", 24: "MembroJaEndossou",
   25: "PerguntasForaDaFaixa", 26: "VotacaoAindaNaoComecou", 27: "ComparecimentoEncerrado",
   28: "JaCompareceu", 29: "AnelInvalido", 30: "ImagemJaUsada", 31: "ModoErrado",
+  32: "SecaoInvalida", 33: "VotacaoAberta", 34: "RodadaNaoFecha",
+  35: "RelogioAindaNaoAbriu", 36: "CadeiaNaoFecha", 37: "NaoMelhora",
+  38: "CriptogramaMalFormado",
 };
 
 /** Arredondar para inteiro faz uma chamada barata ler "0% do teto", que soa
@@ -137,6 +140,9 @@ const ponto = (h: string) => bytesN(h);
  */
 const escalar = (h: string) => nativeToScVal(BigInt("0x" + h), { type: "u256" });
 const u32 = (n: number) => xdr.ScVal.scvU32(n);
+const u64 = (n: number) => xdr.ScVal.scvU64(new xdr.Uint64(BigInt(n)));
+const bytes = (h: string) =>
+  xdr.ScVal.scvBytes(h === "" ? new Uint8Array(0) : hexParaBytes(h));
 const vetor = (v: xdr.ScVal[]) => xdr.ScVal.scvVec(v);
 const endereco = (g: string) => new Address(g).toScVal();
 
@@ -512,6 +518,14 @@ export const abrir = (
   anel: boolean,
   secoes: number,
   limiteSecao: number,
+  /** Fechamento em **tempo**, e a rodada da baliza que ele determina.
+   *
+   *  `fecha_em` é sequência de ledger e a fechadura precisa de relógio. Zero
+   *  nos dois é proposta sem fechadura — a da mesa. Quem calcula a rodada é
+   *  `relogio.rodada(fimTempo)` no wasm, o mesmo código que o contrato
+   *  confere. */
+  fimTempo = 0,
+  rodada = 0,
   d?: Diario,
 ) =>
   enviar(
@@ -536,6 +550,8 @@ export const abrir = (
       xdr.ScVal.scvBool(anel),
       u32(secoes),
       u32(limiteSecao),
+      u64(fimTempo),
+      u64(rodada),
     ],
     d,
     `proposta ${id.slice(0, 8)}… · ${perguntas.length} pergunta${perguntas.length === 1 ? "" : "s"} · ` +
@@ -590,6 +606,13 @@ export function votarAnonimo(
   provas: { a0: string; a1: string; e0: string; z0: string; e1: string; z1: string }[],
   provasSoma: { a: string; z: string }[],
   escolhas: number[],
+  /** Os criptogramas da fechadura, concatenados em hexadecimal: 160 bytes por
+   *  opção confidencial. Vazio quando a proposta não tem fechadura.
+   *
+   *  O contrato não os lê — não pode, o host não tem pareamento com saída de
+   *  valor. Ele confere a forma e os carrega no evento, e quem decifra é
+   *  qualquer pessoa, depois da rodada. */
+  cripto = "",
   d?: Diario,
 ) {
   if (c.tipo !== "efemera") {
@@ -643,6 +666,7 @@ export function votarAnonimo(
         ),
       ),
       vetor(escolhas.map(u32)),
+      bytes(cripto),
     ],
     d,
     `proposta ${id.slice(0, 8)}… · seção ${secao} · anel com ${anel.length} · ${compromissos.length} compromisso${compromissos.length === 1 ? "" : "s"}`,

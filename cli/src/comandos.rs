@@ -421,6 +421,12 @@ pub fn abrir(
                 ("fecha_em", fecha_em.to_string()),
                 ("anel", anel.to_string()),
                 ("secoes", secoes.to_string()),
+                // `limite_secao` e a fechadura de tempo: a CLI ainda não as
+                // oferece, e passar zero é a proposta de sempre — uma seção
+                // fixa, e a mesa como quem abre. Ver T-019.
+                ("limite_secao", "0".to_string()),
+                ("fim_tempo", "0".to_string()),
+                ("rodada", "0".to_string()),
             ],
         )
         .map_err(|e| e.to_string())?;
