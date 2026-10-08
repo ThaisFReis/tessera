@@ -389,7 +389,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-007 | "O modo" em `/abrir` | T-001 | §4 | todo | a tela não oferece votação que `/votar` recusa |
 | T-016 | O placar aparece no dapp quando existe | T-013 | §2 | review | `/apurar` e `/votacao` leem `resultado()`; sem mesa, explicam por que nunca haverá |
 | T-017 | `core/relogio`: a fechadura de tempo | T-016 | §5, §6 | todo | cifra e decifra o fator para uma rodada; INV-24 com o vetor congelado da rodada 6.000.000; recusa assinatura que não confere **antes** de decifrar; roda offline; `core` não faz rede |
-| T-018 | Contrato: subconjunto, cadeia e regra monotônica | T-017 | §4, §5, §7 | todo | criptograma no evento `anonimo`; `Cadeia(proposta, secao)` de 32 bytes que não cresce; `apurar` por seção com lista ordenada + bitmap, conferindo a cadeia e o MSM de dois termos; INV-18 a INV-22 com teste cada; rodada presa a `fecha_em` (INV-22); bump de ABI e redeploy com os arquivos repontados; custo medido e citado junto do número; `τ` conferido contra o anel da seção e **não** contra o subconjunto aberto (INV-25, DEC-011) |
+| T-018 | Contrato: subconjunto, cadeia e regra monotônica | T-017 | §4, §5, §7, §11 | todo | **§11-I em aberto** — a derivação da seção depende dela; criptograma no evento `anonimo`; `Cadeia(proposta, secao)` de 32 bytes que não cresce; `apurar` por seção com lista ordenada + bitmap, conferindo a cadeia e o MSM de dois termos; INV-18 a INV-22 com teste cada; rodada presa a `fecha_em` (INV-22); bump de ABI e redeploy com os arquivos repontados; custo medido e citado junto do número; `τ` conferido contra o anel da seção e **não** contra o subconjunto aberto (INV-25, DEC-011) |
 | T-019 | Decifrar no navegador e buscar a rodada | T-017, T-018 | §3, §5 | todo | `cliente-wasm` exporta decifrar; `app/src/rede.ts` busca a assinatura e a **valida** antes de usar; nenhuma página importa o SDK nem o relé direto |
 | T-020 | O placar aparece sozinho quando a janela fecha | T-019 | §2, §4 | todo | antes de `fecha_em` a tela não mostra nada, nem parcial; depois, apura e publica sem ninguém clicar; diz quantas de quantas cédulas abriram; o diário conta o que aconteceu |
 | T-021 | Rodada ponta a ponta na testnet | T-020 | §8 | todo | `app/scripts/rodada-relogio.mjs`: cédulas, fim da janela, apuração automática, e **uma cédula sabotada que não trava o placar**; hash das transações no PR |
@@ -799,3 +799,54 @@ e só recusa votações minúsculas. O que não fiz, por ser enfraquecer uma pro
 declarada: reescrever o enunciado da INV-12 e o texto do `PROTOCOLO §6.6`. A
 pergunta é se o `τ` passa a ser enunciado como piso do **conjunto de anonimato**
 — que é o que ele de fato protege agora — ou se sai.
+
+### §11-I — "o votante não pode saber sua seção" (bloqueia um critério de T-018)
+
+Exigência do humano em 2026-10-07. Como está escrita, **não é realizável**, e por
+dois motivos independentes:
+
+1. **Para votar é preciso nomear a seção.** O anel é por seção; o cliente busca
+   `anel(proposta, secao)` e assina o LSAG *em relação àquele anel*.
+   `votar_anonimo` recebe `secao`. Um votante que não saiba a sua não consegue
+   depositar cédula.
+2. **A seção é pública para o mundo, não só para o votante.** `secao_de(proposta,
+   votante)` é getter público, o evento `comparec` publica `(secao, tamanho)`, e
+   em votação fechada qualquer pessoa calcula `H(0x03 ‖ proposta ‖ endereço) mod
+   seções` de cabeça. Esconder do próprio votante não esconderia de ninguém.
+
+O que a seção faz com o anonimato já está medido e assumido: ela **particiona** o
+conjunto de anonimato publicamente — uma cédula da seção 2 é de alguém que
+compareceu na seção 2. É o teorema de `PROTOCOLO §6.6`, e é por isso que o piso
+de `τ` é por seção (INV-25, DEC-011).
+
+**O que eu acho que a exigência protege, e isto é realizável:** o votante não
+pode **escolher nem prever** a sua seção. Hoje pode prever — a derivação é
+`H(0x03 ‖ proposta ‖ endereço)`, calculável antes de comparecer, e o próprio
+`core/src/merkle.rs` anota que dá para moer o `id` da proposta. Quem prevê,
+coordena: uma coligação que concentre `τ−1` numa seção determina a cédula de quem
+sobrou.
+
+**Proposta.** Derivar a seção da **baliza**: `H(0x03 ‖ assinatura_da_rodada_de
+abre_em ‖ endereço) mod seções`. Antes de `abre_em` essa assinatura não existe,
+então ninguém calcula a própria seção com antecedência; e numa votação **fechada**
+o eleitorado já está preso na raiz desde o `abrir`, então moer endereço depois de
+`abre_em` não entra na lista. Grinding morre. O contrato consegue verificar a
+assinatura da rodada com `hash_to_g1` e `pairing_check`, que ele já tem — custo
+**não medido**.
+
+Na votação **aberta** isso não se consegue: carteiras nascem a qualquer momento e
+de graça. Por isso DEC-006 já recomenda **uma seção só** no modo aberto — e com
+uma seção não existe seção para prever, o que atende a exigência pelo caminho
+mais curto.
+
+**Por que não decido sozinho:** muda a INV-08, que é invariante, e o formato da
+divisão, que é congelado (§5). Precisa da sua palavra entre:
+
+- **(a)** seção derivada da baliza no modo fechado, uma seção só no aberto —
+  grinding morre, custa uma verificação de assinatura a mais no contrato e um
+  bump no formato da divisão;
+- **(b)** uma seção só em todos os modos — atende por construção, e o custo de
+  CPU volta a apertar acima de ~20 votantes (medido: 148.889.608 instruções por
+  cédula com 30 em 3 seções; com 30 numa seção não cabe);
+- **(c)** fica como está, e a §2 passa a dizer que a seção é previsível e que uma
+  coligação pode se concentrar.
