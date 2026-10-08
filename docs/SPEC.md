@@ -97,6 +97,7 @@ foi auditado por terceiros.
 | "uma cédula que não abre não trava as outras" | INV-19, INV-21 |
 | "omitir uma cédula honesta não gruda" | INV-21 — só um conjunto estritamente maior substitui o guardado, e qualquer pessoa consegue incluí-la |
 | "a assinatura da baliza se autovalida: um relé que minta é recusado" | INV-24, vetor congelado da rodada 6.000.000 |
+| "nem quem organiza escolhe quem se esconde atrás de quem" | INV-08 e DEC-012 — a seção vem da baliza, que não existe quando a votação é aberta |
 | "o piso de `τ` protege o conjunto de anonimato, e abrir cédula por cédula não o afrouxa" | INV-12 e INV-25; `PROTOCOLO §6.6` — o piso é sobre o anel, não sobre quantas cédulas abriram |
 | "não existe segredo durável que possa vazar depois" | INV-23 — a chave é publicada de propósito no instante da rodada; nenhum cliente guarda o `r` |
 
@@ -104,6 +105,12 @@ foi auditado por terceiros.
 lista de quem faltou, ou que o total significa alguma coisa — qualquer pessoa
 vota quantas vezes quiser criando carteiras, e na testnet o friendbot as
 financia de graça. O que a votação aberta demonstra é **sigilo**, não contagem.
+
+**Proibido afirmar sobre as seções:** que a seção de uma pessoa é secreta, ou
+difícil de descobrir. Não é: o anel é nomeado, as seções particionam, e quem lê
+os anéis lê a seção de todo mundo (DEC-012). O que se pode afirmar é que ela é
+**imprevisível até a abertura** — que é o que impede escolher quem se esconde
+atrás de quem.
 
 **Proibido afirmar sobre a fechadura de tempo:** que abrir o **conteúdo** antes
 da hora é *impossível*. Não é: é conluio de um limiar dos operadores da baliza —
@@ -179,7 +186,7 @@ pergunta.
 | INV-05 | O caderno e a urna não se ligam | `contrato` `o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem` |
 | INV-06 | A mesma pessoa não vota duas vezes, e a recusa não revela quem é | `contrato` `ninguem_vota_duas_vezes`; `core` `a_mesma_pessoa_produz_a_mesma_imagem` |
 | INV-07 | A imagem de chave não atravessa propostas | `core` `a_imagem_nao_atravessa_propostas` |
-| INV-08 | **Na votação fechada**, a seção está presa na folha de Merkle: o votante não escolhe a sua | `core` `a_secao_esta_presa_na_folha`; `contrato` `trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez` |
+| INV-08 | **Na votação fechada**, a seção é imprevisível até `abre_em`: nem o votante nem quem organiza escolhe a sua | `core` `a_secao_vem_da_baliza_e_nao_do_identificador`, `moer_o_identificador_nao_isola_ninguem`; `contrato` `trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez` — DEC-012 |
 | INV-25 | O piso de `τ` é conferido contra o **anel**, nunca contra o subconjunto que abriu — sabotar não trava | `contrato` `sabotar_o_proprio_criptograma_nao_derruba_o_piso` |
 | INV-18 | Nenhum resultado, **nem parcial**, existe no contrato antes de `fecha_em` | `contrato` `antes_do_fechamento_nao_existe_placar` — relógio do ledger, sem suposição |
 | INV-19 | Uma cédula que não abre perde o próprio voto e **não** impede a apuração das outras | `contrato` `a_cedula_que_nao_abre_perde_so_o_proprio_voto` |
@@ -207,7 +214,7 @@ pergunta.
 
 | O quê | Onde | Por quê |
 |---|---|---|
-| Folha de Merkle `H(0x00 ‖ endereço ‖ peso_be ‖ secao_be)` | `core/src/merkle.rs::folha` | muda a raiz; quebra toda prova de aptidão existente |
+| Folha de Merkle `H(0x00 ‖ endereço ‖ peso_be)` — **o `secao_be` sai em T-023** (DEC-012) | `core/src/merkle.rs::folha` | muda a raiz; quebra toda prova de aptidão existente |
 | Separação de domínio `0x00` folha, `0x01` nó, `0x02` vazio, `0x03` seção | idem | sem ela, folha de 64 bytes vira nó interno |
 | Serialização G1, inclusive o infinito | `core/src/ponto.rs` | o host recusa qualquer outra coisa |
 | ABI do contrato (`abrir`, `comparecer`, `votar`, `votar_anonimo`, `apurar`) | `contrato/src/lib.rs` | redeploy invalida toda votação aberta e 12 arquivos que pinam o endereço |
@@ -389,10 +396,11 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-007 | "O modo" em `/abrir` | T-001 | §4 | todo | a tela não oferece votação que `/votar` recusa |
 | T-016 | O placar aparece no dapp quando existe | T-013 | §2 | review | `/apurar` e `/votacao` leem `resultado()`; sem mesa, explicam por que nunca haverá |
 | T-017 | `core/relogio`: a fechadura de tempo | T-016 | §5, §6 | todo | cifra e decifra o fator para uma rodada; INV-24 com o vetor congelado da rodada 6.000.000; recusa assinatura que não confere **antes** de decifrar; roda offline; `core` não faz rede |
-| T-018 | Contrato: subconjunto, cadeia e regra monotônica | T-017 | §4, §5, §7, §11 | todo | **§11-I em aberto** — a derivação da seção depende dela; criptograma no evento `anonimo`; `Cadeia(proposta, secao)` de 32 bytes que não cresce; `apurar` por seção com lista ordenada + bitmap, conferindo a cadeia e o MSM de dois termos; INV-18 a INV-22 com teste cada; rodada presa a `fecha_em` (INV-22); bump de ABI e redeploy com os arquivos repontados; custo medido e citado junto do número; `τ` conferido contra o anel da seção e **não** contra o subconjunto aberto (INV-25, DEC-011) |
+| T-018 | Contrato: subconjunto, cadeia e regra monotônica | T-017 | §4, §5, §7 | todo | criptograma no evento `anonimo`; `Cadeia(proposta, secao)` de 32 bytes que não cresce; `apurar` por seção com lista ordenada + bitmap, conferindo a cadeia e o MSM de dois termos; INV-18 a INV-22 com teste cada; rodada presa a `fecha_em` (INV-22); bump de ABI e redeploy com os arquivos repontados; custo medido e citado junto do número; `τ` conferido contra o anel da seção e **não** contra o subconjunto aberto (INV-25, DEC-011) |
 | T-019 | Decifrar no navegador e buscar a rodada | T-017, T-018 | §3, §5 | todo | `cliente-wasm` exporta decifrar; `app/src/rede.ts` busca a assinatura e a **valida** antes de usar; nenhuma página importa o SDK nem o relé direto |
 | T-020 | O placar aparece sozinho quando a janela fecha | T-019 | §2, §4 | todo | antes de `fecha_em` a tela não mostra nada, nem parcial; depois, apura e publica sem ninguém clicar; diz quantas de quantas cédulas abriram; o diário conta o que aconteceu |
 | T-021 | Rodada ponta a ponta na testnet | T-020 | §8 | todo | `app/scripts/rodada-relogio.mjs`: cédulas, fim da janela, apuração automática, e **uma cédula sabotada que não trava o placar**; hash das transações no PR |
+| T-023 | A seção vem da baliza, não do identificador | T-017 | §4, §5, §10 | todo | `dividir` troca `proposta` por assinatura da rodada de `abre_em`; a folha perde `secao_be`; teste de que moer o identificador não isola ninguém; dados-ouro regerados; a tela da votação aberta diz por que ela usa uma seção só (DEC-012) |
 | T-022 | Alinhar README, UX e decks à fechadura | T-021 | §2 | todo | o que §2 passa a permitir e o que passa a proibir aparece nos três; a suposição da baliza e a falta de plano B ficam escritas, não implícitas |
 | T-008 | ~~`/apurar` junta as parcelas da mesa~~ | — | §11 | substituída | §11-E respondida por DEC-008: o retentor deixa de ser a mesa. Ver T-017 a T-022 |
 | T-009 | Assembleia sem mesa nenhuma | T-000 | §5, §10 | review | `limiar == 0` aceito sse `mesa` vazia; redeploy; os 12 arquivos repontados; `/abrir` e `/apurar` param de exigir mesa |
@@ -667,6 +675,66 @@ muda de lugar; §2 ganhou a afirmação; §4 ganhou INV-25; T-018 ganhou o crit�
 de aceitação. O caso de **uma seção só** com anel abaixo de `τ` continua como
 DEC-005 decidiu — aviso do organizador, não recusa —, e o aviso é T-010.
 
+### DEC-012: A seção de uma pessoa não dá para esconder — dá para tornar imprevisível (2026-10-07, T-023)
+
+**Contexto.** Exigência nova: *"o votante não pode saber sua seção; as seções não
+são públicas ou pelo menos difíceis de saber."*
+
+**O que é impossível, e por quê.** Esconder em que seção uma pessoa está, neste
+desenho, não dá. A prova é curta: uma assinatura de anel só verifica contra um
+anel **nomeado**, então o anel de cada cédula é necessariamente público; as
+seções particionam o eleitorado, cada pessoa aparece em exatamente um anel; logo
+quem lê os anéis lê a seção de todo mundo. Hoje é ainda mais direto: o contrato
+guarda a seção em `Compareceu(proposta, endereço)`, `secao_de()` devolve, e o
+evento `comparec` publica.
+
+Anéis **sobrepostos**, com iscas, não resgatam: o comparecimento é público por
+pessoa — e é afirmação de §2 que seja —, então os candidatos a uma cédula são
+`anel ∩ quem compareceu`, e as iscas caem fora. Esconder a seção exigiria
+esconder o comparecimento, que é o oposto do que o projeto promete.
+
+**O ataque que importa não é saber, é escolher — e aqui eu errei.** DEC-006
+disse que moer endereços até cair numa seção escolhida *"não tira nada de
+ninguém, porque escolher o próprio esconderijo não encolhe o de outra pessoa."*
+Está errado. Moer **para dentro** da seção da vítima não encolhe a seção, e
+enche de atacantes: cada um conhece a própria imagem de chave, elimina a própria
+cédula, e o que sobra é a da vítima. O conjunto de anonimato efetivo vira 1. O
+mesmo vale para quem organiza numa votação fechada, que escolhe o identificador
+da proposta — e é dele que `dividir` deriva a seção
+(`H(0x03 ‖ proposta ‖ endereço)`), então moer o identificador isola quem quiser.
+
+**Decisão.** A seção passa a ser **imprevisível até `abre_em`**: derivada da
+assinatura da baliza da rodada de abertura, não do identificador da proposta.
+Quem organiza não consegue moer, porque na hora de `abrir` a assinatura não
+existe. Depois de `abre_em` ela é determinística e pública — e tem de ser, pelo
+parágrafo da impossibilidade acima.
+
+Isso sobrevive ao muro que matou a atribuição por ordem de chegada (DEC-006):
+passado `abre_em` a seção é função de dado público, então o cliente a calcula na
+**simulação** e o footprint nomeia a entrada certa. O que falhou antes falhava
+por depender de estado só conhecido na aplicação.
+
+**Consequência congelada:** a folha de Merkle perde o `secao_be`
+(`H(0x00 ‖ endereço ‖ peso_be)`), porque a seção deixa de existir no momento em
+que a folha é construída. É mudança de formato congelado (§5): bump, dados-ouro
+regerados, e a INV-08 reescrita — a seção deixa de estar presa na folha e passa
+a estar presa na baliza, que é uma amarra mais forte, não mais fraca.
+
+**Residual declarado.** Numa votação **aberta**, quem quiser ainda cria
+endereços *depois* de `abre_em` e mói para dentro de uma seção. Contra isso não
+há derivação que ajude: a defesa é a de DEC-006 — votação aberta usa **uma seção
+só**, e aí não há seção para onde moer — ou a divisão por ordem de chegada de
+T-014, que não deriva do endereço (§11-D).
+
+**O que eu não faço.** Remover `secao_de()` e o campo do evento como se fosse
+conserto: a seção é derivável da assinatura e do endereço, então esconder a
+consulta é segurança cosmética, e §2 proíbe afirmar o que o código não sustenta.
+Se o campo sair, sai por economia, não por sigilo.
+
+**Alternativas.** Anéis sobrepostos com iscas: não funciona com comparecimento
+público (acima). Seção sorteada pelo PRNG do host no `comparecer`: é estado da
+aplicação, e cai no mesmo muro de footprint medido em DEC-006.
+
 ---
 
 ## §11 Perguntas em aberto
@@ -799,54 +867,3 @@ e só recusa votações minúsculas. O que não fiz, por ser enfraquecer uma pro
 declarada: reescrever o enunciado da INV-12 e o texto do `PROTOCOLO §6.6`. A
 pergunta é se o `τ` passa a ser enunciado como piso do **conjunto de anonimato**
 — que é o que ele de fato protege agora — ou se sai.
-
-### §11-I — "o votante não pode saber sua seção" (bloqueia um critério de T-018)
-
-Exigência do humano em 2026-10-07. Como está escrita, **não é realizável**, e por
-dois motivos independentes:
-
-1. **Para votar é preciso nomear a seção.** O anel é por seção; o cliente busca
-   `anel(proposta, secao)` e assina o LSAG *em relação àquele anel*.
-   `votar_anonimo` recebe `secao`. Um votante que não saiba a sua não consegue
-   depositar cédula.
-2. **A seção é pública para o mundo, não só para o votante.** `secao_de(proposta,
-   votante)` é getter público, o evento `comparec` publica `(secao, tamanho)`, e
-   em votação fechada qualquer pessoa calcula `H(0x03 ‖ proposta ‖ endereço) mod
-   seções` de cabeça. Esconder do próprio votante não esconderia de ninguém.
-
-O que a seção faz com o anonimato já está medido e assumido: ela **particiona** o
-conjunto de anonimato publicamente — uma cédula da seção 2 é de alguém que
-compareceu na seção 2. É o teorema de `PROTOCOLO §6.6`, e é por isso que o piso
-de `τ` é por seção (INV-25, DEC-011).
-
-**O que eu acho que a exigência protege, e isto é realizável:** o votante não
-pode **escolher nem prever** a sua seção. Hoje pode prever — a derivação é
-`H(0x03 ‖ proposta ‖ endereço)`, calculável antes de comparecer, e o próprio
-`core/src/merkle.rs` anota que dá para moer o `id` da proposta. Quem prevê,
-coordena: uma coligação que concentre `τ−1` numa seção determina a cédula de quem
-sobrou.
-
-**Proposta.** Derivar a seção da **baliza**: `H(0x03 ‖ assinatura_da_rodada_de
-abre_em ‖ endereço) mod seções`. Antes de `abre_em` essa assinatura não existe,
-então ninguém calcula a própria seção com antecedência; e numa votação **fechada**
-o eleitorado já está preso na raiz desde o `abrir`, então moer endereço depois de
-`abre_em` não entra na lista. Grinding morre. O contrato consegue verificar a
-assinatura da rodada com `hash_to_g1` e `pairing_check`, que ele já tem — custo
-**não medido**.
-
-Na votação **aberta** isso não se consegue: carteiras nascem a qualquer momento e
-de graça. Por isso DEC-006 já recomenda **uma seção só** no modo aberto — e com
-uma seção não existe seção para prever, o que atende a exigência pelo caminho
-mais curto.
-
-**Por que não decido sozinho:** muda a INV-08, que é invariante, e o formato da
-divisão, que é congelado (§5). Precisa da sua palavra entre:
-
-- **(a)** seção derivada da baliza no modo fechado, uma seção só no aberto —
-  grinding morre, custa uma verificação de assinatura a mais no contrato e um
-  bump no formato da divisão;
-- **(b)** uma seção só em todos os modos — atende por construção, e o custo de
-  CPU volta a apertar acima de ~20 votantes (medido: 148.889.608 instruções por
-  cédula com 30 em 3 seções; com 30 numa seção não cabe);
-- **(c)** fica como está, e a §2 passa a dizer que a seção é previsível e que uma
-  coligação pode se concentrar.
