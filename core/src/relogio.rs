@@ -222,6 +222,31 @@ pub fn decifrar(c: &[u8], chave: &Chave) -> Result<Fr, Erro> {
     Ok(Fr::from_be_bytes_mod_order(&m))
 }
 
+/// A chave pública da cadeia nos 192 bytes que o host do Soroban lê.
+///
+/// A baliza publica comprimido (96 bytes em G2, 48 em G1) e o host só lê não
+/// comprimido. Descomprimir exige raiz quadrada em `Fp`, que o host não tem —
+/// então quem converte é o cliente, e é por isso que estas duas funções existem
+/// aqui e não no contrato.
+pub fn chave_da_cadeia_para_host() -> [u8; crate::ponto::TAMANHO_G2] {
+    crate::ponto::serializar_g2(&chave_da_cadeia())
+}
+
+/// O gerador de G2, idem. O contrato precisa dele para o lado esquerdo de
+/// `e(σ, g₂) == e(H₁, P)`.
+pub fn gerador_g2_para_host() -> [u8; crate::ponto::TAMANHO_G2] {
+    crate::ponto::serializar_g2(&G2Affine::generator())
+}
+
+/// A assinatura comprimida da baliza nos 96 bytes que o host lê.
+///
+/// Valida de passagem: um ponto fora da curva ou fora do subgrupo é recusado
+/// aqui, antes de chegar ao contrato.
+pub fn assinatura_para_host(assinatura: &[u8]) -> Result<[u8; crate::ponto::TAMANHO], Erro> {
+    let s = G1Affine::deserialize_compressed(assinatura).map_err(|_| Erro::AssinaturaNaoConfere)?;
+    Ok(crate::ponto::serializar(&s))
+}
+
 fn em_bytes(r: &Fr) -> [u8; 32] {
     let v = r.into_bigint().to_bytes_be();
     let mut saida = [0u8; 32];

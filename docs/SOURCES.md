@@ -23,6 +23,7 @@ no teste que as produz, que é o que as mantém verdadeiras. Ver
 | 2026-10-03 | Prazo de submissão do hackathon | 12 out 2026, 20:59 | — | https://demo.stellarpassport.xyz/hackathons/find-your-way-meridian-hackathon |
 | 2026-10-03 | Trilhas e prêmios (General: 2.000/1.000/500 USDC) | 5.000 USDC no total | — | idem |
 | 2026-10-03 | Critérios de avaliação da trilha General | execução técnica, uso significativo da Stellar, originalidade, impacto, experiência de uso, apresentação | — | idem |
+| 2026-10-08 | Ordem de `Fp2` nos pontos G2 que o host do Soroban lê | **`c1` antes de `c0`** (convenção zcash): `be(x.c1)‖be(x.c0)‖be(y.c1)‖be(y.c0)`, 192 bytes não comprimidos | sdk 28.0.0 | medido: `contrato` `o_host_confere_a_baliza_e_a_ordem_de_g2_e_medida` — com a ordem trocada o pareamento falha |
 | 2026-10-08 | `cost.cpuInsns` da simulação no SDK | **não existe mais** — nenhuma ocorrência em `@stellar/stellar-sdk` 14.6.1; a CPU vem de `transactionData.resources().instructions()` | 14.6.1 | busca na árvore instalada; ver T-024 |
 | 2026-10-03 | `SorobanResources` renomeou `readBytes` | `diskReadBytes` | protocolo 23 | `@stellar/stellar-sdk` 14.6.1, introspecção de `SorobanDataBuilder().build().resources()` |
 | 2026-10-03 | A rede cobra o mínimo necessário, não o lance oferecido | lance 100 e 1.000.000 → mesma cobrança de 19.690.096 stroops | — | medido na testnet, duas invocações de `abrir` |

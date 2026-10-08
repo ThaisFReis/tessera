@@ -3756,3 +3756,72 @@ fn orcamento_da_apuracao_por_secao() {
         "cada cédula passou a custar {por_cedula} na apuração"
     );
 }
+
+/// **O host sabe conferir a baliza?** E em que ordem ele lê as coordenadas de
+/// G2?
+///
+/// A primeira pergunta decide se a T-023 é possível: derivar a seção da
+/// assinatura da rodada de abertura exige que o contrato **verifique** aquela
+/// assinatura, senão quem a apresenta escolhe o que quiser. O host tem
+/// `hash_to_g1` e `pairing_check`, que é tudo de que `e(σ, g₂) == e(H₁, P)`
+/// precisa.
+///
+/// A segunda é empírica de propósito. Em G1 o host lê `be(X) || be(Y)`, não
+/// comprimido (`core/src/ponto.rs`). Em G2 cada coordenada é de `Fp2`, e a ordem
+/// entre `c0` e `c1` é precisamente a divergência silenciosa que o `ponto.rs`
+/// existe para fechar. **Medido: `c1` antes de `c0`**, a convenção zcash — e o
+/// pareamento do host é o juiz, porque com a ordem trocada ele recusa o ponto ou
+/// a igualdade falha. É esta asserção que trava `ponto::serializar_g2`.
+///
+/// Custo medido: **24.053.490 instruções**, 6% do teto de uma transação. Pago
+/// uma vez por proposta em `registrar_abertura`, não por cédula — e é o número
+/// que torna a T-023 possível em vez de teórica.
+#[test]
+fn o_host_confere_a_baliza_e_a_ordem_de_g2_e_medida() {
+    use soroban_sdk::crypto::bls12_381::Bls12381G2Affine;
+    use soroban_sdk::Bytes;
+    use tessera_core::{ponto, relogio};
+
+    const RODADA: u64 = 6_000_000;
+    const ASSINATURA: &str = "848a0288a7102249bd6a274f65414ec8ca5b12c5e6f13a322e315ab734107784cd9b7ed4ebae73980cd72730ac6eb9f7";
+
+    let env = Env::default();
+    env.cost_estimate().budget().reset_unlimited();
+    let bls = env.crypto().bls12_381();
+
+    // `H₁(sha256(rodada em 8 bytes big-endian))` com o DST da drand — a mesma
+    // mensagem que o `core` mediu, agora calculada pelo host.
+    let msg = env
+        .crypto()
+        .sha256(&Bytes::from_array(&env, &RODADA.to_be_bytes()));
+    let q = bls.hash_to_g1(
+        &Bytes::from_array(&env, &msg.to_array()),
+        &Bytes::from_slice(&env, b"BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_"),
+    );
+
+    let sig = relogio::assinatura_para_host(&hex_bytes(ASSINATURA)).unwrap();
+    let s = Bls12381G1Affine::from_bytes(BytesN::from_array(&env, &sig));
+    let menos_q = bls.g1_mul(&q, &escalar(&env, &(-ArkFr::from(1u64))));
+
+    let g2 =
+        |b: [u8; ponto::TAMANHO_G2]| Bls12381G2Affine::from_bytes(BytesN::from_array(&env, &b));
+    let mut p1 = Vec::new(&env);
+    let mut p2 = Vec::new(&env);
+    p1.push_back(s);
+    p1.push_back(menos_q);
+    p2.push_back(g2(relogio::gerador_g2_para_host()));
+    p2.push_back(g2(relogio::chave_da_cadeia_para_host()));
+
+    let antes = env.cost_estimate().budget().cpu_instruction_cost();
+    assert!(
+        bls.pairing_check(p1, p2),
+        "o host recusou a assinatura da baliza, ou `serializar_g2` está na ordem \
+         errada de Fp2 — inverta `c1`/`c0` em `core/src/ponto.rs` e rode de novo"
+    );
+    let gasto = env.cost_estimate().budget().cpu_instruction_cost() - antes;
+    std::println!("conferir a baliza: {gasto} instruções");
+    assert!(
+        gasto < 100_000_000,
+        "conferir a baliza custou {gasto}, inviável dentro de uma cédula"
+    );
+}
