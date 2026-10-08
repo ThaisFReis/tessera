@@ -22,10 +22,20 @@ significa "legível quando a chave vazar". Então o ledger **nunca recebe um tex
 cifrado do voto**. Ele recebe um compromisso de Pedersen, `C = v·G + r·H`. O
 voto em si transita fora da cadeia e é destruído.
 
-A segunda ideia veio da urna brasileira, que resolve há décadas e sem
-criptografia nenhuma o problema de o remetente da cédula ser a identidade de
-quem vota: **o caderno diz quem compareceu, a urna diz o que foi votado, e nada
-liga os dois.** Tessera faz isso em dois atos — `comparecer()` identificado, e
+**O princípio que organiza tudo é um só: não é possível ligar uma cédula a quem
+a depositou.** Não é uma propriedade entre outras — é de onde o desenho inteiro
+decorre. O anel existe para que a cédula não carregue remetente; a imagem de
+chave, para impedir a segunda cédula sem revelar de quem é a primeira; a chave
+de uso único, para que nem o pagamento da taxa ligue as duas pontas.
+
+E é por isso que abrir uma cédula diz o que *aquela cédula* votou e nada mais.
+Quem abre não ganha o vínculo, porque o vínculo não está guardado em lugar
+nenhum para ser ganho.
+
+A segunda ideia é o princípio do voto secreto, que resolve sem criptografia
+nenhuma o problema de o remetente da cédula ser a identidade de quem vota:
+**o caderno diz quem compareceu, a urna diz o que foi votado, e nada liga os
+dois.** Tessera faz isso em dois atos — `comparecer()` identificado, e
 `votar_anonimo()` de uma chave efêmera, com uma imagem de chave que impede a
 segunda cédula da mesma pessoa sem revelar quem ela é.
 
@@ -157,8 +167,8 @@ cédula    148.889.608 instruções · 37,2% do teto
 ```
 
 **O resultado continua único.** O acumulador é por proposta e não sabe de que
-seção veio cada cédula — o Brasil publica boletim por seção e é daí que vem o
-vazamento da seção unânime; aqui não precisa.
+seção veio cada cédula. Publicar totais por seção abriria a brecha da seção
+unânime, que entrega todo mundo que caiu nela; aqui não é preciso.
 
 O que se paga é o conjunto de anonimato, que passa a ser a seção.
 
@@ -365,9 +375,9 @@ sigilo além do que entrega é pior que um honesto.
   não existe voto obrigatório. O que o ledger não mostra é qual cédula é dela.
 - **A lista de aptos fica pública no modo anel.** Um anel só é verificável por
   quem tem as chaves de todos os ramos: anonimato de anel é anonimato *dentro de
-  um conjunto conhecido*. É coerente com a urna — no Brasil o eleitorado e o
-  caderno são ambos públicos — mas é uma troca, e ela não existia no desenho
-  identificado.
+  um conjunto conhecido*. É coerente com o voto secreto, onde o eleitorado e a
+  lista de presença são públicos e só o vínculo é secreto — mas é uma troca, e
+  ela não existia no desenho identificado.
 - **Um anel de um não esconde ninguém.** O sigilo é propriedade do grupo, não da
   matemática sozinha. Com seções o contrato recusa anel abaixo de `TAU`; sem
   seções ele avisa e deixa passar, porque ali ninguém escolheu o grupo.
@@ -390,6 +400,9 @@ sigilo além do que entrega é pior que um honesto.
   **O que continua em aberto:** um cliente adulterado pode guardar o `r` sem
   você saber. Rodar o seu é a defesa, e é por isso que o dapp é estático e o
   `core` é o mesmo crate em todos os caminhos.
+- **O conteúdo de uma cédula aberta.** O que o protocolo protege é o *vínculo*,
+  não o conteúdo: quem reúne a abertura descobre o que aquela cédula votou, e
+  nunca de quem ela é. Numa votação sem mesa ninguém reúne nada.
 - **Mesa que não destrói suas cópias.** O limiar `k`-de-`n` está implementado
   em `core/src/shamir.rs` e protege abaixo de `k` conluios: a mesa soma as
   shares localmente e nenhum `r` individual se junta em lugar algum. Acima de

@@ -942,8 +942,8 @@ fn a_janela_precisa_ter_duracao() {
 /// `votar_publico` para encolher o conjunto sigiloso e vetar a assembleia.
 /// Sem aquela função, o único caminho até aqui é comparecimento baixo — e aí a
 /// recusa deixa de ser negação de serviço e vira quórum, com o mesmo remédio
-/// que o Brasil usa: estender o prazo, ou refazer com um eleitorado que caiba
-/// no sigilo.
+/// de sempre: estender o prazo, ou refazer com um eleitorado que caiba no
+/// sigilo.
 #[test]
 fn abaixo_de_tau_a_apuracao_trava_em_vez_de_vazar() {
     let c = montar(16);

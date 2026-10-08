@@ -32,6 +32,21 @@ Vale o `CLAUDE.md` da raiz, com estas adições deste projeto:
 **Marco corrente: submissão do hackathon Find Your Way (Meridian), trilha
 General, até 12 out 2026 20:59** ([fonte](SOURCES.md)).
 
+**O princípio que organiza tudo:** *não é possível ligar uma cédula a quem a
+depositou.* Não é uma propriedade entre outras — é a decisão de onde todo o
+desenho decorre, e ela veio antes do anel, antes das seções e antes de qualquer
+escolha de curva. O caderno diz quem compareceu, a urna diz o que foi votado, e
+**nada liga os dois**.
+
+Disso vem o resto: o anel existe para que a cédula não carregue remetente; a
+imagem de chave existe para impedir a segunda cédula sem revelar de quem é a
+primeira; a chave de uso único existe para que nem o pagamento da taxa ligue as
+duas pontas.
+
+E disso vem também o que o projeto **aceita**: abrir uma cédula anônima diz o
+que *aquela cédula* votou, nunca de quem ela é. Quem abre não ganha o vínculo,
+porque o vínculo não existe em lugar nenhum para ser ganho.
+
 Sucesso é: um módulo de votação para Soroban em que se sabe quem compareceu, não
 se sabe em que cada pessoa votou, não se sabe de quem é cada cédula, e qualquer
 pessoa recalcula o resultado do ledger. Mais o que a submissão exige — vídeo e
@@ -64,6 +79,7 @@ foi auditado por terceiros.
 | "roda na testnet" | hash da transação, verificável no explorer |
 | "não há servidor que veja o fator de aleatoriedade" | o dapp é estático; as provas nascem no navegador |
 | "depois de votar, nem quem votou reabre a própria cédula" | `r` não é persistido em nenhum cliente; `cli` `nenhum_comando_grava_recibo` lê o próprio fonte, e `queimar_sobrescreve_antes_de_remover` |
+| "abrir uma cédula anônima revela o que ela votou, nunca de quem é" | INV-04b; o vínculo não é guardado em lugar nenhum |
 | "ninguém pode abrir uma cédula em anel" | ela não reparte o fator com a mesa; `AberturaNaoFecha` recusa qualquer total afirmado |
 
 **Proibido afirmar na votação aberta:** que há voto obrigatório, que existe
@@ -126,6 +142,7 @@ pergunta.
 | INV-02b | Nenhum cliente persiste o fator `r`: depois de votar, nem quem votou reabre a própria cédula | `cli` `nenhum_comando_grava_recibo`, `queimar_sobrescreve_antes_de_remover` |
 | INV-03 | O diário nunca grava nome de segredo junto de um valor | `app/scripts/diario.test.mjs` |
 | INV-04 | Uma chave efêmera assina **uma cédula**, nunca duas | `app/scripts/usoUnico.test.mjs` |
+| INV-04b | **Nada liga uma cédula a quem a depositou** — nem para quem abre a cédula | o anel, a imagem de chave e a carteira de uso único; `contrato` `o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem`; `app/scripts/rodada-anel.mjs` afere interseção caderno ∩ urna = 0 |
 | INV-05 | O caderno e a urna não se ligam | `contrato` `o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem` |
 | INV-06 | A mesma pessoa não vota duas vezes, e a recusa não revela quem é | `contrato` `ninguem_vota_duas_vezes`; `core` `a_mesma_pessoa_produz_a_mesma_imagem` |
 | INV-07 | A imagem de chave não atravessa propostas | `core` `a_imagem_nao_atravessa_propostas` |
@@ -397,6 +414,28 @@ a de 4 ficou abaixo de `TAU` e aquelas 4 pessoas não votaram (`#19`). Então
 gente: o anel passa a ser quem apareceu, que é o melhor anonimato possível, e o
 custo só aperta acima de ~20. §2 ganha a proibição de afirmar contagem no modo
 aberto.
+
+### DEC-007: O vínculo é o que se protege, não o conteúdo da cédula (2026-10-07, T-016)
+
+**Contexto.** Ao discutir se a mesa pode existir numa votação em anel, a
+pergunta voltou ao princípio: o que exatamente o projeto promete não revelar?
+
+**Decisão.** Registrar explicitamente o que já era a decisão fundadora: o que
+não pode existir é o **vínculo** entre uma cédula e quem a depositou. Abrir uma
+cédula anônima revela o que *aquela cédula* votou e nada mais — quem abre não
+ganha o vínculo, porque ele não está guardado em lugar nenhum.
+
+Isso resolve a aparente tensão com a exigência original ("ninguém pode descobrir
+o voto de outra pessoa"): ela continua de pé, porque "o voto *de outra pessoa*"
+pressupõe saber de quem é a cédula.
+
+**Alternativas.** Tratar o conteúdo de cada cédula como igualmente secreto —
+rejeitada: levaria a recusar qualquer apuração, já que um total é agregação de
+conteúdos, e a §11-E mostra que isso inviabiliza o placar.
+
+**Consequências.** §1 ganhou o princípio no topo, §2 ganhou a afirmação com a
+evidência, §4 ganhou INV-04b. E as referências a um sistema eleitoral específico
+saíram de 16 lugares: o princípio vale por si, não por analogia.
 
 ---
 

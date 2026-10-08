@@ -117,10 +117,10 @@ export default function Inicio() {
         <span className="eyebrow">04 / O CADERNO E A URNA</span>
         <h2>Quem faltou é público.<br />De quem é cada cédula, não.</h2>
         <p className="faixa-sub">
-          Esconder a escolha não basta quando o remetente da cédula é o seu endereço. A urna
-          brasileira resolve isso há décadas sem criptografia nenhuma: o caderno diz quem
-          compareceu, a urna diz o que foi votado, e <strong>nada liga os dois</strong>. Tessera
-          faz o mesmo em dois atos.
+          Esconder a escolha não basta quando o remetente da cédula é o seu endereço. O voto
+          secreto resolve isso sem criptografia nenhuma: o caderno diz quem compareceu, a urna
+          diz o que foi votado, e <strong>nada liga os dois</strong>. Tessera faz o mesmo em
+          dois atos.
         </p>
         <div className="duas">
           <div className="painel">
@@ -190,8 +190,9 @@ export default function Inicio() {
             <span className="eyebrow">A LISTA FICA PÚBLICA</span>
             <p>
               Um anel só é verificável por quem tem as chaves de todos os ramos: anonimato de
-              anel é anonimato <em>dentro de um conjunto conhecido</em>. É coerente com a urna —
-              no Brasil o eleitorado e o caderno são ambos públicos — mas é uma troca.
+              anel é anonimato <em>dentro de um conjunto conhecido</em>. É coerente com o voto
+              secreto, onde o eleitorado e a lista de presença são públicos e só o vínculo é
+              secreto — mas é uma troca.
             </p>
           </div>
           <div className="painel">

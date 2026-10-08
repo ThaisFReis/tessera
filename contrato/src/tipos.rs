@@ -19,15 +19,15 @@ use soroban_sdk::{
 /// fora, e três pessoas bastavam para vetar a assembleia inteira. Recusar o
 /// resultado correto virava negação de serviço contra a eleição.
 ///
-/// Nenhum sistema eleitoral sério aceita isso. O Brasil protege a célula
-/// pequena **antes**, agregando seções com menos de 50 eleitores, e nunca
-/// recusa a contagem depois (TSE, Res. 23.669/2021); quando há nulidade, o
-/// remédio é eleição nova (CE art. 224), não ausência de resultado.
+/// Nenhum sistema eleitoral sério aceita isso. A prática é proteger a célula
+/// pequena **antes** — agregando seções abaixo de um piso — e nunca recusar a
+/// contagem depois; quando há nulidade, o remédio é eleição nova, não ausência
+/// de resultado.
 ///
 /// Removido `votar_publico`, não há partição a induzir: toda cédula é
 /// sigilosa, e o único jeito de ficar abaixo de `TAU` é comparecimento baixo.
-/// O remédio é o mesmo do Brasil — estender o prazo ou refazer com um
-/// eleitorado que caiba no sigilo.
+/// O remédio é o de sempre — estender o prazo ou refazer com um eleitorado que
+/// caiba no sigilo.
 ///
 /// Perguntas públicas não mexem nisso: são do estatuto, iguais para todos, e
 /// não distinguem um eleitor de outro.

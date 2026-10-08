@@ -557,9 +557,9 @@ impl Tessera {
     // `TAU` (§6.6). Três pessoas abrindo o voto vetavam a assembleia inteira —
     // negação de serviço contra a própria eleição.
     //
-    // Nenhuma eleição séria aceita isso. O Brasil protege a célula pequena
-    // **antes**, agregando seções com menos de 50 eleitores, e nunca recusando
-    // a contagem depois (TSE, Res. 23.669/2021). Sem revelação individual não
+    // Nenhuma eleição séria aceita isso. A prática é proteger a célula pequena
+    // **antes**, agregando seções abaixo de um piso, e nunca recusar a contagem
+    // depois. Sem revelação individual não
     // há partição a induzir, e `TAU` volta a ser o que deveria: quórum,
     // declarado na abertura.
     //
