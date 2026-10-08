@@ -238,3 +238,96 @@ São todas da coluna "pergunte ao humano" do `CLAUDE.md`:
 4. **Escopo** (§6): fatia A só, ou A e B.
 
 Registradas como §11-F na `docs/SPEC.md`.
+
+---
+
+## 8. As duas exigências, e o que elas forçam
+
+Chegaram depois do estudo acima, e são firmes:
+
+> Não pode ser possível abrir cedo demais, os resultados têm que ser
+> apresentados depois que a janela de votação fechar. Não pode ser possível
+> travar o placar.
+
+### 8.1 O que trava o placar é o `Acum`, não a fechadura
+
+O contrato guarda, por opção confidencial, só o acumulado
+`A_j = Σᵢ C_{i,j}`, e o `apurar` confere `A_j == T_j·G + R_j·H` — um MSM de
+dois termos, 5.408.931 instruções medidas. Essa equação só fecha com **todas**
+as cédulas abertas. Uma que não abra derruba o placar inteiro, e isso vale hoje,
+com mesa, sem fechadura nenhuma. A §5.1 não descreveu um defeito do *timelock*:
+descreveu um defeito que já estava lá.
+
+Logo, "não pode travar" **exige** que a apuração deixe de ser tudo-ou-nada. E
+exige por cima do que já é verdade: só quem votou produz o criptograma da
+própria cédula, então sabotar é sabotar o próprio voto — desde que o protocolo
+saiba descartar uma cédula sem perder as outras.
+
+### 8.2 O material para isso já é público
+
+O evento `anonimo` publica `(imagem, compromissos, escolhas)`. Os compromissos
+de **cada** cédula já estão lá, um por um. Não falta dado; falta o contrato
+aceitar um subconjunto.
+
+### 8.3 O desenho que atende as duas
+
+Passado `fecha_em`, qualquer pessoa busca a assinatura da rodada, decifra os
+criptogramas, confere cédula por cédula e apura o que abriu:
+
+1. **A cadeia.** Cada cédula atualiza `Cadeia(proposta, seção) ← H(anterior ‖
+   compromissos)`. É uma entrada de 32 bytes que **não cresce** — ao contrário
+   do anel, que cresce 96 B por pessoa e produziu a §11-D.
+2. **A apuração.** Quem apura apresenta a lista ordenada de todos os
+   compromissos, mais um bitmap de quais abriram, mais `T_j` e
+   `R_j = Σ_{i abertas} r_{i,j}`. O contrato re-encadeia a lista — o que prova
+   que é exatamente o conjunto de cédulas daquela seção, sem omissão nem
+   invenção —, soma os compromissos marcados e confere o mesmo MSM de dois
+   termos de hoje. Custo: *n* hashes e *n* somas em G1, mais um MSM. Somas em
+   G1 são muito mais baratas que multiplicações; **não medido**.
+3. **A solidez não muda.** Como a prova CDS já garante `v ∈ {0,1}` em cada
+   compromisso, o compromisso de Pedersen é vinculante e a equação sobre o
+   subconjunto força `T_j = Σ v_i` e `R_j = Σ r_i`. Ninguém fabrica um total.
+4. **Monotonicidade — é isto que impede travar.** O contrato guarda o resultado
+   com o maior número de cédulas incluídas e aceita substituição **só** por um
+   conjunto estritamente maior. Quem omitir uma cédula honesta é sobreposto por
+   qualquer pessoa que a inclua, e qualquer pessoa consegue: a chave da rodada é
+   pública, então todo mundo decifra tudo. Basta **um** observador honesto, não
+   que os votantes voltem.
+
+Resultado: sabotar custa o próprio voto e nada mais. Omitir não gruda.
+
+### 8.4 "Abrir cedo": o que é impossível e o que é suposição
+
+Separando as duas coisas, porque só uma é impossível de verdade:
+
+- **O resultado na tela antes do fim: impossível, sem suposição nenhuma.** O
+  `apurar` recusa antes de `fecha_em` pelo relógio do ledger. Não há conluio que
+  publique um placar parcial no contrato.
+- **O conteúdo das cédulas antes do fim: suposição.** Um limiar dos operadores
+  da drand, em conluio, decifraria antes da hora e poderia contar por fora. O
+  contrato não manda no que alguém diz na internet.
+
+Não existe peça de prateleira que dê sigilo **incondicional** do conteúdo com
+revelação automática — é a impossibilidade do §1, e a fechadura a troca pela
+suposição mais fraca disponível: operadores independentes, que não foram
+escolhidos por quem abriu a urna e não têm interesse na votação. O que o vínculo
+protege continua intacto em qualquer cenário: ele não está guardado em lugar
+nenhum (DEC-007).
+
+### 8.5 O que isto custa em dias
+
+Acima da fatia A (mecanismo no `core`): criptograma no evento; `Cadeia` por
+seção; caminho novo de `apurar` com subconjunto, bitmap e regra monotônica;
+decifragem exportada no `cliente-wasm`; apuração automática na tela; e a rodada
+medida na testnet, como todas as outras. **3 a 4 dias**, e faltam 5 com vídeo,
+publicação e decks abertos. Não cabe.
+
+A versão que cabe em ~2 dias atende as duas exigências no produto, com uma
+troca declarada: o criptograma entra no evento (mudança mínima no contrato) e a
+apuração é **função determinística de dado público** — eventos mais assinatura
+da rodada —, calculada e conferível por qualquer pessoa, cédula por cédula
+contra o próprio compromisso. Não trava (criptograma ruim perde só o próprio
+voto) e não abre cedo (a tela não mostra nada antes de `fecha_em`). O que se
+perde é o contrato **certificar** o total: ele passa a ser publicamente
+recalculável em vez de recusado na hora. É uma garantia diferente, não uma
+garantia menor disfarçada — e a §2 tem de dizer qual das duas está valendo.

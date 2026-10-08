@@ -511,6 +511,12 @@ indisponível antes de um instante, disponível depois **para qualquer pessoa**,
 sem mesa, sem Shamir e sem servidor. O contrato não decifra (o host só tem
 `pairing_check`) e **não precisa**: o `apurar` já recusa um total que mente.
 
+**Decidido pelo humano em 2026-10-07:** abrir cedo não pode, o resultado só
+aparece depois de `fecha_em`, e travar o placar não pode. Isso responde os itens
+2 e parte do 1 abaixo, e força a mudança de protocolo da §8 do estudo — a
+apuração deixa de ser tudo-ou-nada, porque quem trava hoje é o `Acum`, não a
+fechadura. Falta decidir escopo e afirmação.
+
 Quatro coisas eu não decido:
 
 1. **Confiança.** Abrir cedo exige conluio de um limiar dos operadores da
