@@ -23,6 +23,7 @@ no teste que as produz, que é o que as mantém verdadeiras. Ver
 | 2026-10-03 | Prazo de submissão do hackathon | 12 out 2026, 20:59 | — | https://demo.stellarpassport.xyz/hackathons/find-your-way-meridian-hackathon |
 | 2026-10-03 | Trilhas e prêmios (General: 2.000/1.000/500 USDC) | 5.000 USDC no total | — | idem |
 | 2026-10-03 | Critérios de avaliação da trilha General | execução técnica, uso significativo da Stellar, originalidade, impacto, experiência de uso, apresentação | — | idem |
+| 2026-10-08 | `cost.cpuInsns` da simulação no SDK | **não existe mais** — nenhuma ocorrência em `@stellar/stellar-sdk` 14.6.1; a CPU vem de `transactionData.resources().instructions()` | 14.6.1 | busca na árvore instalada; ver T-024 |
 | 2026-10-03 | `SorobanResources` renomeou `readBytes` | `diskReadBytes` | protocolo 23 | `@stellar/stellar-sdk` 14.6.1, introspecção de `SorobanDataBuilder().build().resources()` |
 | 2026-10-03 | A rede cobra o mínimo necessário, não o lance oferecido | lance 100 e 1.000.000 → mesma cobrança de 19.690.096 stroops | — | medido na testnet, duas invocações de `abrir` |
 | 2026-10-03 | Folga de escrita declarada é devolvida | 3.679.157 sem folga · 3.682.659 com | — | medido na testnet, `app/scripts/folga.mjs` |
