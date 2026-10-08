@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { CarteiraEfemera } from "../carteira";
-import { lerChaveDeAnel } from "../lista";
+import { esquecerChaveDeAnel, lerChaveDeAnel } from "../lista";
 import { fase, ledgerAtual, lerAnel, lerGeradorH, lerHp, lerProposta, REDE, votarAnonimo, type PropostaRede } from "../rede";
 import { carregar } from "../wasm";
 import { useDiario } from "./comum";
@@ -114,6 +114,10 @@ function Urna({ id, demo }: { id: string; demo: boolean }) {
         setProgresso(2);
         const hash = await votarAnonimo(efemera, id, guardada.secao, anel, c.imagem, c.c0, c.z, c.cedula.compromissos, c.cedula.provas, c.cedula.provas_soma, c.cedula.escolhas, diario);
         if (!montada.current) return;
+        // A cédula entrou: a chave de anel deixa de ser útil e passa a ser só
+        // o vínculo entre você e ela. Morre aqui.
+        esquecerChaveDeAnel(id);
+        diario({ tipo: "nota", txt: "a chave de participação foi apagada — nada mais liga você à sua cédula" });
         setTx(hash);
       }
       if (montada.current) { setEscolha(null); setEtapa("concluido"); }
@@ -157,7 +161,7 @@ function Urna({ id, demo }: { id: string; demo: boolean }) {
       <p>A presença é pública. A cédula usa outra chave para separar sua escolha da sua identidade.</p>
       {quantidade > 0 && <p>{quantidade} participantes no conjunto{demo ? " · dados ilustrativos" : ""}.</p>}
       <p>A prova de participação usa o grupo de quem compareceu. Esta cédula não compartilha com a mesa o segredo que permitiria abri-la individualmente; a apuração deste modo ainda não está disponível.</p>
-      <p>Depois de enviar, <strong>nem você consegue voltar ao próprio voto</strong>. O número que o esconde nasce nesta aba, vai para a cédula e morre aqui — nada o grava, nem no navegador nem em arquivo. Quem quiser que você prove em quem votou precisa estar olhando a sua tela agora.</p>
+      <p>Depois de enviar, <strong>nem você consegue voltar ao próprio voto</strong>. Duas coisas morrem no mesmo instante: o número que esconde a escolha, que nunca é gravado em lugar nenhum, e a chave de participação, que é apagada assim que a cédula entra — com ela, alguém acharia qual das cédulas é a sua. Quem quiser que você prove em quem votou precisa estar olhando a sua tela agora.</p>
       <p>Na testnet, o serviço que financia a chave de uso único pode ver seu IP. Preserve a chave de participação neste navegador.</p>
     </details>
     {demo && <p className="demo-note">Prévia interativa · nenhuma transação real</p>}
