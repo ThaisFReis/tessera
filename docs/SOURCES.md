@@ -13,6 +13,13 @@ no teste que as produz, que é o que as mantém verdadeiras. Ver
 
 | Data | Fato | Valor | Versão | Fonte |
 |------|------|-------|--------|-------|
+| 2026-10-07 | Hash da cadeia quicknet da drand | `52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971` | — | https://api.drand.sh/v2/chains |
+| 2026-10-07 | Esquema, gênese e período da quicknet | `bls-unchained-g1-rfc9380`, 1692803367, 3 s | — | https://api.drand.sh/v2/chains/52db9ba7…/info |
+| 2026-10-07 | Chave pública da quicknet | 96 bytes, G2 comprimido (byte alto `0x83`) | — | idem, comprimento medido |
+| 2026-10-07 | Mensagem assinada pela drand em modo *unchained* | `sha256(rodada em 8 bytes big-endian)` — a rodada crua **não** confere | quicknet | medido: pareamento contra a rodada 6.000.000, DST `BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_` |
+| 2026-10-07 | Rodada de um instante `t` | `(t − 1692803367)/3 + 1`, vencendo exatamente em `t` | quicknet | medido: `t=1791421407` → 32872681, relé publicando a 32872680 |
+| 2026-10-07 | `soroban-sdk` expõe pareamento com saída de valor | não — só `pairing_check`, que devolve `bool` | 28.0.0 | fonte instalada, `src/crypto/bls12_381.rs` |
+| 2026-10-07 | `ark-bls12-381` com a feature `curve` alcança pareamento e *hash-to-curve* em G1 | sim, sem dependência nova | 0.5 | medido no `core`, `e(xP,Q)==e(P,xQ)` |
 | 2026-10-03 | Prazo de submissão do hackathon | 12 out 2026, 20:59 | — | https://demo.stellarpassport.xyz/hackathons/find-your-way-meridian-hackathon |
 | 2026-10-03 | Trilhas e prêmios (General: 2.000/1.000/500 USDC) | 5.000 USDC no total | — | idem |
 | 2026-10-03 | Critérios de avaliação da trilha General | execução técnica, uso significativo da Stellar, originalidade, impacto, experiência de uso, apresentação | — | idem |

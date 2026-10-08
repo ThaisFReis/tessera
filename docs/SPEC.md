@@ -287,6 +287,7 @@ cd app && node scripts/folga.mjs                    # contenção de escrita
 | T-006 | Atualizar os decks | T-001 | §2 | todo | slide 06 deixa de listar desvinculação como futura; seções aparecem |
 | T-007 | "O modo" em `/abrir` | T-001 | §4 | todo | a tela não oferece votação que `/votar` recusa |
 | T-016 | O placar aparece no dapp quando existe | T-013 | §2 | review | `/apurar` e `/votacao` leem `resultado()`; sem mesa, explicam por que nunca haverá |
+| T-017 | Fechadura de tempo como retentor | T-016 | §4, §7, §11 | blocked | §11-F — estudo pronto em `docs/RELOGIO.md`; exige decisão humana sobre confiança, vivacidade, afirmação e escopo |
 | T-008 | `/apurar` junta as parcelas da mesa | — | §4, §11 | blocked | §11-E — exige transporte das parcelas, e as três saídas quebram um princípio declarado |
 | T-009 | Assembleia sem mesa nenhuma | T-000 | §5, §10 | review | `limiar == 0` aceito sse `mesa` vazia; redeploy; os 12 arquivos repontados; `/abrir` e `/apurar` param de exigir mesa |
 | T-014 | Limite por seção, com split automático na aberta | T-013 | §4, §5 | blocked | §11-D — contrato e testes prontos; a rajada ainda não entra | `abrir` troca `secoes` por `limite_secao`; a aberta enche e abre a próxima; o cliente declara uma janela de anéis no footprint; rajada de 20 com limite 10 entra |
@@ -495,6 +496,31 @@ isso. Vale mudar `cedula_anonima` para repartir — aceitando que `k` membros em
 conluio abrem **uma cédula anônima**, sem saber de quem é — ou o placar do vídeo
 sai da CLI?
 
+**Resposta parcial, 2026-10-07:** existe uma quarta saída que as três não
+cobriam — um retentor que não é gente. Ver §11-F e `docs/RELOGIO.md`.
+
 Enquanto isso, a votação aberta funciona com **uma seção só**
 (`limite_secao = 0`), que é o padrão recomendado em DEC-006 e o que a tela
 sugere.
+
+### §11-F — o retentor não-humano (bloqueia T-017)
+
+O estudo está em [`docs/RELOGIO.md`](RELOGIO.md), com o que foi medido e o que
+não foi. Resumo: a fechadura de tempo sobre a drand resolve a §11-E — abertura
+indisponível antes de um instante, disponível depois **para qualquer pessoa**,
+sem mesa, sem Shamir e sem servidor. O contrato não decifra (o host só tem
+`pairing_check`) e **não precisa**: o `apurar` já recusa um total que mente.
+
+Quatro coisas eu não decido:
+
+1. **Confiança.** Abrir cedo exige conluio de um limiar dos operadores da
+   drand. É mais fraco que confiar na mesa, e não é "ninguém". Aceita?
+2. **Vivacidade.** Drand parada = sem resultado, para sempre. E todo plano B que
+   abre sem a drand abre *antes da hora*. Fechadura só, 2 de 2, ou 1 de 2?
+3. **Afirmação.** O que o deck pode dizer, e a partir de qual fatia.
+4. **Escopo.** Fatia A (mecanismo no `core` e na CLI, ~1 dia) só, ou A e B
+   (dapp apura sozinho, 2–3 dias, com o buraco de §5.1 do estudo: um saboteador
+   trava o placar até o protocolo guardar o compromisso de cada cédula)?
+
+Minha recomendação está em §6 do estudo: A agora, B só se A sair rápido, e o
+deck afirmando a peça medida em vez de prometer o placar automático.
