@@ -65,6 +65,15 @@
                 },
                 {
                   "u32": 1
+                },
+                {
+                  "u32": 0
+                },
+                {
+                  "u64": "0"
+                },
+                {
+                  "u64": "0"
                 }
               ]
             }
@@ -92,7 +101,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "bytes": "026f296cbde214996e04ddd28bbccb4d591445d8867d67e3864c2bffe46d22b2ab50f4ebce7c45c605aa5b4c01d49aab07f3fe3dedd5835491b94ef60906b5b62c7e2f5031f0efacda86c42e677495b9f7ce938dd89b5b7dd9fc1b5af9f9ddd2"
+                  "bytes": "0daa93772e6f4f64c64dd079a4e9d8066825339557a21b2d6b22a71c02dd6bd1a9bcec99d817a326c41407e063c366a70e97322e006aad400914f7d97247220505da6932e80798b9caa91a5fa517cbf60ba2093b1be79297cf18a8192f85c7da"
                 },
                 {
                   "vec": []
@@ -213,9 +222,36 @@
               "val": {
                 "vec": [
                   {
-                    "bytes": "026f296cbde214996e04ddd28bbccb4d591445d8867d67e3864c2bffe46d22b2ab50f4ebce7c45c605aa5b4c01d49aab07f3fe3dedd5835491b94ef60906b5b62c7e2f5031f0efacda86c42e677495b9f7ce938dd89b5b7dd9fc1b5af9f9ddd2"
+                    "bytes": "0daa93772e6f4f64c64dd079a4e9d8066825339557a21b2d6b22a71c02dd6bd1a9bcec99d817a326c41407e063c366a70e97322e006aad400914f7d97247220505da6932e80798b9caa91a5fa517cbf60ba2093b1be79297cf18a8192f85c7da"
                   }
                 ]
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 11301899
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "Caderno"
+                  },
+                  {
+                    "bytes": "1717171717171717171717171717171717171717171717171717171717171717"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "u32": 1
               }
             }
           },
@@ -333,7 +369,23 @@
                   },
                   {
                     "key": {
+                      "symbol": "fim_tempo"
+                    },
+                    "val": {
+                      "u64": "0"
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "limiar"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "limite_secao"
                     },
                     "val": {
                       "u32": 0
@@ -382,6 +434,14 @@
                     },
                     "val": {
                       "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "rodada"
+                    },
+                    "val": {
+                      "u64": "0"
                     }
                   },
                   {

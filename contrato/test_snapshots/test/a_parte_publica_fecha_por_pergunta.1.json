@@ -121,6 +121,15 @@
                 },
                 {
                   "u32": 1
+                },
+                {
+                  "u32": 0
+                },
+                {
+                  "u64": "0"
+                },
+                {
+                  "u64": "0"
                 }
               ]
             }
@@ -288,10 +297,26 @@
                   },
                   {
                     "key": {
+                      "symbol": "fim_tempo"
+                    },
+                    "val": {
+                      "u64": "0"
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "limiar"
                     },
                     "val": {
                       "u32": 3
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "limite_secao"
+                    },
+                    "val": {
+                      "u32": 0
                     }
                   },
                   {
@@ -393,6 +418,14 @@
                     },
                     "val": {
                       "bytes": "eb551d0cd4c4b2d30b30cccaba45b26dd1ee0fb50e6c6a29ce21065ef60d3bd3"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "rodada"
+                    },
+                    "val": {
+                      "u64": "0"
                     }
                   },
                   {

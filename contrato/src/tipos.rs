@@ -106,6 +106,21 @@ pub enum Erro {
     /// Numa votação aberta não há lista: o caminho de Merkle tem de vir vazio,
     /// e a seção quem decide é o contrato.
     VotacaoAberta = 33,
+    /// A rodada da fechadura de tempo não é a que `fim_tempo` determina. É o
+    /// portão que impede cifrar para uma rodada no passado — que abriria na
+    /// hora — ou longe no futuro, que nunca abriria. Ver SPEC INV-22.
+    RodadaNaoFecha = 34,
+    /// A rodada da fechadura ainda não venceu: a chave que decifra as cédulas
+    /// não existe no mundo. Recusar aqui é o que torna INV-18 incondicional.
+    RelogioAindaNaoAbriu = 35,
+    /// A lista de compromissos apresentada não re-encadeia no que as cédulas
+    /// escreveram. É omissão ou invenção — ver SPEC INV-20.
+    CadeiaNaoFecha = 36,
+    /// A apuração apresentada abre **menos** cédulas que a já guardada. Só um
+    /// conjunto estritamente maior substitui — ver SPEC INV-21.
+    NaoMelhora = 37,
+    /// O criptograma não tem 160 bytes por opção confidencial.
+    CriptogramaMalFormado = 38,
 }
 
 #[contracttype]
@@ -158,6 +173,20 @@ pub enum Chave {
     /// tamanho, então o footprint declarado continua valendo quando várias
     /// pessoas comparecem no mesmo instante.
     Caderno(BytesN<32>),
+    /// **A cadeia de compromissos da seção**: `(sha256(anterior ‖
+    /// compromissos), quantas cédulas)`, atualizada por cada cédula anônima.
+    ///
+    /// Trinta e seis bytes que **não crescem** — ao contrário de `Anel`, que
+    /// cresce 96 B por pessoa e produziu a §11-D. É ela que prova, na apuração,
+    /// que a lista apresentada é exatamente o conjunto de cédulas daquela
+    /// seção: omitir uma muda o encadeamento, inventar uma também.
+    Cadeia(BytesN<32>, u32),
+    /// `(quantas cédulas abriram, totais confidenciais)` daquela seção. Só é
+    /// substituído por uma apuração que abra **mais** cédulas (INV-21).
+    ResultadoSecao(BytesN<32>, u32),
+    /// Quantas seções já têm resultado. Quando bate com `secoes`, o placar
+    /// existe.
+    SecoesApuradas(BytesN<32>),
     /// Uma imagem de chave já usada. **Não é um endereço**: é `I = x·Hp`, que
     /// identifica a pessoa dentro desta proposta e em nenhuma outra.
     ImagemUsada(BytesN<32>, BytesN<32>),
@@ -205,6 +234,18 @@ pub struct Proposta {
     pub abre_em: u32,
     /// Sequência de ledger a partir da qual não se vota mais.
     pub fecha_em: u32,
+    /// O mesmo fechamento, em **tempo** (segundos unix).
+    ///
+    /// `fecha_em` é sequência de ledger e a fechadura de tempo precisa de
+    /// relógio: a rodada da baliza vence num instante, não num ledger. Então a
+    /// proposta carrega os dois, e a apuração exige **os dois** portões — a
+    /// sequência passou e a rodada venceu.
+    pub fim_tempo: u64,
+    /// A rodada da baliza que destranca as cédulas. Determinada por
+    /// `fim_tempo`, não escolhida: o contrato recusa divergência (INV-22).
+    ///
+    /// `0` é proposta sem fechadura — a da mesa, que continua existindo.
+    pub rodada: u64,
     /// **O caderno e a urna, separados.**
     ///
     /// Com `anel = true` a proposta tem duas fases: até `abre_em` as pessoas

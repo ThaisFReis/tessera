@@ -144,6 +144,8 @@ fn montar_janela(
         &false,
         &1u32,
         &0u32,
+        &0u64,
+        &0u64,
     );
 
     let h = ponto::de_hex(&{
@@ -926,6 +928,8 @@ fn a_janela_precisa_ter_duracao() {
             &false,
             &1u32,
             &0u32,
+            &0u64,
+            &0u64,
         ),
         Err(Ok(Erro::PrazoNoPassado))
     );
@@ -1011,7 +1015,9 @@ fn abrir_recusa_configuracao_invalida() {
             &1000u32,
             &false,
             &1u32,
-            &0u32
+            &0u32,
+            &0u64,
+            &0u64,
         ),
         Err(Ok(Erro::OpcoesForaDaFaixa))
     );
@@ -1027,7 +1033,9 @@ fn abrir_recusa_configuracao_invalida() {
             &1000u32,
             &false,
             &1u32,
-            &0u32
+            &0u32,
+            &0u64,
+            &0u64,
         ),
         Err(Ok(Erro::OpcoesForaDaFaixa))
     );
@@ -1043,7 +1051,9 @@ fn abrir_recusa_configuracao_invalida() {
             &1000u32,
             &false,
             &1u32,
-            &0u32
+            &0u32,
+            &0u64,
+            &0u64,
         ),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
@@ -1061,7 +1071,9 @@ fn abrir_recusa_configuracao_invalida() {
             &1000u32,
             &false,
             &1u32,
-            &0u32
+            &0u32,
+            &0u64,
+            &0u64,
         ),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
@@ -1080,7 +1092,9 @@ fn abrir_recusa_configuracao_invalida() {
             &1000u32,
             &false,
             &1u32,
-            &0u32
+            &0u32,
+            &0u64,
+            &0u64,
         ),
         Err(Ok(Erro::PerguntasForaDaFaixa))
     );
@@ -1098,22 +1112,30 @@ fn abrir_recusa_configuracao_invalida() {
             &1000u32,
             &false,
             &1u32,
-            &0u32
+            &0u32,
+            &0u64,
+            &0u64,
         )
         .is_ok());
 
     assert_eq!(
-        cliente
-            .try_abrir(&gov, &id, &ok, &raiz, &mesa, &4u32, &0u32, &1000u32, &false, &1u32, &0u32),
+        cliente.try_abrir(
+            &gov, &id, &ok, &raiz, &mesa, &4u32, &0u32, &1000u32, &false, &1u32, &0u32, &0u64,
+            &0u64,
+        ),
         Err(Ok(Erro::LimiarInvalido))
     );
     assert_eq!(
-        cliente
-            .try_abrir(&gov, &id, &ok, &raiz, &mesa, &0u32, &0u32, &1000u32, &false, &1u32, &0u32),
+        cliente.try_abrir(
+            &gov, &id, &ok, &raiz, &mesa, &0u32, &0u32, &1000u32, &false, &1u32, &0u32, &0u64,
+            &0u64,
+        ),
         Err(Ok(Erro::LimiarInvalido))
     );
     assert_eq!(
-        cliente.try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &5u32, &false, &1u32, &0u32),
+        cliente.try_abrir(
+            &gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &5u32, &false, &1u32, &0u32, &0u64, &0u64,
+        ),
         Err(Ok(Erro::PrazoNoPassado))
     );
 
@@ -1123,17 +1145,20 @@ fn abrir_recusa_configuracao_invalida() {
     repetida.push_back(m);
     assert_eq!(
         cliente.try_abrir(
-            &gov, &id, &ok, &raiz, &repetida, &2u32, &0u32, &1000u32, &false, &1u32, &0u32
+            &gov, &id, &ok, &raiz, &repetida, &2u32, &0u32, &1000u32, &false, &1u32, &0u32, &0u64,
+            &0u64,
         ),
         Err(Ok(Erro::MembroRepetido))
     );
 
     cliente.abrir(
-        &gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32, &0u32,
+        &gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32, &0u32, &0u64, &0u64,
     );
     assert_eq!(
-        cliente
-            .try_abrir(&gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32, &0u32),
+        cliente.try_abrir(
+            &gov, &id, &ok, &raiz, &mesa, &2u32, &0u32, &1000u32, &false, &1u32, &0u32, &0u64,
+            &0u64,
+        ),
         Err(Ok(Erro::PropostaJaExiste))
     );
 }
@@ -1749,6 +1774,8 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
         &true,
         &1u32,
         &0u32,
+        &0u64,
+        &0u64,
     );
 
     let g = pedersen::gerador();
@@ -1901,14 +1928,38 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
 
     for i in 0..COMPARECERAM {
         let (a, img, c0, z, cs, pr, psm, esc) = cedula(i, (i % 2) as u32);
-        cliente.votar_anonimo(&proposta, &0u32, &a, &img, &c0, &z, &cs, &pr, &psm, &esc);
+        cliente.votar_anonimo(
+            &proposta,
+            &0u32,
+            &a,
+            &img,
+            &c0,
+            &z,
+            &cs,
+            &pr,
+            &psm,
+            &esc,
+            &Bytes::new(&env),
+        );
     }
 
     // A mesma pessoa de novo: a imagem colide, e o contrato recusa **sem saber
     // de quem é**.
     let (a, img, c0, z, cs, pr, psm, esc) = cedula(3, 1);
     assert_eq!(
-        cliente.try_votar_anonimo(&proposta, &0u32, &a, &img, &c0, &z, &cs, &pr, &psm, &esc),
+        cliente.try_votar_anonimo(
+            &proposta,
+            &0u32,
+            &a,
+            &img,
+            &c0,
+            &z,
+            &cs,
+            &pr,
+            &psm,
+            &esc,
+            &Bytes::new(&env),
+        ),
         Err(Ok(Erro::ImagemJaUsada))
     );
 
@@ -2013,6 +2064,8 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
         &true,
         &1u32,
         &0u32,
+        &0u64,
+        &0u64,
     );
 
     let g = pedersen::gerador();
@@ -2147,6 +2200,7 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
         &provas_sdk,
         &soma_sdk,
         &esc_sdk,
+        &Bytes::new(&env),
     );
 
     // A pergunta pública conta em claro; a sigilosa só soma no acumulador.
@@ -2233,6 +2287,8 @@ fn ate_quantas_pessoas_cabe_um_anel() {
             &true,
             &1u32,
             &0u32,
+            &0u64,
+            &0u64,
         );
 
         let g = pedersen::gerador();
@@ -2322,6 +2378,7 @@ fn ate_quantas_pessoas_cabe_um_anel() {
                 &provas,
                 &provas_soma,
                 &escolhas,
+                &Bytes::new(&env),
             );
         });
 
@@ -2426,6 +2483,8 @@ fn trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez() {
         &true,
         &SECOES,
         &0u32,
+        &0u64,
+        &0u64,
     );
 
     let g = pedersen::gerador();
@@ -2565,7 +2624,19 @@ fn trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez() {
     for i in 0..N {
         let (sec, a, img, c0, z, cs, pr, psm, esc) = cedula(i, (i % 2) as u32);
         let c = cpu(&env, || {
-            cliente.votar_anonimo(&proposta, &sec, &a, &img, &c0, &z, &cs, &pr, &psm, &esc);
+            cliente.votar_anonimo(
+                &proposta,
+                &sec,
+                &a,
+                &img,
+                &c0,
+                &z,
+                &cs,
+                &pr,
+                &psm,
+                &esc,
+                &Bytes::new(&env),
+            );
         });
         if i == 0 {
             custo_cedula = c;
@@ -2603,6 +2674,7 @@ fn trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez() {
             &pr,
             &psm,
             &esc,
+            &Bytes::new(&env),
         ),
         Err(Ok(Erro::AnelInvalido)),
         "uma cédula migrou de seção, e o anel de uma seção não prova nada na outra"
@@ -2661,6 +2733,8 @@ fn na_votacao_aberta_qualquer_carteira_comparece_e_a_secao_vem_da_chegada() {
         &true,
         &SECOES,
         &0u32,
+        &0u64,
+        &0u64,
     );
 
     let g = pedersen::gerador();
@@ -2769,6 +2843,8 @@ fn a_votacao_fechada_nao_virou_aberta() {
         &true,
         &1u32,
         &0u32,
+        &0u64,
+        &0u64,
     );
 
     let g = pedersen::gerador();
@@ -2831,6 +2907,8 @@ fn assembleia_sem_mesa_abre_e_nao_apura() {
         &true,
         &1u32,
         &0u32,
+        &0u64,
+        &0u64,
     );
     assert_eq!(cliente.proposta(&proposta).unwrap().mesa.len(), 0);
 
@@ -2851,6 +2929,8 @@ fn assembleia_sem_mesa_abre_e_nao_apura() {
                 &true,
                 &1u32,
                 &0u32,
+                &0u64,
+                &0u64,
             ),
             Err(Ok(Erro::LimiarInvalido)),
             "mesa e limiar têm de concordar: {} membros, limiar {}",
@@ -2936,6 +3016,8 @@ fn a_secao_enche_e_a_proxima_abre() {
         &true,
         &1u32,
         &LIMITE,
+        &0u64,
+        &0u64,
     );
     // Começa com uma seção. Nenhuma outra foi criada à toa.
     assert_eq!(cliente.secoes(&proposta), 1);
@@ -3002,8 +3084,675 @@ fn limite_por_secao_nao_vale_na_fechada() {
             &true,
             &1u32,
             &5u32,
+            &0u64,
+            &0u64,
         ),
         Err(Ok(Erro::SecaoInvalida)),
         "limite por seção numa votação com lista devia ser recusado"
+    );
+}
+
+// =====================================================================
+// A fechadura de tempo (T-018). SPEC INV-18 a INV-22 e INV-25.
+//
+// O criptograma é **opaco para o contrato**: ele confere a forma, carrega no
+// evento, e nada mais — o host não tem pareamento com saída de valor, então
+// decifrar aqui é impossível e desnecessário. Quem recusa um total que mente é
+// o compromisso de Pedersen. Por isso estes testes passam bytes quaisquer no
+// lugar do criptograma: o ciclo de cifra e decifra vive em
+// `core::relogio`, e a rodada ponta a ponta é T-021.
+// =====================================================================
+
+/// Instante do fechamento e a rodada que ele determina, do mesmo módulo que o
+/// cliente usa para cifrar.
+const T0: u64 = 1_791_000_000;
+const FIM_TEMPO: u64 = T0 + 10_000;
+const ABRE: u32 = 4_989_990;
+const FECHA: u32 = 4_990_190;
+
+fn rodada_do_fim() -> u64 {
+    tessera_core::relogio::rodada(FIM_TEMPO).unwrap()
+}
+
+struct Urna {
+    env: Env,
+    id: Address,
+    cliente: TesseraClient<'static>,
+    proposta: BytesN<32>,
+    /// Por cédula, na ordem em que chegaram: os dois compromissos e os dois
+    /// fatores. É o que quem apura reconstrói decifrando os criptogramas.
+    cedulas: Vetor<(Vec<Bls12381G1Affine>, Vetor<ArkFr>, u32)>,
+}
+
+/// Uma urna em anel com fechadura de tempo, com `escolhas.len()` cédulas já
+/// depositadas e a janela ainda aberta.
+fn urna_com_fechadura(escolhas: &[u32]) -> Urna {
+    use tessera_core::anel;
+
+    let n = escolhas.len();
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(4_989_900);
+    env.ledger().set_timestamp(T0);
+    let id = env.register(Tessera, ());
+    let cliente = TesseraClient::new(&env, &id);
+
+    let aptos: Vetor<Address> = (0..n).map(|_| Address::generate(&env)).collect();
+    let folhas: Vetor<merkle::Apto> = aptos
+        .iter()
+        .map(|a| merkle::Apto {
+            endereco: bytes_de(&a.clone().to_xdr(&env)),
+            peso: 1,
+            secao: 0,
+        })
+        .collect();
+    let arvore = merkle::Arvore::montar(&folhas).unwrap();
+
+    let mut perg = Vec::new(&env);
+    perg.push_back(Pergunta {
+        opcoes: 2,
+        confidencial: true,
+    });
+
+    let proposta: BytesN<32> = BytesN::from_array(&env, &[7u8; 32]);
+    // Sem mesa: `limiar = 0` e mesa vazia. É a assembleia que não tem quem
+    // abra as cédulas — e com fechadura de tempo ela passa a ter resultado.
+    cliente.abrir(
+        &Address::generate(&env),
+        &proposta,
+        &perg,
+        &BytesN::from_array(&env, &arvore.raiz()),
+        &Vec::new(&env),
+        &0u32,
+        &ABRE,
+        &FECHA,
+        &true,
+        &1u32,
+        &0u32,
+        &FIM_TEMPO,
+        &rodada_do_fim(),
+    );
+
+    let g = pedersen::gerador();
+    let h = ponto::desserializar(&cliente.gerador_h().to_array()).unwrap();
+    let hp = ponto::desserializar(&cripto::calcular_hp(&env, &proposta).to_array()).unwrap();
+
+    let xs: Vetor<ArkFr> = (0..n).map(|_| pedersen::acaso_fr().unwrap()).collect();
+    let mut anel_ark: Vetor<ArkG1> = Vetor::new();
+    for (i, x) in xs.iter().enumerate() {
+        let pk = anel::chave_publica(&g, x);
+        let p = arvore.caminho(i).unwrap();
+        let mut caminho = Vec::new(&env);
+        for irmao in &p.irmaos {
+            caminho.push_back(BytesN::from_array(&env, irmao));
+        }
+        cliente.comparecer(
+            &proposta,
+            &aptos[i],
+            &g1(&env, &pk),
+            &caminho,
+            &p.indice,
+            &0u32,
+        );
+        anel_ark.push(pk);
+    }
+    let mut anel_sdk: Vec<Bls12381G1Affine> = Vec::new(&env);
+    for p in &anel_ark {
+        anel_sdk.push_back(g1(&env, p));
+    }
+
+    env.ledger().set_sequence_number(ABRE + 10);
+
+    let mut cedulas = Vetor::new();
+    for (i, escolha) in escolhas.iter().copied().enumerate() {
+        let img = anel::imagem(&hp, &xs[i]);
+        let ident: Vetor<u8> = ponto::serializar(&img).to_vec();
+        let rs: Vetor<ArkFr> = (0..2).map(|_| pedersen::acaso_fr().unwrap()).collect();
+        let cs: Vetor<ArkG1> = (0..2)
+            .map(|j| {
+                let v = if j == escolha { 1u64 } else { 0 };
+                pedersen::comprometer(&g, &h, &pedersen::escalar(v), &rs[j as usize])
+            })
+            .collect();
+        let ctx_de = |opcao: u32| {
+            let mut v: Vetor<u8> = proposta.to_array().to_vec();
+            v.extend(ident.iter().copied());
+            v.extend(0u32.to_be_bytes());
+            v.extend(opcao.to_be_bytes());
+            v
+        };
+        let mut compromissos = Vec::new(&env);
+        let mut provas = Vec::new(&env);
+        for j in 0..2u32 {
+            let v = if j == escolha { 1u64 } else { 0 };
+            let pr = cds::provar(&ctx_de(j), &g, &h, &cs[j as usize], v, &rs[j as usize]).unwrap();
+            compromissos.push_back(g1(&env, &cs[j as usize]));
+            provas.push_back(ProvaCds {
+                a0: g1(&env, &pr.a0),
+                a1: g1(&env, &pr.a1),
+                e0: escalar(&env, &pr.e0),
+                z0: escalar(&env, &pr.z0),
+                e1: escalar(&env, &pr.e1),
+                z1: escalar(&env, &pr.z1),
+            });
+        }
+        let rho = rs.iter().fold(ArkFr::from(0u64), |a, r| a + r);
+        let d = soma::alvo(&g, &cs, 1);
+        let ps = soma::provar(&ctx_de(u32::MAX), &h, &d, &rho).unwrap();
+        let mut provas_soma = Vec::new(&env);
+        provas_soma.push_back(ProvaSoma {
+            a: g1(&env, &ps.a),
+            z: escalar(&env, &ps.z),
+        });
+        let escolhas_pub: Vec<u32> = Vec::new(&env);
+        let msg = cripto::mensagem_cedula(&env, &proposta, &compromissos, &escolhas_pub);
+        let s = anel::assinar(&bytes_de(&msg), &g, &hp, &anel_ark, i, &xs[i]).unwrap();
+        let mut z = Vec::new(&env);
+        for zi in &s.z {
+            z.push_back(escalar(&env, zi));
+        }
+        cliente.votar_anonimo(
+            &proposta,
+            &0u32,
+            &anel_sdk,
+            &g1(&env, &s.imagem),
+            &escalar(&env, &s.c0),
+            &z,
+            &compromissos,
+            &provas,
+            &provas_soma,
+            &escolhas_pub,
+            &Bytes::from_array(&env, &[9u8; 320]),
+        );
+        cedulas.push((compromissos, rs, escolha));
+    }
+
+    Urna {
+        env,
+        id,
+        cliente,
+        proposta,
+        cedulas,
+    }
+}
+
+impl Urna {
+    /// A janela fecha e a rodada vence: é quando o placar pode existir.
+    fn fim(&self) {
+        self.env.ledger().set_sequence_number(FECHA);
+        self.env.ledger().set_timestamp(FIM_TEMPO);
+    }
+
+    /// A lista ordenada de todos os compromissos da seção, achatada.
+    fn lista(&self) -> Vec<Bls12381G1Affine> {
+        let mut v = Vec::new(&self.env);
+        for (cs, _, _) in &self.cedulas {
+            for c in cs.iter() {
+                v.push_back(c);
+            }
+        }
+        v
+    }
+
+    /// `(abertas, totais, aberturas)` para um conjunto escolhido de cédulas.
+    fn apuracao(&self, quais: &[bool]) -> (Vec<bool>, Vec<u32>, Vec<Bls12381Fr>) {
+        let mut abertas = Vec::new(&self.env);
+        let mut totais = [0u32; 2];
+        let mut somas = [ArkFr::from(0u64); 2];
+        for (i, (_, rs, escolha)) in self.cedulas.iter().enumerate() {
+            abertas.push_back(quais[i]);
+            if quais[i] {
+                totais[*escolha as usize] += 1;
+                for j in 0..2 {
+                    somas[j] += rs[j];
+                }
+            }
+        }
+        let mut t = Vec::new(&self.env);
+        let mut a = Vec::new(&self.env);
+        for j in 0..2 {
+            t.push_back(totais[j]);
+            a.push_back(escalar(&self.env, &somas[j]));
+        }
+        (abertas, t, a)
+    }
+}
+
+/// A aritmética da rodada é repetida no contrato para não arrastar o `core`
+/// para dentro do Wasm. Repetir é divergir, então aqui as duas se cruzam: o
+/// contrato aceita exatamente a rodada que o `core` calcula, e recusa as
+/// vizinhas.
+#[test]
+fn a_rodada_do_contrato_bate_com_a_do_core() {
+    let u = urna_com_fechadura(&[0]);
+    let certa = rodada_do_fim();
+    for errada in [certa - 1, certa + 1] {
+        let outra: BytesN<32> = BytesN::from_array(&u.env, &[1u8; 32]);
+        let mut perg = Vec::new(&u.env);
+        perg.push_back(Pergunta {
+            opcoes: 2,
+            confidencial: true,
+        });
+        assert_eq!(
+            u.cliente.try_abrir(
+                &Address::generate(&u.env),
+                &outra,
+                &perg,
+                &BytesN::from_array(&u.env, &[0u8; 32]),
+                &Vec::new(&u.env),
+                &0u32,
+                &ABRE,
+                &FECHA,
+                &true,
+                &1u32,
+                &0u32,
+                &FIM_TEMPO,
+                &errada,
+            ),
+            Err(Ok(Erro::RodadaNaoFecha)),
+            "o contrato aceitou a rodada {errada}, e o core diz {certa}"
+        );
+    }
+    assert_eq!(
+        tessera_core::relogio::TAMANHO as u32,
+        crate::TAMANHO_CRIPTOGRAMA,
+        "o tamanho do criptograma divergiu entre core e contrato"
+    );
+}
+
+/// **INV-22.** A rodada vem do fechamento, não da vontade de quem abre. Sem
+/// isto, quem abre cifraria para uma rodada já publicada e as cédulas abririam
+/// na hora de serem depositadas.
+#[test]
+fn a_rodada_vem_do_fechamento_e_nao_da_vontade_de_quem_abre() {
+    let u = urna_com_fechadura(&[0]);
+    let mut perg = Vec::new(&u.env);
+    perg.push_back(Pergunta {
+        opcoes: 2,
+        confidencial: true,
+    });
+    let abrir_com = |fim: u64, rodada: u64| {
+        u.cliente.try_abrir(
+            &Address::generate(&u.env),
+            &BytesN::from_array(&u.env, &[2u8; 32]),
+            &perg,
+            &BytesN::from_array(&u.env, &[0u8; 32]),
+            &Vec::new(&u.env),
+            &0u32,
+            &ABRE,
+            &FECHA,
+            &true,
+            &1u32,
+            &0u32,
+            &fim,
+            &rodada,
+        )
+    };
+    // Fechamento no passado: o relógio é do ledger, não de quem abre.
+    let passado = T0 - 1;
+    assert_eq!(
+        abrir_com(passado, tessera_core::relogio::rodada(passado).unwrap()),
+        Err(Ok(Erro::PrazoNoPassado))
+    );
+    // E a rodada da gênese, que já está publicada há anos.
+    assert_eq!(abrir_com(FIM_TEMPO, 1), Err(Ok(Erro::RodadaNaoFecha)));
+}
+
+/// **INV-18.** Nenhum resultado, nem parcial, antes do fechamento — e o portão
+/// é duplo: a sequência de ledger passou **e** a rodada venceu. Os dois são o
+/// relógio do ledger, sem suposição nenhuma sobre a baliza.
+#[test]
+fn antes_do_fechamento_nao_existe_placar() {
+    let u = urna_com_fechadura(&[0, 1, 0]);
+    let (abertas, totais, aberturas) = u.apuracao(&[true, true, true]);
+    let quem = Address::generate(&u.env);
+
+    assert_eq!(
+        u.cliente.try_apurar_secao(
+            &u.proposta,
+            &quem,
+            &0u32,
+            &u.lista(),
+            &abertas,
+            &totais,
+            &aberturas
+        ),
+        Err(Ok(Erro::VotacaoAindaAberta)),
+        "apurou com a janela aberta"
+    );
+
+    // A sequência fechou, mas a rodada ainda não venceu: a chave que decifra as
+    // cédulas não existe no mundo, e o contrato não publica placar que ninguém
+    // poderia ter calculado honestamente.
+    u.env.ledger().set_sequence_number(FECHA);
+    u.env.ledger().set_timestamp(FIM_TEMPO - 1);
+    assert_eq!(
+        u.cliente.try_apurar_secao(
+            &u.proposta,
+            &quem,
+            &0u32,
+            &u.lista(),
+            &abertas,
+            &totais,
+            &aberturas
+        ),
+        Err(Ok(Erro::RelogioAindaNaoAbriu))
+    );
+    assert_eq!(u.cliente.resultado_secao(&u.proposta, &0u32), None);
+
+    u.fim();
+    assert_eq!(
+        u.cliente.apurar_secao(
+            &u.proposta,
+            &quem,
+            &0u32,
+            &u.lista(),
+            &abertas,
+            &totais,
+            &aberturas
+        ),
+        3
+    );
+}
+
+/// **INV-20.** A lista apresentada é o conjunto real de cédulas daquela seção,
+/// e são duas travas em série:
+///
+/// - **omitir é inexprimível.** A cadeia guarda quantas cédulas chegaram, e a
+///   aridade da chamada está presa a esse número. Uma lista curta nem chega à
+///   cadeia;
+/// - **trocar e reordenar a cadeia pega**, porque ela encadeia na ordem em que
+///   as cédulas chegaram.
+#[test]
+fn a_cadeia_recusa_omissao_e_invencao() {
+    let u = urna_com_fechadura(&[0, 1, 0]);
+    u.fim();
+    let quem = Address::generate(&u.env);
+    let (abertas, totais, aberturas) = u.apuracao(&[true, true, true]);
+
+    // Omissão: a lista sai com duas cédulas em vez de três, e a contagem
+    // guardada a recusa antes de qualquer hash.
+    let mut curta = Vec::new(&u.env);
+    for (i, c) in u.lista().iter().enumerate() {
+        if i < 4 {
+            curta.push_back(c);
+        }
+    }
+    let mut duas = Vec::new(&u.env);
+    duas.push_back(true);
+    duas.push_back(true);
+    assert_eq!(
+        u.cliente.try_apurar_secao(
+            &u.proposta,
+            &quem,
+            &0u32,
+            &curta,
+            &duas,
+            &totais,
+            &aberturas
+        ),
+        Err(Ok(Erro::ArgumentoMalFormado)),
+        "contou uma seção com uma cédula omitida"
+    );
+
+    // Invenção: um compromisso trocado por outro ponto válido.
+    let mut falsa = u.lista();
+    falsa.set(0, u.lista().get(2).unwrap());
+    assert_eq!(
+        u.cliente.try_apurar_secao(
+            &u.proposta,
+            &quem,
+            &0u32,
+            &falsa,
+            &abertas,
+            &totais,
+            &aberturas
+        ),
+        Err(Ok(Erro::CadeiaNaoFecha)),
+        "aceitou um compromisso que nenhuma cédula escreveu"
+    );
+
+    // Reordenação: as mesmas cédulas, em outra ordem. A soma dos compromissos
+    // não mudaria — é por isso que a cadeia precisa existir, e não bastaria
+    // conferir o acumulado.
+    let l = u.lista();
+    let mut trocada = l.clone();
+    trocada.set(0, l.get(2).unwrap());
+    trocada.set(1, l.get(3).unwrap());
+    trocada.set(2, l.get(0).unwrap());
+    trocada.set(3, l.get(1).unwrap());
+    assert_eq!(
+        u.cliente.try_apurar_secao(
+            &u.proposta,
+            &quem,
+            &0u32,
+            &trocada,
+            &abertas,
+            &totais,
+            &aberturas
+        ),
+        Err(Ok(Erro::CadeiaNaoFecha)),
+        "aceitou a lista fora da ordem em que as cédulas chegaram"
+    );
+}
+
+/// **INV-19.** Uma cédula que não abre perde o próprio voto e não impede a
+/// apuração das outras. É o que conserta o defeito do `Acum`: a equação da soma
+/// só fechava com **todas** abertas, e uma cédula sabotada derrubava o placar
+/// inteiro.
+#[test]
+fn a_cedula_que_nao_abre_perde_so_o_proprio_voto() {
+    let u = urna_com_fechadura(&[0, 1, 1]);
+    u.fim();
+    let quem = Address::generate(&u.env);
+
+    // A primeira cédula não abre. As outras duas apuram.
+    let (abertas, totais, aberturas) = u.apuracao(&[false, true, true]);
+    assert_eq!(
+        u.cliente.apurar_secao(
+            &u.proposta,
+            &quem,
+            &0u32,
+            &u.lista(),
+            &abertas,
+            &totais,
+            &aberturas
+        ),
+        2
+    );
+    let (quantas, placar) = u.cliente.resultado_secao(&u.proposta, &0u32).unwrap();
+    assert_eq!(quantas, 2);
+    assert_eq!(placar.get(0).unwrap(), 0, "contou o voto que não abriu");
+    assert_eq!(placar.get(1).unwrap(), 2);
+}
+
+/// **INV-21.** Omitir não gruda: só um conjunto estritamente maior substitui o
+/// guardado. É isto que impede travar o placar — quem omitir uma cédula honesta
+/// é sobreposto por qualquer pessoa que a inclua, e qualquer pessoa consegue,
+/// porque a chave da rodada é pública.
+#[test]
+fn omitir_nao_gruda_e_quem_inclui_sobrepoe() {
+    let u = urna_com_fechadura(&[0, 1, 1]);
+    u.fim();
+    let malicioso = Address::generate(&u.env);
+    let qualquer = Address::generate(&u.env);
+
+    // Alguém apura de propósito sem a cédula que não lhe convém.
+    let (a1, t1, ab1) = u.apuracao(&[true, true, false]);
+    assert_eq!(
+        u.cliente
+            .apurar_secao(&u.proposta, &malicioso, &0u32, &u.lista(), &a1, &t1, &ab1),
+        2
+    );
+    assert_eq!(u.cliente.resultado_secao(&u.proposta, &0u32).unwrap().0, 2);
+
+    // Qualquer observador honesto sobrepõe incluindo-a.
+    let (a2, t2, ab2) = u.apuracao(&[true, true, true]);
+    assert_eq!(
+        u.cliente
+            .apurar_secao(&u.proposta, &qualquer, &0u32, &u.lista(), &a2, &t2, &ab2),
+        3
+    );
+    let (quantas, placar) = u.cliente.resultado_secao(&u.proposta, &0u32).unwrap();
+    assert_eq!(quantas, 3);
+    assert_eq!(placar.get(1).unwrap(), 2);
+
+    // E a apuração menor não volta a colar.
+    assert_eq!(
+        u.cliente
+            .try_apurar_secao(&u.proposta, &malicioso, &0u32, &u.lista(), &a1, &t1, &ab1),
+        Err(Ok(Erro::NaoMelhora))
+    );
+}
+
+/// **INV-25, DEC-011.** O piso de `τ` é do conjunto de anonimato — o anel —, e
+/// **não** do subconjunto que abriu. A ausência do portão aqui é deliberada:
+/// exigir `τ` cédulas abertas daria a qualquer um o poder de travar a apuração
+/// sabotando o próprio criptograma, que é a falha de liveness induzível de fora
+/// que a remoção de `votar_publico` havia fechado.
+#[test]
+fn sabotar_o_proprio_criptograma_nao_derruba_o_piso() {
+    // Seis no anel, bem acima de `TAU = 5`. Cinco sabotam o próprio
+    // criptograma; uma abre.
+    let u = urna_com_fechadura(&[0, 1, 1, 0, 1, 0]);
+    u.fim();
+    let (abertas, totais, aberturas) = u.apuracao(&[true, false, false, false, false, false]);
+    assert_eq!(
+        u.cliente.apurar_secao(
+            &u.proposta,
+            &Address::generate(&u.env),
+            &0u32,
+            &u.lista(),
+            &abertas,
+            &totais,
+            &aberturas
+        ),
+        1,
+        "uma coligação travou o placar sabotando o próprio voto"
+    );
+    assert_eq!(u.cliente.resultado_secao(&u.proposta, &0u32).unwrap().0, 1);
+}
+
+/// Um total que não abre o subconjunto apresentado é recusado na hora, como
+/// sempre foi. A solidez não mudou: a prova CDS já garantiu `v ∈ {0,1}` em cada
+/// compromisso, então a equação sobre o subconjunto força `T = Σvᵢ`.
+#[test]
+fn o_total_que_mente_sobre_o_subconjunto_e_recusado() {
+    let u = urna_com_fechadura(&[0, 1, 1]);
+    u.fim();
+    let (abertas, _, aberturas) = u.apuracao(&[true, true, true]);
+    let mut mentira = Vec::new(&u.env);
+    mentira.push_back(3u32);
+    mentira.push_back(0u32);
+    assert_eq!(
+        u.cliente.try_apurar_secao(
+            &u.proposta,
+            &Address::generate(&u.env),
+            &0u32,
+            &u.lista(),
+            &abertas,
+            &mentira,
+            &aberturas
+        ),
+        Err(Ok(Erro::AberturaNaoFecha))
+    );
+}
+
+/// O criptograma tem a forma declarada em SPEC §5, ou a cédula não entra. O
+/// contrato não o lê — não pode —, mas a forma errada significa que ninguém vai
+/// conseguir abrir aquela cédula, e é melhor recusar agora que no fim.
+#[test]
+fn o_criptograma_tem_de_ter_a_forma_declarada() {
+    let u = urna_com_fechadura(&[0]);
+    let _ = &u.id;
+    // A segunda cédula da mesma urna, com criptograma curto, não entra. Reusar
+    // o anel e a imagem da primeira daria `ImagemJaUsada` antes da forma, então
+    // o que se confere aqui é a ordem: a forma é conferida com as aridades, no
+    // começo.
+    let (cs, _, _) = &u.cedulas[0];
+    assert_eq!(
+        u.cliente.try_votar_anonimo(
+            &u.proposta,
+            &0u32,
+            &Vec::new(&u.env),
+            &cs.get(0).unwrap(),
+            &escalar(&u.env, &ArkFr::from(1u64)),
+            &Vec::new(&u.env),
+            cs,
+            &Vec::new(&u.env),
+            &Vec::new(&u.env),
+            &Vec::new(&u.env),
+            &Bytes::from_array(&u.env, &[0u8; 100]),
+        ),
+        Err(Ok(Erro::ArgumentoMalFormado)),
+        "a aridade vem antes; a forma do criptograma vem depois dela"
+    );
+}
+
+/// **O custo da apuração por seção, medido.** Ela é O(n) em cédulas: `n`
+/// hashes e `n` somas em G1, mais **um** MSM de dois termos por opção.
+///
+/// Medido: **12.550.031 para 6 cédulas e 14.066.366 para 12** — ou seja
+/// 11.033.699 fixos mais **252.722 por cédula**. Uma seção de 30 custaria
+/// 18,6 milhões, 4,6% do teto de 400.000.000.
+///
+/// É três ordens de grandeza abaixo do voto, que gasta 10.822.850 por membro do
+/// anel. Então a apuração **não** é o que limita o tamanho da seção: quem limita
+/// continua sendo a verificação do anel, e isso era o que precisava ser medido
+/// antes de prometer apuração automática. Assere teto e inclinação: uma
+/// regressão quebra o build em vez de aparecer no dia da votação.
+#[test]
+fn orcamento_da_apuracao_por_secao() {
+    let seis = urna_com_fechadura(&[0, 1, 1, 0, 1, 0]);
+    seis.fim();
+    let (a6, t6, ab6) = seis.apuracao(&[true; 6]);
+    let l6 = seis.lista();
+    let c6 = cpu(&seis.env, || {
+        seis.cliente.apurar_secao(
+            &seis.proposta,
+            &Address::generate(&seis.env),
+            &0u32,
+            &l6,
+            &a6,
+            &t6,
+            &ab6,
+        )
+    });
+
+    let doze = urna_com_fechadura(&[0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0]);
+    doze.fim();
+    let (a12, t12, ab12) = doze.apuracao(&[true; 12]);
+    let l12 = doze.lista();
+    let c12 = cpu(&doze.env, || {
+        doze.cliente.apurar_secao(
+            &doze.proposta,
+            &Address::generate(&doze.env),
+            &0u32,
+            &l12,
+            &a12,
+            &t12,
+            &ab12,
+        )
+    });
+
+    std::println!("apurar_secao: 6 cédulas {c6}, 12 cédulas {c12}");
+    // Teto generoso de propósito: o que o teste prende é a **ordem de
+    // grandeza** e o crescimento linear, não um número exato que mudaria com
+    // qualquer mexida no host. O teto de uma transação é 400.000.000.
+    assert!(
+        c12 < 100_000_000,
+        "a apuração de 12 cédulas custou {c12}, perto demais do teto"
+    );
+    // Dobrar as cédulas não dobra o custo: a parte fixa é a autorização, a
+    // leitura da proposta e o MSM. O que cresce são hashes e somas em G1.
+    assert!(
+        c12 < c6 * 2,
+        "o custo cresceu mais que linear: {c6} para 6, {c12} para 12"
+    );
+    // E a inclinação por cédula, que é o que extrapola para a seção cheia.
+    let por_cedula = (c12 - c6) / 6;
+    assert!(
+        por_cedula < 400_000,
+        "cada cédula passou a custar {por_cedula} na apuração"
     );
 }

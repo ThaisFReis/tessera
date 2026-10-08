@@ -17,13 +17,18 @@
 //! `cli`. Um crate de matemática que faz HTTP não é testável sem rede, e o
 //! portão tem de rodar offline.
 //!
-//! O `contrato` depende do `core`, então a pergunta óbvia é se pôr pareamento
-//! aqui engorda o Wasm. **Medido: não engorda nada.** `tessera.wasm` tem 37.568
-//! bytes com e sem este módulo — o contrato não o alcança, e o ligador o
-//! descarta inteiro. O contrato aliás *não poderia* usá-lo: o host só expõe
-//! `pairing_check`, sem pareamento com saída de valor, e a decifragem precisa do
-//! **valor**. Ele não precisa: quem recusa um total que mente é o compromisso de
-//! Pedersen, não a fechadura.
+//! Pôr pareamento aqui não engorda o Wasm do contrato: `tessera.wasm` tem
+//! 37.568 bytes com e sem este módulo, medido — e o motivo não é o ligador, é
+//! que `tessera-core` é **dev-dependency** do contrato, usada pelos testes para
+//! cruzar provador e verificador. O contrato aliás *não poderia* decifrar: o
+//! host só expõe `pairing_check`, sem pareamento com saída de valor, e a
+//! decifragem precisa do **valor**. Ele não precisa — quem recusa um total que
+//! mente é o compromisso de Pedersen, não a fechadura.
+//!
+//! O que o contrato precisa é só da **aritmética da rodada**, que ele repete em
+//! três linhas em vez de arrastar este crate para dentro do Wasm. Repetir é
+//! arriscado, então `contrato` cruza as duas com `core` a cada `cargo test`:
+//! `a_rodada_do_contrato_bate_com_a_do_core`.
 //!
 //! E a conferência não é opcional por construção: `decifrar` só aceita uma
 //! [`Chave`], e o único jeito de obter uma `Chave` é passar por [`conferir`].

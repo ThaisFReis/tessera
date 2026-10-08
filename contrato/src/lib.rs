@@ -83,6 +83,8 @@ impl Tessera {
         anel: bool,
         secoes: u32,
         limite_secao: u32,
+        fim_tempo: u64,
+        rodada: u64,
     ) -> Result<(), Erro> {
         governanca.require_auth();
 
@@ -135,6 +137,27 @@ impl Tessera {
         if abre_em >= fecha_em {
             return Err(Erro::PrazoNoPassado);
         }
+        // **A fechadura de tempo.** `rodada = 0` é proposta sem fechadura — a
+        // da mesa, que continua existindo. Com fechadura, dois portões:
+        //
+        // 1. a rodada é **determinada** por `fim_tempo`, não escolhida. Sem
+        //    isto, quem abre cifraria para uma rodada no passado, cuja
+        //    assinatura já está publicada — e as cédulas abririam na hora de
+        //    serem depositadas;
+        // 2. o fechamento está no futuro. O relógio é do ledger, não de quem
+        //    abre.
+        //
+        // A fórmula vem do `core`, o mesmo módulo que o cliente usa para
+        // cifrar. Se divergissem, a cédula seria cifrada para uma rodada e
+        // destrancada por outra — e o jeito de não divergir é não ter duas.
+        if rodada != 0 {
+            if fim_tempo <= env.ledger().timestamp() {
+                return Err(Erro::PrazoNoPassado);
+            }
+            if rodada_da_baliza(fim_tempo) != Some(rodada) {
+                return Err(Erro::RodadaNaoFecha);
+            }
+        }
         // Membros repetidos reduziriam o limiar efetivo sem que aparecesse.
         for (i, m) in mesa.iter().enumerate() {
             if mesa.iter().take(i).any(|o| o == m) {
@@ -176,6 +199,8 @@ impl Tessera {
             anel,
             secoes,
             limite_secao,
+            fim_tempo,
+            rodada,
         };
         if anel {
             // Um anel por seção, e cada um nasce vazio: sem esta escrita, o
@@ -442,6 +467,7 @@ impl Tessera {
         provas: Vec<ProvaCds>,
         provas_soma: Vec<ProvaSoma>,
         escolhas: Vec<u32>,
+        cripto: Bytes,
     ) -> Result<(), Erro> {
         let p = abrir_proposta(&env, &proposta)?;
         if !p.anel {
@@ -465,6 +491,20 @@ impl Tessera {
             || z.len() != anel.len()
         {
             return Err(Erro::ArgumentoMalFormado);
+        }
+        // Um criptograma de 160 bytes por opção confidencial (SPEC §5), ou
+        // nenhum quando a proposta não tem fechadura. O contrato não os lê — ele
+        // **não pode**: o host só expõe `pairing_check`, sem pareamento com
+        // saída de valor, e decifrar precisa do valor. Ele só confere a forma e
+        // os carrega no evento, e quem decifra é qualquer pessoa, depois da
+        // rodada. Quem recusa um total que mente é o compromisso de Pedersen.
+        let esperado = if p.rodada == 0 {
+            0
+        } else {
+            TAMANHO_CRIPTOGRAMA * n_conf
+        };
+        if cripto.len() != esperado {
+            return Err(Erro::CriptogramaMalFormado);
         }
 
         // O digesto do conjunto é calculado uma vez, na primeira cédula, e
@@ -536,11 +576,33 @@ impl Tessera {
         env.storage().persistent().set(&ki, &true);
         guardar_longo(&env, &ki);
 
+        // **A cadeia da seção.** Trinta e seis bytes que não crescem, e que
+        // prendem a lista de compromissos daquela seção à ordem em que as
+        // cédulas chegaram. Na apuração, re-encadear a lista apresentada é o
+        // que recusa omissão e invenção (INV-20) — e sem isso quem apura
+        // escolheria quais cédulas contar.
+        if p.rodada != 0 {
+            let kc = Chave::Cadeia(proposta.clone(), secao);
+            let (anterior, quantas) = cadeia_de(&env, &proposta, secao);
+            let mut buf = Bytes::from_array(&env, &anterior.to_array());
+            for c in compromissos.iter() {
+                buf.extend_from_array(&c.to_array());
+            }
+            let novo: BytesN<32> = env.crypto().sha256(&buf).into();
+            env.storage().persistent().set(&kc, &(novo, quantas + 1));
+            guardar_longo(&env, &kc);
+        }
+
         // O evento NÃO carrega remetente. É o que separa este evento do
         // `votar`: ali o tópico tem o endereço, aqui tem a imagem.
+        //
+        // E carrega o criptograma, que é o que torna a apuração possível sem
+        // mesa: evento não toca entrada compartilhada, então não tem o problema
+        // de rajada da §11-D, e a retenção do RPC público (7 dias, medida) é
+        // maior que qualquer janela de votação.
         env.events().publish(
             (symbol_short!("anonimo"), proposta),
-            (imagem, compromissos, escolhas),
+            (imagem, compromissos, escolhas, cripto),
         );
         Ok(())
     }
@@ -742,6 +804,164 @@ impl Tessera {
             (totais, aberturas, resultado.clone()),
         );
         Ok(Some(resultado))
+    }
+
+    /// **A apuração sem mesa.** Qualquer pessoa, depois que a janela fechou e a
+    /// rodada da baliza venceu.
+    ///
+    /// Quem apura apresenta a lista ordenada de **todos** os compromissos da
+    /// seção, um `abertas[i]` por cédula dizendo quais o criptograma abriu, e
+    /// `(totais, aberturas)` sobre as abertas. O contrato re-encadeia a lista
+    /// (INV-20), soma os compromissos marcados e confere o mesmo MSM de dois
+    /// termos de sempre — a solidez não muda, porque a prova CDS já garantiu
+    /// `v ∈ {0,1}` em cada compromisso na hora do voto, então o compromisso é
+    /// vinculante e a equação sobre o subconjunto força `T = Σvᵢ` e `R = Σrᵢ`.
+    ///
+    /// E guarda só se abrir **mais** cédulas que a apuração já guardada
+    /// (INV-21). É isso que impede travar: quem omitir uma cédula honesta é
+    /// sobreposto por qualquer pessoa que a inclua — e qualquer pessoa consegue,
+    /// porque a chave da rodada é pública. Basta um observador honesto, não que
+    /// os votantes voltem.
+    ///
+    /// **Não há portão de `τ` sobre quantas abriram, e a ausência é
+    /// deliberada** (INV-25, DEC-011). O piso de `τ` protege o conjunto de
+    /// anonimato, que é o anel, e `votar_anonimo` já o impõe lá. Exigi-lo aqui
+    /// sobre o subconjunto aberto daria a qualquer um o poder de travar a
+    /// apuração sabotando o próprio criptograma — a falha de liveness induzível
+    /// de fora que a remoção de `votar_publico` havia fechado.
+    pub fn apurar_secao(
+        env: Env,
+        proposta: BytesN<32>,
+        quem: Address,
+        secao: u32,
+        compromissos: Vec<Bls12381G1Affine>,
+        abertas: Vec<bool>,
+        totais: Vec<u32>,
+        aberturas: Vec<Bls12381Fr>,
+    ) -> Result<u32, Erro> {
+        quem.require_auth();
+        let p = abrir_proposta(&env, &proposta)?;
+        if !p.anel || p.rodada == 0 {
+            return Err(Erro::ModoErrado);
+        }
+        if secao >= quantas_secoes(&env, &proposta, &p) {
+            return Err(Erro::SecaoInvalida);
+        }
+        // **Os dois portões, e os dois são o relógio do ledger.** A sequência
+        // fechou a janela; a rodada é o instante em que a chave que decifra as
+        // cédulas passa a existir no mundo. Antes dos dois, nenhum placar — nem
+        // parcial — sai daqui (INV-18), e isso não depende de suposição nenhuma
+        // sobre a baliza.
+        if env.ledger().sequence() < p.fecha_em {
+            return Err(Erro::VotacaoAindaAberta);
+        }
+        if env.ledger().timestamp() < p.fim_tempo {
+            return Err(Erro::RelogioAindaNaoAbriu);
+        }
+
+        let (n_conf, _, _) = formato(&p);
+        let (cadeia, quantas) = cadeia_de(&env, &proposta, secao);
+        if abertas.len() != quantas
+            || compromissos.len() != quantas * n_conf
+            || totais.len() != n_conf
+            || aberturas.len() != n_conf
+        {
+            return Err(Erro::ArgumentoMalFormado);
+        }
+
+        // **Re-encadear é o que recusa omissão e invenção** (INV-20). A cadeia
+        // de 32 bytes que as cédulas escreveram prende a lista inteira, na
+        // ordem: tirar uma cédula muda o encadeamento, trocar um compromisso
+        // também. Sem isto, quem apura escolheria quais cédulas contar.
+        let mut acc = BytesN::from_array(&env, &[0u8; 32]);
+        for i in 0..quantas {
+            let mut buf = Bytes::from_array(&env, &acc.to_array());
+            for j in 0..n_conf {
+                buf.extend_from_array(&compromissos.get(i * n_conf + j).unwrap().to_array());
+            }
+            acc = env.crypto().sha256(&buf).into();
+        }
+        if acc != cadeia {
+            return Err(Erro::CadeiaNaoFecha);
+        }
+
+        // **Monotonicidade** (INV-21): só um conjunto estritamente maior
+        // substitui o guardado. É a peça que impede travar — quem omitir uma
+        // cédula honesta é sobreposto por qualquer pessoa que a inclua.
+        let mut quantas_abertas = 0u32;
+        for b in abertas.iter() {
+            if b {
+                quantas_abertas += 1;
+            }
+        }
+        let kr = Chave::ResultadoSecao(proposta.clone(), secao);
+        let antes: Option<(u32, Vec<u32>)> = env.storage().persistent().get(&kr);
+        if let Some((ja, _)) = &antes {
+            if quantas_abertas <= *ja {
+                return Err(Erro::NaoMelhora);
+            }
+        }
+
+        // E a conferência de sempre, agora sobre o subconjunto: a soma dos
+        // compromissos marcados tem de abrir em `T_j·G + R_j·H`. A solidez não
+        // muda, porque a prova CDS já garantiu `v ∈ {0,1}` em cada compromisso
+        // na hora do voto — o compromisso é vinculante, e a equação sobre o
+        // subconjunto força `T_j = Σvᵢ` e `R_j = Σrᵢ`.
+        //
+        // Somar `n` pontos e fazer **um** MSM de dois termos é o caminho
+        // barato: somas em G1 custam uma fração de uma multiplicação, e
+        // conferir cédula por cédula pediria uma multiplicação cada.
+        let g = gerador_g(&env);
+        let h: Bls12381G1Affine = env
+            .storage()
+            .instance()
+            .get(&Instancia::GeradorH)
+            .ok_or(Erro::PropostaNaoExiste)?;
+        let bls = env.crypto().bls12_381();
+
+        let mut placar = Vec::new(&env);
+        for j in 0..n_conf {
+            let mut soma = infinito(&env);
+            for i in 0..quantas {
+                if abertas.get(i).unwrap() {
+                    soma = bls.g1_add(&soma, &compromissos.get(i * n_conf + j).unwrap());
+                }
+            }
+            let mut ps = Vec::new(&env);
+            let mut ss = Vec::new(&env);
+            ps.push_back(g.clone());
+            ps.push_back(h.clone());
+            ss.push_back(fr(&env, totais.get(j).unwrap()));
+            ss.push_back(aberturas.get(j).unwrap());
+            if bls.g1_msm(ps, ss) != soma {
+                return Err(Erro::AberturaNaoFecha);
+            }
+            placar.push_back(totais.get(j).unwrap());
+        }
+
+        if antes.is_none() {
+            let ks = Chave::SecoesApuradas(proposta.clone());
+            let n: u32 = env.storage().persistent().get(&ks).unwrap_or(0);
+            env.storage().persistent().set(&ks, &(n + 1));
+            guardar_longo(&env, &ks);
+        }
+        env.storage()
+            .persistent()
+            .set(&kr, &(quantas_abertas, placar.clone()));
+        guardar_longo(&env, &kr);
+
+        env.events().publish(
+            (symbol_short!("apursec"), proposta, secao),
+            (quantas_abertas, quantas, placar),
+        );
+        Ok(quantas_abertas)
+    }
+
+    /// O que a seção apurou: `(quantas cédulas abriram, totais confidenciais)`.
+    pub fn resultado_secao(env: Env, proposta: BytesN<32>, secao: u32) -> Option<(u32, Vec<u32>)> {
+        env.storage()
+            .persistent()
+            .get(&Chave::ResultadoSecao(proposta, secao))
     }
 
     /// Quantos membros já endossaram exatamente estes números.
@@ -1034,6 +1254,35 @@ fn conferir_e_somar(
 /// Estende o TTL ao teto da rede. Aplicado a tudo que o verificador precisará
 /// depois do sétimo dia, e **não** às entradas `Votou`: estender 10.000 delas
 /// custaria ~2.070 XLM, e elas só impedem voto duplo *durante* a votação.
+/// Gênese e período da cadeia `quicknet` da baliza, e o tamanho do criptograma.
+/// Formato congelado (SPEC §5), medidos em 2026-10-07.
+///
+/// Repetidos aqui em vez de importados do `core` porque o `core` é
+/// dev-dependency: trazê-lo para o runtime arrastaria arkworks para dentro do
+/// Wasm por causa de três linhas de aritmética. O risco de repetir é divergir,
+/// e é por isso que `a_rodada_do_contrato_bate_com_a_do_core` cruza as duas a
+/// cada `cargo test` — o mesmo padrão que faz o contrato verificar as provas que
+/// o `core` gera, em vez de confiar num vetor congelado.
+const GENESE_BALIZA: u64 = 1_692_803_367;
+const PERIODO_BALIZA: u64 = 3;
+pub const TAMANHO_CRIPTOGRAMA: u32 = 160;
+
+/// A rodada da baliza que vence no instante `t`.
+fn rodada_da_baliza(t: u64) -> Option<u64> {
+    if t < GENESE_BALIZA {
+        return None;
+    }
+    Some((t - GENESE_BALIZA) / PERIODO_BALIZA + 1)
+}
+
+/// A cadeia daquela seção, ou o começo: 32 zeros e nenhuma cédula.
+fn cadeia_de(env: &Env, proposta: &BytesN<32>, secao: u32) -> (BytesN<32>, u32) {
+    env.storage()
+        .persistent()
+        .get(&Chave::Cadeia(proposta.clone(), secao))
+        .unwrap_or((BytesN::from_array(env, &[0u8; 32]), 0))
+}
+
 fn guardar_longo(env: &Env, k: &Chave) {
     let m = env.storage().max_ttl();
     env.storage().persistent().extend_ttl(k, m - 1, m);
