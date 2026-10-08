@@ -83,7 +83,10 @@ pub struct Assinatura {
 #[derive(Debug, PartialEq)]
 pub enum Erro {
     AnelVazio,
-    IndiceForaDoAnel { indice: usize, tamanho: usize },
+    IndiceForaDoAnel {
+        indice: usize,
+        tamanho: usize,
+    },
     /// A chave secreta não abre a chave pública daquele índice. É erro de quem
     /// chama, e vale falhar alto: assinar com o índice errado produziria uma
     /// assinatura inválida e um bug muito mais caro de achar.
@@ -250,7 +253,11 @@ pub fn assinar(
     // secreta torna possível.
     z[indice] = u - c[indice] * x;
 
-    Ok(Assinatura { c0: c[0], z, imagem: img })
+    Ok(Assinatura {
+        c0: c[0],
+        z,
+        imagem: img,
+    })
 }
 
 /// Dá a volta no anel e confere se cai de volta em `c0`.
@@ -267,9 +274,9 @@ pub fn verificar(
     }
     let pre = preambulo(msg, anel);
     let mut c = s.c0;
-    for i in 0..n {
-        let a: G1Affine = (*g * s.z[i] + G1Projective::from(anel[i]) * c).into();
-        let b: G1Affine = (*hp * s.z[i] + G1Projective::from(s.imagem) * c).into();
+    for (z, p) in s.z.iter().zip(anel) {
+        let a: G1Affine = (*g * z + G1Projective::from(*p) * c).into();
+        let b: G1Affine = (*hp * z + G1Projective::from(s.imagem) * c).into();
         c = elo(&pre, &s.imagem, &a, &b);
     }
     c == s.c0
@@ -304,6 +311,9 @@ impl Assinatura {
 
 #[cfg(test)]
 mod testes {
+    // O índice é o assunto destes laços: ramo `i` do anel, membro `i` da
+    // lista. Trocar por iterador esconderia exatamente o que o teste afirma.
+    #![allow(clippy::needless_range_loop)]
     use super::*;
 
     fn membros(n: usize) -> (G1Affine, Vec<Fr>, Vec<G1Affine>) {
@@ -319,7 +329,11 @@ mod testes {
         let hp = hp(b"assembleia-2026");
         for i in 0..7 {
             let s = assinar(b"cedula", &g, &hp, &anel, i, &xs[i]).unwrap();
-            assert!(verificar(b"cedula", &g, &hp, &anel, &s), "ramo {} não fechou", i);
+            assert!(
+                verificar(b"cedula", &g, &hp, &anel, &s),
+                "ramo {} não fechou",
+                i
+            );
         }
     }
 
@@ -415,7 +429,10 @@ mod testes {
         let anel = vec![chave_publica(&g, &x)];
         assert_eq!(
             assinar(b"m", &g, &hp, &anel, 5, &x),
-            Err(Erro::IndiceForaDoAnel { indice: 5, tamanho: 1 })
+            Err(Erro::IndiceForaDoAnel {
+                indice: 5,
+                tamanho: 1
+            })
         );
     }
 

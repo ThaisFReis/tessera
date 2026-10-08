@@ -712,4 +712,4 @@ linear nas opções sigilosas e a pergunta pública custa quase nada. O ganho é
 | E1 · UX de duas perguntas | **aberto** |
 
 Abstenção explícita fica para a v1.1: hoje a cédula sigilosa não tem como dizer
-"nenhuma das opções" sem quebrar a prova de soma. SPEC §6.5 e roadmap §12.1.
+"nenhuma das opções" sem quebrar a prova de soma. PROTOCOLO §6.5 e roadmap §12.1.

@@ -87,6 +87,20 @@ impl Prova {
     }
 }
 
+impl Prova {
+    /// 128 bytes, para o verificador reler a prova do ledger.
+    pub fn desserializar(b: &[u8]) -> Result<Prova, Erro> {
+        if b.len() != TAMANHO {
+            return Err(Erro::TamanhoErrado(b.len()));
+        }
+        let a = ponto::desserializar(&b[..96]).map_err(|_| Erro::PontoInvalido)?;
+        Ok(Prova {
+            a,
+            z: Fr::from_be_bytes_mod_order(&b[96..]),
+        })
+    }
+}
+
 #[cfg(test)]
 mod testes {
     use super::*;
@@ -170,11 +184,20 @@ mod testes {
         ];
         let d = alvo(&g, &cs, 1);
         let p = provar(CTX, &h, &d, &(r0 + r1)).unwrap();
-        assert!(verificar(CTX, &h, &d, &p), "o cenario do teste nao se montou");
+        assert!(
+            verificar(CTX, &h, &d, &p),
+            "o cenario do teste nao se montou"
+        );
 
         // e e a disjuntiva que recusa
         assert!(
-            !cds::verificar(CTX, &g, &h, &cs[0], &cds::provar(CTX, &g, &h, &cs[1], 0, &r1).unwrap()),
+            !cds::verificar(
+                CTX,
+                &g,
+                &h,
+                &cs[0],
+                &cds::provar(CTX, &g, &h, &cs[1], 0, &r1).unwrap()
+            ),
             "a disjuntiva de outro compromisso valeu"
         );
         assert_eq!(
@@ -215,16 +238,5 @@ mod testes {
         let (g, h, cs, rho) = cedula(2, 0);
         let p = provar(CTX, &h, &alvo(&g, &cs, 1), &rho).unwrap();
         assert_eq!(p.serializar().len(), 128);
-    }
-}
-
-impl Prova {
-    /// 128 bytes, para o verificador reler a prova do ledger.
-    pub fn desserializar(b: &[u8]) -> Result<Prova, Erro> {
-        if b.len() != TAMANHO {
-            return Err(Erro::TamanhoErrado(b.len()));
-        }
-        let a = ponto::desserializar(&b[..96]).map_err(|_| Erro::PontoInvalido)?;
-        Ok(Prova { a, z: Fr::from_be_bytes_mod_order(&b[96..]) })
     }
 }

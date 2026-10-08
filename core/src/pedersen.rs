@@ -82,6 +82,53 @@ pub fn para_hex(p: &G1Affine) -> String {
     ponto::para_hex(p)
 }
 
+/// Escalar → 32 bytes big-endian canônicos, que é como `Bls12381Fr::from_bytes`
+/// lê. O contrato **não reduz** módulo `r` na leitura, então os bytes têm de
+/// já ser canônicos — e são, porque `acaso.rs` sorteia por rejeição.
+pub fn fr_para_bytes_be(f: &Fr) -> [u8; 32] {
+    use ark_ff::BigInteger;
+    let v = f.into_bigint().to_bytes_be();
+    let mut b = [0u8; 32];
+    b[32 - v.len()..].copy_from_slice(&v);
+    b
+}
+
+/// A volta: 32 bytes big-endian → escalar.
+///
+/// Existe para o cliente no navegador, que recebe de volta em hex o que ele
+/// mesmo guardou — a chave de anel de quem comparece. Reduz módulo `r`, que é
+/// seguro aqui porque a ida produz bytes já canônicos.
+pub fn fr_de_bytes_be(b: &[u8]) -> Fr {
+    Fr::from_be_bytes_mod_order(b)
+}
+
+/// Descobre `T` tal que `A = T·G + soma_r·H`, por busca em `0..=max`.
+///
+/// **Isto roda fora da cadeia, e é a outra metade da sonda 5.** Lá, procurar o
+/// total *dentro* do contrato custava 124.277 por unidade e tinha teto de
+/// ~3.218: inviável. Aqui, na máquina da mesa, procurar é de graça — e a mesa
+/// precisa procurar, porque as shares de Shamir lhe dão `R_j`, nunca `T_j`.
+///
+/// A assimetria é o desenho inteiro em duas linhas: **a mesa procura, a cadeia
+/// confere.** Procurar é O(n) e livre; conferir é um MSM de 2 termos, constante
+/// no comparecimento.
+pub fn descobrir_total(
+    a: &G1Affine,
+    g: &G1Affine,
+    h: &G1Affine,
+    soma_r: &Fr,
+    max: u64,
+) -> Option<u64> {
+    let mut acc: G1Projective = *h * soma_r;
+    for t in 0..=max {
+        if acc == G1Projective::from(*a) {
+            return Some(t);
+        }
+        acc += *g;
+    }
+    None
+}
+
 #[cfg(test)]
 mod testes {
     use super::*;
@@ -152,7 +199,7 @@ mod testes {
         assert_eq!(soma, comprometer(&g, &h, &escalar(2), &(r1 + r2)));
     }
 
-    /// A ocultação perfeita é um teorema (SPEC §3.2), não algo que um teste
+    /// A ocultação perfeita é um teorema (PROTOCOLO §3.2), não algo que um teste
     /// unitário prove. O que dá para fazer em código é a checagem empírica
     /// grosseira: compromissos a 0 e a 1, com `r` independente, têm de ser
     /// indistinguíveis por qualquer estatística simples dos bytes.
@@ -237,7 +284,10 @@ mod testes {
 
         assert_eq!(descobrir_total(&a, &g, &h, &soma_r, 100), Some(5));
         // e com o R errado nao se acha total nenhum
-        assert_eq!(descobrir_total(&a, &g, &h, &(soma_r + escalar(1)), 100), None);
+        assert_eq!(
+            descobrir_total(&a, &g, &h, &(soma_r + escalar(1)), 100),
+            None
+        );
         // nem alem do teto da busca
         assert_eq!(descobrir_total(&a, &g, &h, &soma_r, 3), None);
 
@@ -252,51 +302,4 @@ mod testes {
         assert_eq!(fr_para_decimal(&escalar(1515)), "1515");
         assert_eq!(fr_para_decimal(&escalar(101)), "101");
     }
-}
-
-/// Escalar → 32 bytes big-endian canônicos, que é como `Bls12381Fr::from_bytes`
-/// lê. O contrato **não reduz** módulo `r` na leitura, então os bytes têm de
-/// já ser canônicos — e são, porque `acaso.rs` sorteia por rejeição.
-pub fn fr_para_bytes_be(f: &Fr) -> [u8; 32] {
-    use ark_ff::BigInteger;
-    let v = f.into_bigint().to_bytes_be();
-    let mut b = [0u8; 32];
-    b[32 - v.len()..].copy_from_slice(&v);
-    b
-}
-
-/// A volta: 32 bytes big-endian → escalar.
-///
-/// Existe para o cliente no navegador, que recebe de volta em hex o que ele
-/// mesmo guardou — a chave de anel de quem comparece. Reduz módulo `r`, que é
-/// seguro aqui porque a ida produz bytes já canônicos.
-pub fn fr_de_bytes_be(b: &[u8]) -> Fr {
-    Fr::from_be_bytes_mod_order(b)
-}
-
-/// Descobre `T` tal que `A = T·G + soma_r·H`, por busca em `0..=max`.
-///
-/// **Isto roda fora da cadeia, e é a outra metade da sonda 5.** Lá, procurar o
-/// total *dentro* do contrato custava 124.277 por unidade e tinha teto de
-/// ~3.218: inviável. Aqui, na máquina da mesa, procurar é de graça — e a mesa
-/// precisa procurar, porque as shares de Shamir lhe dão `R_j`, nunca `T_j`.
-///
-/// A assimetria é o desenho inteiro em duas linhas: **a mesa procura, a cadeia
-/// confere.** Procurar é O(n) e livre; conferir é um MSM de 2 termos, constante
-/// no comparecimento.
-pub fn descobrir_total(
-    a: &G1Affine,
-    g: &G1Affine,
-    h: &G1Affine,
-    soma_r: &Fr,
-    max: u64,
-) -> Option<u64> {
-    let mut acc: G1Projective = (*h * soma_r).into();
-    for t in 0..=max {
-        if acc == G1Projective::from(*a) {
-            return Some(t);
-        }
-        acc += *g;
-    }
-    None
 }

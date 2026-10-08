@@ -53,7 +53,13 @@ pub fn titulo_com(s: &str, direita: &str) {
     println!();
     let esq = format!("TESSERA · {}", s);
     let vago = LARGURA.saturating_sub(esq.chars().count() + direita.chars().count());
-    println!("{}{}{}{}", MARGEM, c(TEXTO, &esq), " ".repeat(vago), c(SECUNDARIO, direita));
+    println!(
+        "{}{}{}{}",
+        MARGEM,
+        c(TEXTO, &esq),
+        " ".repeat(vago),
+        c(SECUNDARIO, direita)
+    );
     regua();
 }
 
@@ -66,7 +72,11 @@ pub fn secao(s: &str) {
     println!();
     let texto = format!("── {} ", s);
     let resto = LARGURA.saturating_sub(texto.chars().count());
-    println!("{}{}", MARGEM, c(APAGADO, &format!("{}{}", texto, "─".repeat(resto))));
+    println!(
+        "{}{}",
+        MARGEM,
+        c(APAGADO, &format!("{}{}", texto, "─".repeat(resto)))
+    );
     println!();
 }
 
@@ -144,11 +154,6 @@ pub fn recusa(s: &str) {
     println!("{}{}", MARGEM, c(RECUSA, &format!("✗ {}", s)));
 }
 
-pub fn atencao(s: &str) {
-    println!();
-    println!("{}{}", MARGEM, c(TEXTO, &format!("⚠  {}", s)));
-}
-
 pub fn centrado(s: &str) {
     let n = s.chars().count();
     let pad = (LARGURA.saturating_sub(n)) / 2;
@@ -193,9 +198,8 @@ pub fn bloco_hex(bytes: &[u8]) {
 pub fn blocos_lado_a_lado(a: &[u8], b: &[u8], rot_a: &str, rot_b: &str) {
     let (ha, hb) = (hex(a), hex(b));
     // 28 caracteres de hex por coluna cabem em 72 com o espaço entre elas
-    let corta = |v: &[String]| -> Vec<String> {
-        v.iter().map(|l| l.chars().take(28).collect()).collect()
-    };
+    let corta =
+        |v: &[String]| -> Vec<String> { v.iter().map(|l| l.chars().take(28).collect()).collect() };
     let (ca, cb) = (corta(&ha), corta(&hb));
     println!(
         "{}{}{}{}",
@@ -256,7 +260,7 @@ mod testes {
             let n = rotulo.chars().count();
             let pontos = COLUNA_VALOR.saturating_sub(n + 1);
             let usado = n + 1 + pontos + 1 + valor.chars().count();
-            assert!(usado + 1 <= LARGURA, "{:?} estourou a largura", rotulo);
+            assert!(usado < LARGURA, "{:?} estourou a largura", rotulo);
         }
     }
 

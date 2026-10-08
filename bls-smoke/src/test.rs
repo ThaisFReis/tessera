@@ -2,11 +2,10 @@ extern crate std;
 
 use super::{BlsSmoke, BlsSmokeClient};
 use soroban_sdk::{
-    BytesN,
     bytes, bytesn,
     crypto::bls12_381::{Bls12381Fr as Fr, Bls12381G1Affine as G1},
     testutils::arbitrary::std::println,
-    Bytes, Env, Vec, U256,
+    Bytes, BytesN, Env, Vec, U256,
 };
 
 /// Teto de CPU por transacao, MEDIDO empiricamente na testnet em 2026-09-30
@@ -55,7 +54,10 @@ fn sonda1_serializacao_do_gerador() {
     println!("gerador canonico na curva ........ {}", on_curve);
     println!("gerador canonico no subgrupo ..... {}", in_subgroup);
 
-    assert!(on_curve, "host rejeitou be_bytes(X)||be_bytes(Y) — encoding diverge");
+    assert!(
+        on_curve,
+        "host rejeitou be_bytes(X)||be_bytes(Y) — encoding diverge"
+    );
     assert!(in_subgroup);
 }
 
@@ -86,11 +88,17 @@ fn sonda3_schnorr_verifica_on_chain() {
     let e = client.challenge(&g, &pk, &a);
     let z = bls.fr_add(&k, &bls.fr_mul(&e, &sk));
 
-    assert!(client.verify_schnorr(&g, &pk, &a, &z), "prova valida recusada");
+    assert!(
+        client.verify_schnorr(&g, &pk, &a, &z),
+        "prova valida recusada"
+    );
 
     // prova adulterada tem de cair
     let z_ruim = bls.fr_add(&z, &fr(&env, 1));
-    assert!(!client.verify_schnorr(&g, &pk, &a, &z_ruim), "prova forjada aceita");
+    assert!(
+        !client.verify_schnorr(&g, &pk, &a, &z_ruim),
+        "prova forjada aceita"
+    );
 
     println!("\n== SONDA 3: sigma-protocolo ==");
     println!("prova valida aceita, prova forjada recusada. OK");
@@ -248,7 +256,10 @@ fn sonda5_verificar_e_barato_procurar_nao() {
     println!("tally por forca bruta (peso {}) ... {}", peso, c_busca);
     println!("  custo marginal por unidade ...... {}", por_unidade);
     println!("tally_checked (total asseverado) .. {}", c_check);
-    println!("  razao ........................... {}x", c_busca / c_check.max(1));
+    println!(
+        "  razao ........................... {}x",
+        c_busca / c_check.max(1)
+    );
     println!(
         "  peso total maximo por busca ..... ~{} (teto {} )",
         TX_CPU_LIMIT / por_unidade.max(1),
@@ -265,13 +276,18 @@ fn sonda5_verificar_e_barato_procurar_nao() {
         &bls.g1_mul(&pk, &r2),
         &bls.g1_mul(&g, &fr(&env, peso_grande)),
     ));
-    let c_check_grande = cpu(&env, || client.tally_checked(&g, &d1, &d2, &sk, &peso_grande));
+    let c_check_grande = cpu(&env, || {
+        client.tally_checked(&g, &d1, &d2, &sk, &peso_grande)
+    });
     assert!(client.tally_checked(&g, &d1, &d2, &sk, &peso_grande));
 
     println!("tally_checked (peso 1.000.000) .... {}", c_check_grande);
     let teto_busca = TX_CPU_LIMIT / por_unidade.max(1);
 
-    assert!(c_check < c_busca, "verificacao deveria ser mais barata que a busca");
+    assert!(
+        c_check < c_busca,
+        "verificacao deveria ser mais barata que a busca"
+    );
     assert!(
         c_check_grande < c_check * 2,
         "custo de verificar deveria ser ~constante no peso"
@@ -545,7 +561,7 @@ fn sonda7_pedersen_abertura_do_agregado_fecha() {
         TX_CPU_LIMIT / c_verify.max(1)
     );
 
-    // Criterio do smoke B1: <= 8M (projetado 5,4M no SPEC §7.2).
+    // Criterio do smoke B1: <= 8M (projetado 5,4M no PROTOCOLO §7.2).
     assert!(
         c_verify <= 8_000_000,
         "verify_aggregate custou {}, acima do teto de 8M do smoke",
@@ -696,10 +712,22 @@ fn sonda12_cds_verifica_e_custa() {
     let c = G1::from_bytes(bytesn!(&env, 0x191fab693fe01641555a088dd540a16d9ee62312feb3f752ffa55ebba270cfc49c96b4ad1ebd7098f21995333839ea8b1742141021a3d2c3834c415e63cbeeff2236cb95127faa339c7a05e21181eaa28f3b80e64bd506262cd1d45f7ce6df7a));
     let a0 = G1::from_bytes(bytesn!(&env, 0x153730e4e4a5d57c774119f37fa07f4bec68741934ce1f4c5dad6584d8e63aa5ff78aa6543b2426e429230194cd40ce20be2e4d403ddfb1c5b195bd883a89a437ae7e77a033e04f4e0b418970764976cac0e48a81b8ed9705b54df2ad07bc72c));
     let a1 = G1::from_bytes(bytesn!(&env, 0x03a1e4a301a681cc0024c375fb86364da96ae773fb2d3f4131af1c3490651497f292926f822a491ac54f64edb3920ec10c813d8135b948f37c3716416bf115eed635fa362b6ba12ad28fe1a33a51e398aed4e711973dddb976e4de1898b08529));
-    let e0 = Fr::from_bytes(bytesn!(&env, 0x709dce372550d44aa0b33083323149d14be674ea27181d945750c6619e7ac050));
-    let z0 = Fr::from_bytes(bytesn!(&env, 0x540de293552c98c9363bcb6c028870b2021a5181c76d433fb7ceb8ac6d973580));
-    let e1 = Fr::from_bytes(bytesn!(&env, 0x03a64ddf3ed244944e2b922db48781d277a780636c3c74f457fe4eec891d4770));
-    let z1 = Fr::from_bytes(bytesn!(&env, 0x5225db38c6cf1177518ef0b1b16ddea0ead83e461a465d97d8de160394553cd8));
+    let e0 = Fr::from_bytes(bytesn!(
+        &env,
+        0x709dce372550d44aa0b33083323149d14be674ea27181d945750c6619e7ac050
+    ));
+    let z0 = Fr::from_bytes(bytesn!(
+        &env,
+        0x540de293552c98c9363bcb6c028870b2021a5181c76d433fb7ceb8ac6d973580
+    ));
+    let e1 = Fr::from_bytes(bytesn!(
+        &env,
+        0x03a64ddf3ed244944e2b922db48781d277a780636c3c74f457fe4eec891d4770
+    ));
+    let z1 = Fr::from_bytes(bytesn!(
+        &env,
+        0x5225db38c6cf1177518ef0b1b16ddea0ead83e461a465d97d8de160394553cd8
+    ));
 
     // --- a prova do core verifica no contrato
     assert!(
@@ -740,15 +768,21 @@ fn sonda12_cds_verifica_e_custa() {
     println!("desafio (sha256 + from_bytes) .... {:>10}", c_desafio);
     println!("verify_cds (invocacao cheia) ..... {:>10}", c_cds);
     println!("   projecao do SPEC era ~27M");
-    println!("   erro da projecao .............. {:.0}%",
-        100.0 * (27_000_000.0 - c_cds as f64) / 27_000_000.0);
+    println!(
+        "   erro da projecao .............. {:.0}%",
+        100.0 * (27_000_000.0 - c_cds as f64) / 27_000_000.0
+    );
     println!("\n-- orcamento de votar(), m=2 --");
     let votar = 2 * c_cds + 6_737_614 + 4_433_406 + 221_496;
     println!("2 CDS + soma + validacao + adds .. {:>10}", votar);
-    println!("   % do teto de 400M ............. {:.1}%",
-        100.0 * votar as f64 / TX_CPU_LIMIT as f64);
-    println!("   folga ......................... {:.1}x",
-        TX_CPU_LIMIT as f64 / votar as f64);
+    println!(
+        "   % do teto de 400M ............. {:.1}%",
+        100.0 * votar as f64 / TX_CPU_LIMIT as f64
+    );
+    println!(
+        "   folga ......................... {:.1}x",
+        TX_CPU_LIMIT as f64 / votar as f64
+    );
 
     // PORTAO 1 do PLANO: <=200M segue o plano sem corte.
     assert!(
@@ -761,7 +795,7 @@ fn sonda12_cds_verifica_e_custa() {
 /// **SONDA 13 (C3) — caminho de Merkle, medido.**
 ///
 /// Fecha o ultimo item do orcamento de `votar()` que ainda era estimativa: o
-/// SPEC §7.2 projetava ~1M para profundidade 8.
+/// PROTOCOLO §7.2 projetava ~1M para profundidade 8.
 ///
 /// O vetor vem do `core` (`merkle::vetor::emitir_vetor_merkle_para_o_contrato`):
 /// 256 aptos deterministicos, caminho do indice 173. Se a raiz calculada aqui,
@@ -774,23 +808,54 @@ fn sonda13_merkle_verifica_e_custa() {
     let id = env.register(BlsSmoke, ());
     let client = BlsSmokeClient::new(&env, &id);
 
-    let endereco: BytesN<32> =
-        bytesn!(&env, 0x00000000000000ad0000000000000000000000000000000000000000000000a7);
-    let raiz: BytesN<32> =
-        bytesn!(&env, 0x60900c5f790375233a0cdebc3c0e9d0b1a41dba6a05a324b84a5b18a8440b0fc);
+    let endereco: BytesN<32> = bytesn!(
+        &env,
+        0x00000000000000ad0000000000000000000000000000000000000000000000a7
+    );
+    let raiz: BytesN<32> = bytesn!(
+        &env,
+        0x60900c5f790375233a0cdebc3c0e9d0b1a41dba6a05a324b84a5b18a8440b0fc
+    );
     let indice: u32 = 173;
     let peso: u32 = 1;
 
-    let irmaos: Vec<BytesN<32>> = Vec::from_array(&env, [
-        bytesn!(&env, 0x4613df3a4daf7a1373785c20293ceda89b47349b51716ce8636c28681619d073),
-        bytesn!(&env, 0xdfb70ce2c38b0a937f4e2b683a7d7e33cb565000a44a8ea06bbf85868cfea84a),
-        bytesn!(&env, 0x208461337e72ef00cd23c248d3d3907e8e05d2006a7294310806494f33a2831d),
-        bytesn!(&env, 0xf756beac44fbe91b3d5c58db487b706efea44b4e8bc652f9fbbaa8246b03c702),
-        bytesn!(&env, 0x01db0bc465ea1284376e26ccbc9409740939bb7ef8be260b262c1f622d480872),
-        bytesn!(&env, 0x1f445e905a5c7d62f2b7a694a3c3769f90644b28f444cf0c51fd5625ef2a91e8),
-        bytesn!(&env, 0x3731b9b97729f8b4b36683ba8abfe321b328ff90ec65b929582bb5c3b354682d),
-        bytesn!(&env, 0xbb209aa101c383bc47df210c403eeab35a3ae0bc256f32ad1a0022c1fdd5b8cb),
-    ]);
+    let irmaos: Vec<BytesN<32>> = Vec::from_array(
+        &env,
+        [
+            bytesn!(
+                &env,
+                0x4613df3a4daf7a1373785c20293ceda89b47349b51716ce8636c28681619d073
+            ),
+            bytesn!(
+                &env,
+                0xdfb70ce2c38b0a937f4e2b683a7d7e33cb565000a44a8ea06bbf85868cfea84a
+            ),
+            bytesn!(
+                &env,
+                0x208461337e72ef00cd23c248d3d3907e8e05d2006a7294310806494f33a2831d
+            ),
+            bytesn!(
+                &env,
+                0xf756beac44fbe91b3d5c58db487b706efea44b4e8bc652f9fbbaa8246b03c702
+            ),
+            bytesn!(
+                &env,
+                0x01db0bc465ea1284376e26ccbc9409740939bb7ef8be260b262c1f622d480872
+            ),
+            bytesn!(
+                &env,
+                0x1f445e905a5c7d62f2b7a694a3c3769f90644b28f444cf0c51fd5625ef2a91e8
+            ),
+            bytesn!(
+                &env,
+                0x3731b9b97729f8b4b36683ba8abfe321b328ff90ec65b929582bb5c3b354682d
+            ),
+            bytesn!(
+                &env,
+                0xbb209aa101c383bc47df210c403eeab35a3ae0bc256f32ad1a0022c1fdd5b8cb
+            ),
+        ],
+    );
 
     // --- o caminho do core fecha no contrato
     assert!(
@@ -841,7 +906,9 @@ fn sonda13_merkle_verifica_e_custa() {
 
     // --- custo, por profundidade
     let vazio: Vec<BytesN<32>> = Vec::new(&env);
-    let c0 = cpu(&env, || client.verify_merkle(&endereco, &peso, &0u32, &vazio, &raiz));
+    let c0 = cpu(&env, || {
+        client.verify_merkle(&endereco, &peso, &0u32, &vazio, &raiz)
+    });
     let c8 = cpu(&env, || {
         client.verify_merkle(&endereco, &peso, &indice, &irmaos, &raiz)
     });
@@ -852,19 +919,31 @@ fn sonda13_merkle_verifica_e_custa() {
     println!("caminho completo (profundidade 8)  {:>10}", c8);
     println!("   por nivel ..................... {:>10}", por_nivel);
     println!("   projecao do SPEC era ~1.000.000");
-    println!("   erro da projecao .............. {:+.0}%",
-        100.0 * (1_000_000.0 - c8 as f64) / 1_000_000.0);
+    println!(
+        "   erro da projecao .............. {:+.0}%",
+        100.0 * (1_000_000.0 - c8 as f64) / 1_000_000.0
+    );
     println!("\n-- profundidade suportada --");
-    println!("16 (65.536 aptos) ................ {:>10}", c0 + 16 * por_nivel);
-    println!("20 (1.048.576 aptos) ............. {:>10}", c0 + 20 * por_nivel);
+    println!(
+        "16 (65.536 aptos) ................ {:>10}",
+        c0 + 16 * por_nivel
+    );
+    println!(
+        "20 (1.048.576 aptos) ............. {:>10}",
+        c0 + 20 * por_nivel
+    );
 
     println!("\n-- orcamento de votar(), m=2, COM Merkle --");
     let votar = 2 * 10_980_243u64 + 6_737_614 + 4_433_406 + 221_496 + c8;
     println!("2 CDS + soma + validacao + adds + merkle {:>10}", votar);
-    println!("   % do teto de 400M ............. {:.1}%",
-        100.0 * votar as f64 / TX_CPU_LIMIT as f64);
-    println!("   folga ......................... {:.1}x",
-        TX_CPU_LIMIT as f64 / votar as f64);
+    println!(
+        "   % do teto de 400M ............. {:.1}%",
+        100.0 * votar as f64 / TX_CPU_LIMIT as f64
+    );
+    println!(
+        "   folga ......................... {:.1}x",
+        TX_CPU_LIMIT as f64 / votar as f64
+    );
 
     assert!(
         votar <= 200_000_000,

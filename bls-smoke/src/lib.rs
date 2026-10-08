@@ -1,3 +1,6 @@
+// Uma sonda recebe os parâmetros da medição um a um, de propósito: o que ela
+// mede tem de ser legível na chamada, não escondido num struct.
+#![allow(clippy::too_many_arguments)]
 #![no_std]
 //! Smoke test das host functions BLS12-381 (CAP-0059) em Soroban.
 //!
@@ -19,7 +22,7 @@ use soroban_sdk::{
 
 /// Domain separation tag do desafio de Fiat-Shamir.
 /// TODO: renomear para TESSERA-V1-FIAT-SHAMIR de uma vez so, antes de
-/// publicar qualquer vetor de teste (SPEC.md §2).
+/// publicar qualquer vetor de teste (PROTOCOLO.md §2).
 const DST: &[u8] = b"KARN-URNA-V0-CHALLENGE";
 
 /// DST do segundo gerador. "Nothing up my sleeve": H sai de hash-to-curve de
@@ -93,7 +96,12 @@ impl BlsSmoke {
 
     /// Desafio de Fiat-Shamir. Exposto para o provador off-chain usar
     /// exatamente a mesma funcao que o verificador on-chain.
-    pub fn challenge(env: Env, g: Bls12381G1Affine, pk: Bls12381G1Affine, a: Bls12381G1Affine) -> Bls12381Fr {
+    pub fn challenge(
+        env: Env,
+        g: Bls12381G1Affine,
+        pk: Bls12381G1Affine,
+        a: Bls12381G1Affine,
+    ) -> Bls12381Fr {
         challenge_fr(&env, &g, &pk, &a)
     }
 
@@ -104,7 +112,13 @@ impl BlsSmoke {
     ///
     /// Esta e a forma exata da Chaum-Pedersen que a mesa apuradora usa para
     /// provar decifracao correta. Custo: 2 g1_mul + 1 g1_add + 1 sha256.
-    pub fn verify_schnorr(env: Env, g: Bls12381G1Affine, pk: Bls12381G1Affine, a: Bls12381G1Affine, z: Bls12381Fr) -> bool {
+    pub fn verify_schnorr(
+        env: Env,
+        g: Bls12381G1Affine,
+        pk: Bls12381G1Affine,
+        a: Bls12381G1Affine,
+        z: Bls12381Fr,
+    ) -> bool {
         let bls = env.crypto().bls12_381();
         let e = challenge_fr(&env, &g, &pk, &a);
         let lhs = bls.g1_mul(&g, &z);
@@ -123,7 +137,14 @@ impl BlsSmoke {
     /// Decifra: `M = sum C2 - sk * sum C1 = (sum m_i)*G`.
     ///
     /// Devolve `sum m_i`. Panica se o total passar de `max`.
-    pub fn tally(env: Env, g: Bls12381G1Affine, c1s: Vec<Bls12381G1Affine>, c2s: Vec<Bls12381G1Affine>, sk: Bls12381Fr, max: u32) -> u32 {
+    pub fn tally(
+        env: Env,
+        g: Bls12381G1Affine,
+        c1s: Vec<Bls12381G1Affine>,
+        c2s: Vec<Bls12381G1Affine>,
+        sk: Bls12381Fr,
+        max: u32,
+    ) -> u32 {
         let bls = env.crypto().bls12_381();
         let n = c1s.len();
         if n == 0 || n != c2s.len() {
@@ -181,7 +202,10 @@ impl BlsSmoke {
             acc2 = bls.g1_add(&acc2, &c2s.get(i).unwrap());
         }
         let m = bls.g1_add(&acc2, &(-bls.g1_mul(&acc1, &sk)));
-        let alegado = bls.g1_mul(&g, &Bls12381Fr::from_u256(soroban_sdk::U256::from_u32(&env, total_alegado)));
+        let alegado = bls.g1_mul(
+            &g,
+            &Bls12381Fr::from_u256(soroban_sdk::U256::from_u32(&env, total_alegado)),
+        );
         m == alegado
     }
 
@@ -229,7 +253,7 @@ impl BlsSmoke {
     /// compromisso da soma, com a soma das aleatoriedades.
     pub fn agregar(env: Env, cs: Vec<Bls12381G1Affine>) -> Bls12381G1Affine {
         let bls = env.crypto().bls12_381();
-        if cs.len() == 0 {
+        if cs.is_empty() {
             panic!("agregado vazio");
         }
         let mut acc = cs.get(0).unwrap();
@@ -408,9 +432,9 @@ impl BlsSmoke {
     // ====================== SONDA 13 (C3): caminho de Merkle ===============
     //
     // O ultimo item do orcamento de votar() que ainda era ESTIMATIVA (~1M no
-    // SPEC §7.2). A folha e H(0x00 || endereco || peso_be): o contrato
+    // PROTOCOLO §7.2). A folha e H(0x00 || endereco || peso_be): o contrato
     // RECALCULA a folha, entao um peso inflado produz outra folha e o caminho
-    // nao fecha. Essa e a defesa inteira contra peso falso (SPEC §6.4).
+    // nao fecha. Essa e a defesa inteira contra peso falso (PROTOCOLO §6.4).
     //
     // Separacao de dominio entre folha (0x00) e no (0x01): sem ela, uma folha
     // de 64 bytes bem escolhida seria apresentada como no interno.
@@ -433,7 +457,7 @@ impl BlsSmoke {
         let mut i = indice;
         for irmao in irmaos.iter() {
             let mut b = Bytes::from_slice(&env, &[0x01u8]);
-            if i % 2 == 0 {
+            if i.is_multiple_of(2) {
                 b.extend_from_array(&atual.to_array());
                 b.extend_from_array(&irmao.to_array());
             } else {
@@ -470,7 +494,12 @@ fn u32_fr(env: &Env, v: u32) -> Bls12381Fr {
     Bls12381Fr::from_u256(soroban_sdk::U256::from_u32(env, v))
 }
 
-fn challenge_fr(env: &Env, g: &Bls12381G1Affine, pk: &Bls12381G1Affine, a: &Bls12381G1Affine) -> Bls12381Fr {
+fn challenge_fr(
+    env: &Env,
+    g: &Bls12381G1Affine,
+    pk: &Bls12381G1Affine,
+    a: &Bls12381G1Affine,
+) -> Bls12381Fr {
     let mut buf = Bytes::from_slice(env, DST);
     buf.extend_from_array(&g.to_array());
     buf.extend_from_array(&pk.to_array());

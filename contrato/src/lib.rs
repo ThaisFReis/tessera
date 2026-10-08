@@ -23,18 +23,29 @@
 //! revelaria todos os votos já dados, retroativamente e sem reparo. Trocamos um
 //! risco irreversível por um reversível.
 
+// `env.events().publish()` está depreciado em favor da macro `#[contractevent]`,
+// que muda o formato dos tópicos. **Esses eventos são interface congelada**
+// (§5): `app/src/rede.ts` lista as votações lendo `topic[0] == "abrir"` e
+// `topic[1]` como a proposta, e a janela útil do RPC é de 2.000 ledgers. Migrar
+// sem migrar o leitor junto apaga a lista de votações do dapp. Virou T-012.
+#![allow(deprecated)]
+// A aridade das entradas é a ABI, e a ABI é interface congelada (§5): `abrir`
+// tem 11 argumentos porque a proposta tem 11 campos. Reduzir exigiria um
+// struct, logo mudar o ABI, logo redeploy.
+#![allow(clippy::too_many_arguments)]
+
 mod cripto;
 mod tipos;
 
 pub use tipos::{Erro, Pergunta, Proposta, ProvaCds, ProvaSoma};
 
 use cripto::*;
-use soroban_sdk::{
-    contract, contractimpl, symbol_short,
-    crypto::bls12_381::{Bls12381Fr, Bls12381G1Affine},
-    Address, Bytes, BytesN, Env, Vec,
-};
 use soroban_sdk::xdr::ToXdr;
+use soroban_sdk::{
+    contract, contractimpl,
+    crypto::bls12_381::{Bls12381Fr, Bls12381G1Affine},
+    symbol_short, Address, Bytes, BytesN, Env, Vec,
+};
 use tipos::{Chave, Instancia, MAX_OPCOES, MAX_PERGUNTAS, TAU};
 
 #[contract]
@@ -74,10 +85,14 @@ impl Tessera {
     ) -> Result<(), Erro> {
         governanca.require_auth();
 
-        if env.storage().persistent().has(&Chave::Proposta(proposta.clone())) {
+        if env
+            .storage()
+            .persistent()
+            .has(&Chave::Proposta(proposta.clone()))
+        {
             return Err(Erro::PropostaJaExiste);
         }
-        if perguntas.len() == 0 || perguntas.len() > MAX_PERGUNTAS {
+        if perguntas.is_empty() || perguntas.len() > MAX_PERGUNTAS {
             return Err(Erro::PerguntasForaDaFaixa);
         }
         // O que limita a CPU é o total de opções **confidenciais**, porque é
@@ -131,17 +146,30 @@ impl Tessera {
             return Err(Erro::SecaoInvalida);
         }
         let n_perguntas = perguntas.len();
-        let p = Proposta { perguntas, raiz_aptos, mesa, limiar, abre_em, fecha_em, anel, secoes };
+        let p = Proposta {
+            perguntas,
+            raiz_aptos,
+            mesa,
+            limiar,
+            abre_em,
+            fecha_em,
+            anel,
+            secoes,
+        };
         if anel {
             // Um anel por seção, e cada um nasce vazio: sem esta escrita, o
             // primeiro `comparecer` daquela seção não teria onde se somar.
             for s in 0..secoes {
                 let k = Chave::Anel(proposta.clone(), s);
-                env.storage().persistent().set(&k, &Vec::<Bls12381G1Affine>::new(&env));
+                env.storage()
+                    .persistent()
+                    .set(&k, &Vec::<Bls12381G1Affine>::new(&env));
                 guardar_longo(&env, &k);
             }
         }
-        env.storage().persistent().set(&Chave::Proposta(proposta.clone()), &p);
+        env.storage()
+            .persistent()
+            .set(&Chave::Proposta(proposta.clone()), &p);
         guardar_longo(&env, &Chave::Proposta(proposta.clone()));
 
         // Acumuladores começam no infinito: o compromisso de ninguém. Só as
@@ -168,7 +196,15 @@ impl Tessera {
 
         env.events().publish(
             (symbol_short!("abrir"), proposta),
-            (n_perguntas, conf_opcoes, abre_em, fecha_em, limiar, anel, secoes),
+            (
+                n_perguntas,
+                conf_opcoes,
+                abre_em,
+                fecha_em,
+                limiar,
+                anel,
+                secoes,
+            ),
         );
         Ok(())
     }
@@ -236,8 +272,17 @@ impl Tessera {
         conferir_aptidao(&env, &p, &votante, peso, 0, indice, &caminho)?;
         marcar_votou(&env, &proposta, &votante)?;
 
-        conferir_e_somar(&env, &p, &proposta, &votante.clone().to_xdr(&env), &compromissos,
-                         &provas, &provas_soma, &escolhas, peso)?;
+        conferir_e_somar(
+            &env,
+            &p,
+            &proposta,
+            &votante.clone().to_xdr(&env),
+            &compromissos,
+            &provas,
+            &provas_soma,
+            &escolhas,
+            peso,
+        )?;
 
         // O evento é o que o nível 2 do verificador lê dos arquivos de
         // histórico para recalcular o acumulador sem depender do RPC (§8.3).
@@ -291,8 +336,11 @@ impl Tessera {
         validar(&env, &chave_anel)?;
 
         let ka = Chave::Anel(proposta.clone(), secao);
-        let mut anel: Vec<Bls12381G1Affine> =
-            env.storage().persistent().get(&ka).ok_or(Erro::ModoErrado)?;
+        let mut anel: Vec<Bls12381G1Affine> = env
+            .storage()
+            .persistent()
+            .get(&ka)
+            .ok_or(Erro::ModoErrado)?;
         anel.push_back(chave_anel);
         let tamanho = anel.len();
         env.storage().persistent().set(&ka, &anel);
@@ -301,8 +349,10 @@ impl Tessera {
         env.storage().persistent().set(&kc, &true);
         guardar_longo(&env, &kc);
 
-        env.events()
-            .publish((symbol_short!("comparec"), proposta, votante), (secao, tamanho));
+        env.events().publish(
+            (symbol_short!("comparec"), proposta, votante),
+            (secao, tamanho),
+        );
         Ok(tamanho)
     }
 
@@ -378,7 +428,7 @@ impl Tessera {
         // quem organizou — a tela avisa. Com seções, **alguém decidiu** quem se
         // esconde atrás de quem, e uma seção minúscula entregaria o voto de
         // quem caiu nela. Aqui a recusa vale mais que o aviso: o mesmo princípio
-        // do SPEC §6.6, que prefere falhar a vazar.
+        // do PROTOCOLO §6.6, que prefere falhar a vazar.
         if p.secoes > 1 && anel.len() < TAU {
             return Err(Erro::AnonimatoInsuficiente);
         }
@@ -408,7 +458,15 @@ impl Tessera {
         // precisa ser.
         let ident = Bytes::from_array(&env, &imagem.to_array());
         conferir_e_somar(
-            &env, &p, &proposta, &ident, &compromissos, &provas, &provas_soma, &escolhas, 1,
+            &env,
+            &p,
+            &proposta,
+            &ident,
+            &compromissos,
+            &provas,
+            &provas_soma,
+            &escolhas,
+            1,
         )?;
 
         env.storage().persistent().set(&ki, &true);
@@ -460,7 +518,7 @@ impl Tessera {
     /// Revelar `R_j = Σ r_{i,j}` não revela nenhum `r_{i,j}`: é a soma de `n`
     /// valores uniformes, e conhecer a soma de `n` incógnitas não determina
     /// nenhuma delas. E `R_j` chega à mesa por shares de Shamir, então nenhum
-    /// `r` individual se junta em lugar algum (SPEC §4.3).
+    /// `r` individual se junta em lugar algum (PROTOCOLO §4.3).
     ///
     /// ## Por que endosso e não co-assinatura
     ///
@@ -493,7 +551,11 @@ impl Tessera {
         if env.ledger().sequence() < p.fecha_em {
             return Err(Erro::VotacaoAindaAberta);
         }
-        if env.storage().persistent().has(&Chave::Resultado(proposta.clone())) {
+        if env
+            .storage()
+            .persistent()
+            .has(&Chave::Resultado(proposta.clone()))
+        {
             return Err(Erro::JaApurada);
         }
         // `totais` e `aberturas` cobrem só as opções **confidenciais**, em
@@ -506,7 +568,7 @@ impl Tessera {
             return Err(Erro::NaoEMembroDaMesa);
         }
 
-        // **A regra de τ.** Ver SPEC §6.6. Ou ninguém votou em sigilo — e não
+        // **A regra de τ.** Ver PROTOCOLO §6.6. Ou ninguém votou em sigilo — e não
         // há sigilo a proteger — ou pelo menos τ votaram. Uma coligação que
         // publique os próprios votos de propósito encolheria o conjunto
         // secreto até determiná-lo; aqui ela trava a apuração em vez de ler os
@@ -651,11 +713,7 @@ impl Tessera {
                     if let Some(a) = env
                         .storage()
                         .persistent()
-                        .get::<_, Bls12381G1Affine>(&Chave::Acum(
-                            proposta.clone(),
-                            q as u32,
-                            j,
-                        ))
+                        .get::<_, Bls12381G1Affine>(&Chave::Acum(proposta.clone(), q as u32, j))
                     {
                         v.push_back(a);
                     }
@@ -696,14 +754,18 @@ impl Tessera {
     }
 
     pub fn ja_votou(env: Env, proposta: BytesN<32>, votante: Address) -> bool {
-        env.storage().persistent().has(&Chave::Votou(proposta, votante))
+        env.storage()
+            .persistent()
+            .has(&Chave::Votou(proposta, votante))
     }
 
     /// **O caderno, lido.** Quem compareceu — e, por subtração da lista de
     /// aptos, quem faltou. É a leitura que o voto obrigatório precisa, e a
     /// única sobre uma pessoa que esta proposta responde.
     pub fn compareceu(env: Env, proposta: BytesN<32>, votante: Address) -> bool {
-        env.storage().persistent().has(&Chave::Compareceu(proposta, votante))
+        env.storage()
+            .persistent()
+            .has(&Chave::Compareceu(proposta, votante))
     }
 
     /// **O anel**, na ordem em que as pessoas compareceram.
@@ -740,10 +802,6 @@ impl Tessera {
 
 // ===================== auxiliares ========================================
 
-/// Estende o TTL ao teto da rede. Aplicado a tudo que o verificador precisará
-/// depois do sétimo dia, e **não** às entradas `Votou`: estender 10.000 delas
-/// custaria ~2.070 XLM, e elas só impedem voto duplo *durante* a votação.
-
 /// O miolo de uma cédula: conferir tudo, e só depois somar.
 ///
 /// `identidade` é o que prende as provas a quem vota — o XDR do endereço no
@@ -762,96 +820,99 @@ fn conferir_e_somar(
     escolhas: &Vec<u32>,
     peso: u32,
 ) -> Result<(), Erro> {
-        let g = gerador_g(env);
-        let h: Bls12381G1Affine = env
-            .storage()
-            .instance()
-            .get(&Instancia::GeradorH)
-            .ok_or(Erro::PropostaNaoExiste)?;
-        let bls = env.crypto().bls12_381();
+    let g = gerador_g(env);
+    let h: Bls12381G1Affine = env
+        .storage()
+        .instance()
+        .get(&Instancia::GeradorH)
+        .ok_or(Erro::PropostaNaoExiste)?;
+    let bls = env.crypto().bls12_381();
 
-        let mut off_conf = 0u32; // posição em `compromissos`/`provas`
-        let mut off_publ = 0u32; // posição em `escolhas`
-        let mut i_soma = 0u32; // qual prova de soma
-        for (q, pg) in p.perguntas.iter().enumerate() {
-            let q = q as u32;
-            if !pg.confidencial {
-                conferir_bloco(&escolhas, off_publ, pg.opcoes, peso)?;
-                off_publ += pg.opcoes;
-                continue;
-            }
-
-            // Todo ponto que chega é validado: o host não valida sozinho, e
-            // um ponto de ordem pequena vazaria informação sobre o escalar
-            // (sonda 10).
-            let mut soma = infinito(env);
-            for j in 0..pg.opcoes {
-                let c = compromissos.get(off_conf + j).unwrap();
-                let pr = provas.get(off_conf + j).unwrap();
-                validar(env, &c)?;
-                validar(env, &pr.a0)?;
-                validar(env, &pr.a1)?;
-
-                let ctx = contexto_de(env, proposta, identidade, q, j);
-                if !verificar_cds(env, &ctx, &g, &h, &c, &pr) {
-                    return Err(Erro::ProvaBinariaInvalida);
-                }
-                soma = bls.g1_add(&soma, &c);
-            }
-
-            // D = (Σ C_j da pergunta) − w·G tem de ser múltiplo conhecido de
-            // H. Com cada v_j ∈ {0,1} pelas disjuntivas, isso fecha a boa
-            // formação **desta** pergunta.
-            let ps = provas_soma.get(i_soma).unwrap();
-            validar(env, &ps.a)?;
-            let d = bls.g1_add(&soma, &(-bls.g1_mul(&g, &fr(env, peso))));
-            let ctx = contexto_de(env, proposta, identidade, q, u32::MAX);
-            if !verificar_soma(env, &ctx, &h, &d, &ps) {
-                return Err(Erro::ProvaDeSomaInvalida);
-            }
-            i_soma += 1;
-            off_conf += pg.opcoes;
+    let mut off_conf = 0u32; // posição em `compromissos`/`provas`
+    let mut off_publ = 0u32; // posição em `escolhas`
+    let mut i_soma = 0u32; // qual prova de soma
+    for (q, pg) in p.perguntas.iter().enumerate() {
+        let q = q as u32;
+        if !pg.confidencial {
+            conferir_bloco(escolhas, off_publ, pg.opcoes, peso)?;
+            off_publ += pg.opcoes;
+            continue;
         }
 
-        // Daqui para baixo a cédula inteira já passou. Só agora se escreve —
-        // uma pergunta mal formada não deixa rastro parcial no acumulador.
-        let mut off_conf = 0u32;
-        let mut off_publ = 0u32;
-        for (q, pg) in p.perguntas.iter().enumerate() {
-            let q = q as u32;
-            for j in 0..pg.opcoes {
-                if pg.confidencial {
-                    // Agregação homomórfica: g1_add é ~30× mais barato que
-                    // g1_mul, então somar é praticamente de graça.
-                    let k = Chave::Acum(proposta.clone(), q, j);
-                    let a: Bls12381G1Affine = env.storage().persistent().get(&k).unwrap();
-                    let c = compromissos.get(off_conf + j).unwrap();
-                    env.storage().persistent().set(&k, &bls.g1_add(&a, &c));
-                    guardar_longo(env, &k);
-                } else {
-                    let k = Chave::TotalPublico(proposta.clone(), q, j);
-                    let t: u32 = env.storage().persistent().get(&k).unwrap();
-                    env.storage()
-                        .persistent()
-                        .set(&k, &(t + escolhas.get(off_publ + j).unwrap()));
-                    guardar_longo(env, &k);
-                }
+        // Todo ponto que chega é validado: o host não valida sozinho, e
+        // um ponto de ordem pequena vazaria informação sobre o escalar
+        // (sonda 10).
+        let mut soma = infinito(env);
+        for j in 0..pg.opcoes {
+            let c = compromissos.get(off_conf + j).unwrap();
+            let pr = provas.get(off_conf + j).unwrap();
+            validar(env, &c)?;
+            validar(env, &pr.a0)?;
+            validar(env, &pr.a1)?;
+
+            let ctx = contexto_de(env, proposta, identidade, q, j);
+            if !verificar_cds(env, &ctx, &g, &h, &c, &pr) {
+                return Err(Erro::ProvaBinariaInvalida);
             }
+            soma = bls.g1_add(&soma, &c);
+        }
+
+        // D = (Σ C_j da pergunta) − w·G tem de ser múltiplo conhecido de
+        // H. Com cada v_j ∈ {0,1} pelas disjuntivas, isso fecha a boa
+        // formação **desta** pergunta.
+        let ps = provas_soma.get(i_soma).unwrap();
+        validar(env, &ps.a)?;
+        let d = bls.g1_add(&soma, &(-bls.g1_mul(&g, &fr(env, peso))));
+        let ctx = contexto_de(env, proposta, identidade, q, u32::MAX);
+        if !verificar_soma(env, &ctx, &h, &d, &ps) {
+            return Err(Erro::ProvaDeSomaInvalida);
+        }
+        i_soma += 1;
+        off_conf += pg.opcoes;
+    }
+
+    // Daqui para baixo a cédula inteira já passou. Só agora se escreve —
+    // uma pergunta mal formada não deixa rastro parcial no acumulador.
+    let mut off_conf = 0u32;
+    let mut off_publ = 0u32;
+    for (q, pg) in p.perguntas.iter().enumerate() {
+        let q = q as u32;
+        for j in 0..pg.opcoes {
             if pg.confidencial {
-                off_conf += pg.opcoes;
+                // Agregação homomórfica: g1_add é ~30× mais barato que
+                // g1_mul, então somar é praticamente de graça.
+                let k = Chave::Acum(proposta.clone(), q, j);
+                let a: Bls12381G1Affine = env.storage().persistent().get(&k).unwrap();
+                let c = compromissos.get(off_conf + j).unwrap();
+                env.storage().persistent().set(&k, &bls.g1_add(&a, &c));
+                guardar_longo(env, &k);
             } else {
-                off_publ += pg.opcoes;
+                let k = Chave::TotalPublico(proposta.clone(), q, j);
+                let t: u32 = env.storage().persistent().get(&k).unwrap();
+                env.storage()
+                    .persistent()
+                    .set(&k, &(t + escolhas.get(off_publ + j).unwrap()));
+                guardar_longo(env, &k);
             }
         }
+        if pg.confidencial {
+            off_conf += pg.opcoes;
+        } else {
+            off_publ += pg.opcoes;
+        }
+    }
 
-        let kc = Chave::Comparecimento(proposta.clone());
-        let (conf, publ): (u32, u32) = env.storage().persistent().get(&kc).unwrap();
-        env.storage().persistent().set(&kc, &(conf + 1, publ));
-        guardar_longo(env, &kc);
+    let kc = Chave::Comparecimento(proposta.clone());
+    let (conf, publ): (u32, u32) = env.storage().persistent().get(&kc).unwrap();
+    env.storage().persistent().set(&kc, &(conf + 1, publ));
+    guardar_longo(env, &kc);
 
     Ok(())
 }
 
+/// Estende o TTL ao teto da rede. Aplicado a tudo que o verificador precisará
+/// depois do sétimo dia, e **não** às entradas `Votou`: estender 10.000 delas
+/// custaria ~2.070 XLM, e elas só impedem voto duplo *durante* a votação.
 fn guardar_longo(env: &Env, k: &Chave) {
     let m = env.storage().max_ttl();
     env.storage().persistent().extend_ttl(k, m - 1, m);
@@ -930,7 +991,7 @@ fn abrir_proposta(env: &Env, proposta: &BytesN<32>) -> Result<Proposta, Erro> {
 /// Aptidão e peso, numa checagem só.
 ///
 /// A v1 exige peso 1. Pesos públicos distintos são quebrados por
-/// subconjunto-soma (SPEC §6.3) e o contrato **recusa** a configuração em vez
+/// subconjunto-soma (PROTOCOLO §6.3) e o contrato **recusa** a configuração em vez
 /// de documentá-la como cuidado. O campo existe na folha para a v1.1, onde ele
 /// vira identificador de faixa com ocupação mínima τ.
 fn conferir_aptidao(

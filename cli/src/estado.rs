@@ -72,7 +72,6 @@ pub struct Verificacao {
     pub agregado: bool,
 }
 
-
 /// Propostas gravadas antes das seções existirem tinham um anel só.
 fn uma_secao() -> u32 {
     1
@@ -179,20 +178,23 @@ impl Estado {
         self.perguntas.iter().filter(|p| p.confidencial).count()
     }
 
-    /// Todas as opções, de todas as perguntas, em ordem. É o formato do
-    /// resultado que o contrato devolve.
-    pub fn todas_as_opcoes(&self) -> Vec<&str> {
-        self.perguntas
-            .iter()
-            .flat_map(|p| p.opcoes.iter().map(|o| o.as_str()))
-            .collect()
-    }
-
     /// A cédula tem alguma pergunta pública? É o que distingue uma votação
     /// semiconfidencial de uma inteiramente sigilosa.
     pub fn e_mista(&self) -> bool {
         self.perguntas.iter().any(|p| !p.confidencial)
             && self.perguntas.iter().any(|p| p.confidencial)
+    }
+    /// Todas as opções, de todas as perguntas, em ordem. É o formato do
+    /// resultado que o contrato devolve.
+    ///
+    /// Só o teste a chama hoje: o binário lê o resultado por índice. Fica
+    /// porque é ela que documenta o formato — e o teste é quem o prende.
+    #[cfg(test)]
+    pub fn todas_as_opcoes(&self) -> Vec<&str> {
+        self.perguntas
+            .iter()
+            .flat_map(|p| p.opcoes.iter().map(|o| o.as_str()))
+            .collect()
     }
 }
 
@@ -234,9 +236,16 @@ mod testes {
     #[test]
     fn conta_confidenciais_e_publicos() {
         let voto = |publico| Voto {
-            posicao: 0, identidade: "x".into(), endereco: "G".into(),
-            compromissos: vec![], provas: vec![], provas_soma: vec![],
-            publico, escolhas: None, tx: "t".into(), ledger: 0,
+            posicao: 0,
+            identidade: "x".into(),
+            endereco: "G".into(),
+            compromissos: vec![],
+            provas: vec![],
+            provas_soma: vec![],
+            publico,
+            escolhas: None,
+            tx: "t".into(),
+            ledger: 0,
         };
         let e = Estado {
             votos: vec![voto(false), voto(false), voto(true)],
@@ -269,7 +278,11 @@ mod testes {
         let v: Estado = serde_json::from_str(&s).unwrap();
         assert_eq!(v.perguntas.len(), 2);
         assert_eq!(v.todas_as_opcoes().len(), 4);
-        assert_eq!(v.opcoes_confidenciais(), 2, "só a segunda pergunta é sigilosa");
+        assert_eq!(
+            v.opcoes_confidenciais(),
+            2,
+            "só a segunda pergunta é sigilosa"
+        );
         assert_eq!(v.perguntas_confidenciais(), 1);
         assert!(v.e_mista());
         assert_eq!(v.sigilo_minimo, 5);

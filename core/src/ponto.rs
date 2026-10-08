@@ -88,7 +88,8 @@ pub fn de_hex(s: &str) -> Result<G1Affine, Erro> {
     }
     let mut b = [0u8; TAMANHO];
     for i in 0..TAMANHO {
-        b[i] = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).map_err(|_| Erro::CoordenadaInvalida)?;
+        b[i] =
+            u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).map_err(|_| Erro::CoordenadaInvalida)?;
     }
     desserializar(&b)
 }
@@ -101,8 +102,8 @@ pub fn para_hex(p: &G1Affine) -> String {
 #[cfg(test)]
 mod testes {
     use super::*;
-    use ark_ec::PrimeGroup;
     use ark_bls12_381::G1Projective;
+    use ark_ec::PrimeGroup;
 
     /// O gerador canônico tem de serializar exatamente como `G_HEX` do
     /// `vetores.env`, que o host da testnet aceitou na sonda 1.
@@ -143,6 +144,9 @@ mod testes {
         assert_eq!(desserializar(&[0u8; 50]), Err(Erro::TamanhoErrado(50)));
         let mut b = [0xAAu8; 96];
         b[0] = 0x01;
-        assert!(desserializar(&b).is_err(), "aceitou bytes que nao sao ponto");
+        assert!(
+            desserializar(&b).is_err(),
+            "aceitou bytes que nao sao ponto"
+        );
     }
 }

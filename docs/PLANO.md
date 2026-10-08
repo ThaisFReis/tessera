@@ -8,7 +8,7 @@
 Tempo real disponível de código: **3 dias cheios + 1 manhã**.
 Quinta 01, sexta 02, sábado 03, e domingo 04 até meio-dia.
 
-Isto não é tempo para construir tudo que o [SPEC.md](SPEC.md) descreve. O plano
+Isto não é tempo para construir tudo que o [PROTOCOLO.md](PROTOCOLO.md) descreve. O plano
 abaixo escolhe o que entra, **decide os cortes agora** (§4) em vez de improvisar
 sob pressão no sábado à noite, e define três portões de decisão com saída
 pré-combinada.
@@ -317,7 +317,7 @@ Se o Portão 3 falhar sábado 20:00, a submissão passa a ser:
 
 - a sonda criptográfica medida e publicada (existe hoje, funciona hoje);
 - o verificador rodando contra a sonda, não contra a urna;
-- o SPEC.md completo como a contribuição intelectual;
+- o PROTOCOLO.md completo como a contribuição intelectual;
 - **uma linha do deck trocada:** no slide `measured`, "The ballot contract itself
   lands this week" vira a verdade do dia.
 

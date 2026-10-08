@@ -13,7 +13,6 @@
 //! - ramo 0 afirma `C = r·H`        (ou seja `v = 0`)
 //! - ramo 1 afirma `C − G = r·H`    (ou seja `v = 1`)
 
-
 use crate::pedersen;
 use crate::ponto;
 use ark_bls12_381::{Fr, G1Affine, G1Projective};
@@ -104,7 +103,14 @@ pub fn provar(
         let e = desafio(contexto, c, &a0, &a1);
         let e0 = e - e1;
         let z0 = t + e0 * r;
-        Ok(Prova { a0, a1, e0, z0, e1, z1 })
+        Ok(Prova {
+            a0,
+            a1,
+            e0,
+            z0,
+            e1,
+            z1,
+        })
     } else {
         // ramo 1 é o real
         let a1: G1Affine = (*h * t).into();
@@ -115,18 +121,19 @@ pub fn provar(
         let e = desafio(contexto, c, &a0, &a1);
         let e1 = e - e0;
         let z1 = t + e1 * r;
-        Ok(Prova { a0, a1, e0, z0, e1, z1 })
+        Ok(Prova {
+            a0,
+            a1,
+            e0,
+            z0,
+            e1,
+            z1,
+        })
     }
 }
 
 /// Verifica a prova. Três igualdades, e todas têm de fechar.
-pub fn verificar(
-    contexto: &[u8],
-    g: &G1Affine,
-    h: &G1Affine,
-    c: &G1Affine,
-    p: &Prova,
-) -> bool {
+pub fn verificar(contexto: &[u8], g: &G1Affine, h: &G1Affine, c: &G1Affine, p: &Prova) -> bool {
     // 1. os desafios parciais somam o desafio ligado a (contexto, C, a0, a1)
     if p.e0 + p.e1 != desafio(contexto, c, &p.a0, &p.a1) {
         return false;
@@ -196,7 +203,11 @@ mod testes {
     fn aceita_voto_zero_e_voto_um() {
         for v in [0u64, 1] {
             let (g, h, c, _, p) = cenario(v);
-            assert!(verificar(CTX, &g, &h, &c, &p), "prova honesta de v={} falhou", v);
+            assert!(
+                verificar(CTX, &g, &h, &c, &p),
+                "prova honesta de v={} falhou",
+                v
+            );
         }
     }
 
@@ -207,7 +218,10 @@ mod testes {
         let h = ponto::de_hex(H_HEX).unwrap();
         let r = pedersen::acaso_fr().unwrap();
         let c = pedersen::comprometer(&g, &h, &pedersen::escalar(2), &r);
-        assert_eq!(provar(CTX, &g, &h, &c, 2, &r), Err(Erro::VotoForaDoBinario(2)));
+        assert_eq!(
+            provar(CTX, &g, &h, &c, 2, &r),
+            Err(Erro::VotoForaDoBinario(2))
+        );
     }
 
     /// E se alguém TENTAR forjar uma prova para v=2 usando o maquinário
@@ -227,7 +241,14 @@ mod testes {
         let z1 = pedersen::acaso_fr().unwrap();
         let a1: G1Affine = (h * z1 - (G1Projective::from(c2) - g) * e1).into();
         let e = desafio(CTX, &c2, &a0, &a1);
-        let forjada = Prova { a0, a1, e0: e - e1, z0: t + (e - e1) * r, e1, z1 };
+        let forjada = Prova {
+            a0,
+            a1,
+            e0: e - e1,
+            z0: t + (e - e1) * r,
+            e1,
+            z1,
+        };
 
         assert!(
             !verificar(CTX, &g, &h, &c2, &forjada),
@@ -241,15 +262,15 @@ mod testes {
         let um = pedersen::escalar(1);
 
         let mut q = p.clone();
-        q.e0 = q.e0 + um;
+        q.e0 += um;
         assert!(!verificar(CTX, &g, &h, &c, &q), "e0 adulterado passou");
 
         let mut q = p.clone();
-        q.z0 = q.z0 + um;
+        q.z0 += um;
         assert!(!verificar(CTX, &g, &h, &c, &q), "z0 adulterado passou");
 
         let mut q = p.clone();
-        q.z1 = q.z1 + um;
+        q.z1 += um;
         assert!(!verificar(CTX, &g, &h, &c, &q), "z1 adulterado passou");
 
         let mut q = p.clone();
@@ -264,7 +285,10 @@ mod testes {
         let (g, h, _, _, p) = cenario(1);
         let outro_r = pedersen::acaso_fr().unwrap();
         let outro_c = pedersen::comprometer(&g, &h, &pedersen::escalar(1), &outro_r);
-        assert!(!verificar(CTX, &g, &h, &outro_c, &p), "prova migrou de compromisso");
+        assert!(
+            !verificar(CTX, &g, &h, &outro_c, &p),
+            "prova migrou de compromisso"
+        );
     }
 
     /// **A prova está presa a QUEM vota e a QUAL proposta.**

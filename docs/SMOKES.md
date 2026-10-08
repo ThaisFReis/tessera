@@ -58,7 +58,7 @@ Estes são os perigosos. Não falham no `cargo test`. Falham semanas depois, ou 
 
 **Decisão que destrava.** Se o TTL padrão for menor que um ciclo de governança plausível, `abrir()` precisa **estender o TTL de tudo na abertura**, e isso tem custo e entra no orçamento de §7 do spec. Se não, a cláusula "qualquer pessoa recalcula a apuração a partir da rede" tem prazo de validade — e aí o deck está prometendo mais do que o protocolo entrega, exatamente o pecado que o §1.3 proíbe.
 
-**Tempo.** 45 min · **RESULTADO 2026-10-01: TTL padrão 7,00 dias, teto 180 dias, 0,207 XLM por entrada estendida.** O TTL padrão coincide com a janela do RPC: sem intervenção os dois níveis do verificador morrem no dia 7. `abrir()` estende só `Proposta` e `Acum` (~0,6 XLM fixo); `Votou` pode arquivar. Ver SPEC §5.1.
+**Tempo.** 45 min · **RESULTADO 2026-10-01: TTL padrão 7,00 dias, teto 180 dias, 0,207 XLM por entrada estendida.** O TTL padrão coincide com a janela do RPC: sem intervenção os dois níveis do verificador morrem no dia 7. `abrir()` estende só `Proposta` e `Acum` (~0,6 XLM fixo); `Votou` pode arquivar. Ver PROTOCOLO §5.1.
 
 ### A2 · O verificador consegue ler o passado?
 
@@ -75,7 +75,7 @@ Se a janela for curta, o verificador funciona no dia da votação e para de func
 2. Janela curta → o verificador precisa **indexar continuamente** ou tirar um snapshot assinado. É trabalho novo, e muda o escopo de sábado.
 3. Alternativa → ler dos *arquivos de histórico* em vez do RPC, que é mais lento e mais correto.
 
-**Tempo.** 30 min · **RESULTADO 2026-10-01: a janela é 120.960 ledgers = 7,00 dias, e é aplicada.** Não afeta leitura de estado nem arquivos de histórico. O verificador passa a ter dois níveis (SPEC §8.3) e lê dos arquivos por padrão. **Era mesmo a falha mais provável, e aconteceu.**
+**Tempo.** 30 min · **RESULTADO 2026-10-01: a janela é 120.960 ledgers = 7,00 dias, e é aplicada.** Não afeta leitura de estado nem arquivos de histórico. O verificador passa a ter dois níveis (PROTOCOLO §8.3) e lê dos arquivos por padrão. **Era mesmo a falha mais provável, e aconteceu.**
 
 ### A3 · A transação de voto cabe, em bytes e em footprint?
 
