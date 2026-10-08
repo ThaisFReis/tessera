@@ -889,3 +889,52 @@ com ele, **outro bump de ABI e outro redeploy**. Duas saídas:
 
 Eu faria a 1 — um redeploy a menos, e o campo é inerte até T-023 usá-lo —, mas é
 interface congelada e escopo, então é sua.
+
+### §11-J — a DEC-012 tem um problema de ordenação, e o conserto muda o fluxo
+
+Achado implementando a T-023. A DEC-012 deriva a seção da assinatura da rodada
+de `abre_em`. Mas o **comparecimento termina** em `abre_em`, e é durante o
+comparecimento que o contrato monta `Anel(proposta, secao)` — ou seja, a seção
+precisa ser conhecida **antes** do instante em que a assinatura aparece. Como
+está escrito, a DEC-012 não é implementável.
+
+Duas saídas, e a segunda é barata:
+
+1. **Montar as seções depois de `abre_em`.** O comparecimento escreve numa lista
+   só, e uma chamada única particiona e congela os digestos por seção. Funciona,
+   custa uma transação que lê o eleitorado inteiro, e acrescenta um passo humano.
+2. **Mover a rodada para o começo do comparecimento.** `abrir` fixa
+   `rodada_abertura` com `instante(rodada_abertura) > agora`, e `comparecer` só
+   aceita depois que aquela rodada venceu e a assinatura foi registrada. Quem
+   abre não consegue moer, porque na hora de `abrir` a assinatura não existe; e
+   quem comparece já sabe a sua seção, porque a essa altura ela existe. As
+   rodadas da baliza saem a cada 3 segundos, então o custo é o organizador
+   marcar o começo do comparecimento um minuto à frente.
+
+Eu faria a 2. Ela preserva exatamente o que a DEC-012 quer — ninguém escolhe
+quem se esconde atrás de quem — e o único efeito visível é que o comparecimento
+começa um pouco depois da abertura, o que a tela explica em uma linha.
+
+**O que já está medido e não depende desta escolha:** o host confere a
+assinatura da baliza por 24.053.490 instruções (6% do teto), a ordem de Fp2 em
+G2 é `c1` antes de `c0`, e o dimensionamento das seções tem uma faixa cega —
+ver §11-K.
+
+### §11-K — a faixa de 31 a 39 aptos não fecha
+
+A seção derivada por hash desequilibra, então o dimensionamento é o que mantém
+toda seção acima de `τ = 5`. Medido por simulação: com média 20 por seção a
+chance de alguma cair abaixo de `τ` é 0,0%; com média 15 fica entre 0,1% e 0,5%;
+com média 10 vai de 3,5% a 22%.
+
+O teto é CPU: 10.822.850 instruções por membro do anel, logo ~30 membros é o
+máximo de uma seção. Isso deixa uma faixa cega: de **31 a 39 aptos**, uma seção
+só passa do teto de CPU e duas seções dão média 15 a 19 — com 0,1% a 0,5% de
+chance de alguém não votar.
+
+Três saídas: aceitar a faixa como residual declarado (a falha é `τ` recusando,
+não vazamento); recusar abrir uma votação fechada nessa faixa, mandando ajustar
+o eleitorado; ou medir o teto real do anel acima de 30, que nunca foi medido, e
+ver se 36 cabe.
+
+Eu começaria medindo — é um teste e responde sozinho.
