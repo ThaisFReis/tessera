@@ -43,7 +43,7 @@ use cripto::*;
 use soroban_sdk::xdr::ToXdr;
 use soroban_sdk::{
     contract, contractimpl,
-    crypto::bls12_381::{Bls12381Fr, Bls12381G1Affine},
+    crypto::bls12_381::{Bls12381Fr, Bls12381G1Affine, Bls12381G2Affine},
     symbol_short, Address, Bytes, BytesN, Env, Vec,
 };
 use tipos::{Chave, Instancia, MAX_OPCOES, MAX_PERGUNTAS, TAU};
@@ -83,8 +83,8 @@ impl Tessera {
         anel: bool,
         secoes: u32,
         limite_secao: u32,
-        fim_tempo: u64,
         rodada: u64,
+        rodada_abertura: u64,
     ) -> Result<(), Erro> {
         governanca.require_auth();
 
@@ -150,13 +150,34 @@ impl Tessera {
         // A fórmula vem do `core`, o mesmo módulo que o cliente usa para
         // cifrar. Se divergissem, a cédula seria cifrada para uma rodada e
         // destrancada por outra — e o jeito de não divergir é não ter duas.
-        if rodada != 0 {
-            if fim_tempo <= env.ledger().timestamp() {
-                return Err(Erro::PrazoNoPassado);
-            }
-            if rodada_da_baliza(fim_tempo) != Some(rodada) {
+        // **As duas rodadas da baliza, e as duas têm de estar no futuro.**
+        //
+        // No futuro é o que importa, e é a mesma razão nas duas: uma rodada já
+        // vencida tem assinatura publicada. Para a fechadura, isso faria as
+        // cédulas abrirem na hora de serem depositadas; para a seção, deixaria
+        // quem organiza moer até isolar alguém (DEC-012). A rodada **é** o
+        // prazo: o instante dela é `instante(rodada)`, então não há campo de
+        // tempo separado para divergir.
+        let agora = env.ledger().timestamp();
+        if rodada != 0 && instante_da_rodada(rodada) <= agora {
+            return Err(Erro::RodadaNaoFecha);
+        }
+        if rodada_abertura != 0 {
+            if instante_da_rodada(rodada_abertura) <= agora {
                 return Err(Erro::RodadaNaoFecha);
             }
+            // E o comparecimento abre antes de a urna fechar, senão ninguém
+            // chega a votar.
+            if rodada != 0 && rodada_abertura >= rodada {
+                return Err(Erro::PrazoNoPassado);
+            }
+        }
+        // **Seções numa votação fechada exigem a baliza.** Sem ela não há nada
+        // contra o que conferir a seção, e quem comparece escolheria a sua — que
+        // é precisamente o ataque da DEC-012 pela outra porta. Uma seção só
+        // continua dispensando a baliza, porque não há escolha a fazer.
+        if anel && !e_aberta(&raiz_aptos) && secoes > 1 && rodada_abertura == 0 {
+            return Err(Erro::SecaoInvalida);
         }
         // Membros repetidos reduziriam o limiar efetivo sem que aparecesse.
         for (i, m) in mesa.iter().enumerate() {
@@ -199,8 +220,8 @@ impl Tessera {
             anel,
             secoes,
             limite_secao,
-            fim_tempo,
             rodada,
+            rodada_abertura,
         };
         if anel {
             // Um anel por seção, e cada um nasce vazio: sem esta escrita, o
@@ -318,7 +339,7 @@ impl Tessera {
             return Err(Erro::ArgumentoMalFormado);
         }
         // Sem anel não há seção: a folha é a da seção zero.
-        conferir_aptidao(&env, &p, &votante, peso, 0, indice, &caminho)?;
+        conferir_aptidao(&env, &p, &votante, peso, indice, &caminho)?;
         marcar_votou(&env, &proposta, &votante)?;
 
         conferir_e_somar(
@@ -413,7 +434,23 @@ impl Tessera {
             if secao >= p.secoes {
                 return Err(Erro::SecaoInvalida);
             }
-            conferir_aptidao(&env, &p, &votante, 1, secao, indice, &caminho)?;
+            conferir_aptidao(&env, &p, &votante, 1, indice, &caminho)?;
+            // **A seção vem da baliza, e o contrato confere** (DEC-012). Antes
+            // ela vinha presa na folha de Merkle, e quem montava a lista a
+            // escolhia; agora sai de uma assinatura que não existia quando a
+            // proposta foi aberta. Aceitar a seção que a chamada afirma sem
+            // conferir devolveria a escolha para quem vota, o que é o mesmo
+            // ataque pela outra porta.
+            if p.rodada_abertura != 0 && p.secoes > 1 {
+                let assinatura: BytesN<96> = env
+                    .storage()
+                    .persistent()
+                    .get(&Chave::Abertura(proposta.clone()))
+                    .ok_or(Erro::BalizaNaoRegistrada)?;
+                if secao != secao_da_baliza(&env, &assinatura, &votante, p.secoes) {
+                    return Err(Erro::SecaoInvalida);
+                }
+            }
             secao
         };
         // Validado aqui, uma vez. Depois disso o digesto do conjunto prende
@@ -855,7 +892,7 @@ impl Tessera {
         if env.ledger().sequence() < p.fecha_em {
             return Err(Erro::VotacaoAindaAberta);
         }
-        if env.ledger().timestamp() < p.fim_tempo {
+        if env.ledger().timestamp() < instante_da_rodada(p.rodada) {
             return Err(Erro::RelogioAindaNaoAbriu);
         }
 
@@ -955,6 +992,77 @@ impl Tessera {
             (quantas_abertas, quantas, placar),
         );
         Ok(quantas_abertas)
+    }
+
+    /// **Registra a assinatura da baliza da rodada de abertura.** Qualquer
+    /// pessoa, uma vez, depois que a rodada venceu.
+    ///
+    /// É dela que sai a seção de cada um (DEC-012), e o contrato **confere**
+    /// antes de guardar: `e(σ, g₂) == e(H₁(sha256(rodada)), P)`. Sem a
+    /// conferência, quem a apresentasse escolheria as seções, que é exatamente o
+    /// ataque que a derivação pela baliza fecha.
+    ///
+    /// A assinatura chega **não comprimida**, 96 bytes, porque é como o host lê
+    /// pontos de G1 e descomprimir exigiria raiz quadrada em `Fp`, que ele não
+    /// tem. Quem converte é `core::relogio::assinatura_para_host`.
+    ///
+    /// Custo medido: 24.053.490 instruções, 6% do teto — pago uma vez por
+    /// proposta, não por cédula.
+    pub fn registrar_abertura(
+        env: Env,
+        proposta: BytesN<32>,
+        assinatura: BytesN<96>,
+    ) -> Result<(), Erro> {
+        let p = abrir_proposta(&env, &proposta)?;
+        if p.rodada_abertura == 0 {
+            return Err(Erro::ModoErrado);
+        }
+        if env.ledger().timestamp() < instante_da_rodada(p.rodada_abertura) {
+            return Err(Erro::AberturaAindaNaoVenceu);
+        }
+        let k = Chave::Abertura(proposta.clone());
+        if env.storage().persistent().has(&k) {
+            // Já registrada, e ela é única: a assinatura de uma rodada é uma só.
+            return Ok(());
+        }
+
+        let bls = env.crypto().bls12_381();
+        let msg = env
+            .crypto()
+            .sha256(&Bytes::from_array(&env, &p.rodada_abertura.to_be_bytes()));
+        let q = bls.hash_to_g1(
+            &Bytes::from_array(&env, &msg.to_array()),
+            &Bytes::from_slice(&env, DST_BALIZA),
+        );
+        let s = Bls12381G1Affine::from_bytes(assinatura.clone());
+        let menos_q = bls.g1_mul(&q, &neg_um(&env));
+
+        let mut g1s = Vec::new(&env);
+        let mut g2s = Vec::new(&env);
+        g1s.push_back(s);
+        g1s.push_back(menos_q);
+        g2s.push_back(Bls12381G2Affine::from_bytes(BytesN::from_array(
+            &env,
+            &GERADOR_G2,
+        )));
+        g2s.push_back(Bls12381G2Affine::from_bytes(BytesN::from_array(
+            &env,
+            &CHAVE_BALIZA,
+        )));
+        if !bls.pairing_check(g1s, g2s) {
+            return Err(Erro::BalizaNaoConfere);
+        }
+
+        env.storage().persistent().set(&k, &assinatura);
+        guardar_longo(&env, &k);
+        env.events()
+            .publish((symbol_short!("abertura"), proposta), p.rodada_abertura);
+        Ok(())
+    }
+
+    /// A assinatura registrada, para o cliente calcular a própria seção.
+    pub fn abertura(env: Env, proposta: BytesN<32>) -> Option<BytesN<96>> {
+        env.storage().persistent().get(&Chave::Abertura(proposta))
     }
 
     /// O que a seção apurou: `(quantas cédulas abriram, totais confidenciais)`.
@@ -1267,12 +1375,55 @@ const GENESE_BALIZA: u64 = 1_692_803_367;
 const PERIODO_BALIZA: u64 = 3;
 pub const TAMANHO_CRIPTOGRAMA: u32 = 160;
 
-/// A rodada da baliza que vence no instante `t`.
-fn rodada_da_baliza(t: u64) -> Option<u64> {
-    if t < GENESE_BALIZA {
-        return None;
-    }
-    Some((t - GENESE_BALIZA) / PERIODO_BALIZA + 1)
+/// O DST do esquema `bls-unchained-g1-rfc9380`. É da drand, não nosso.
+const DST_BALIZA: &[u8] = b"BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_";
+
+/// `-1` em `Fr`, para negar um ponto: `e(σ, g₂) · e(−H₁, P) == 1`.
+fn neg_um(env: &Env) -> Bls12381Fr {
+    let bls = env.crypto().bls12_381();
+    bls.fr_sub(&fr(env, 0), &fr(env, 1))
+}
+
+/// O gerador de G2 e a chave pública da baliza, nos 192 bytes que o host lê:
+/// `be(x.c1) ‖ be(x.c0) ‖ be(y.c1) ‖ be(y.c0)`, não comprimido.
+///
+/// A ordem de Fp2 não foi deduzida — está medida em
+/// `o_host_confere_a_baliza_e_a_ordem_de_g2_e_medida`, que com a ordem trocada
+/// vê o host recusar o ponto. Vêm de `core::relogio`, e o mesmo teste as cruza.
+const GERADOR_G2: [u8; 192] = [
+    0x13, 0xe0, 0x2b, 0x60, 0x52, 0x71, 0x9f, 0x60, 0x7d, 0xac, 0xd3, 0xa0, 0x88, 0x27, 0x4f, 0x65,
+    0x59, 0x6b, 0xd0, 0xd0, 0x99, 0x20, 0xb6, 0x1a, 0xb5, 0xda, 0x61, 0xbb, 0xdc, 0x7f, 0x50, 0x49,
+    0x33, 0x4c, 0xf1, 0x12, 0x13, 0x94, 0x5d, 0x57, 0xe5, 0xac, 0x7d, 0x05, 0x5d, 0x04, 0x2b, 0x7e,
+    0x02, 0x4a, 0xa2, 0xb2, 0xf0, 0x8f, 0x0a, 0x91, 0x26, 0x08, 0x05, 0x27, 0x2d, 0xc5, 0x10, 0x51,
+    0xc6, 0xe4, 0x7a, 0xd4, 0xfa, 0x40, 0x3b, 0x02, 0xb4, 0x51, 0x0b, 0x64, 0x7a, 0xe3, 0xd1, 0x77,
+    0x0b, 0xac, 0x03, 0x26, 0xa8, 0x05, 0xbb, 0xef, 0xd4, 0x80, 0x56, 0xc8, 0xc1, 0x21, 0xbd, 0xb8,
+    0x06, 0x06, 0xc4, 0xa0, 0x2e, 0xa7, 0x34, 0xcc, 0x32, 0xac, 0xd2, 0xb0, 0x2b, 0xc2, 0x8b, 0x99,
+    0xcb, 0x3e, 0x28, 0x7e, 0x85, 0xa7, 0x63, 0xaf, 0x26, 0x74, 0x92, 0xab, 0x57, 0x2e, 0x99, 0xab,
+    0x3f, 0x37, 0x0d, 0x27, 0x5c, 0xec, 0x1d, 0xa1, 0xaa, 0xa9, 0x07, 0x5f, 0xf0, 0x5f, 0x79, 0xbe,
+    0x0c, 0xe5, 0xd5, 0x27, 0x72, 0x7d, 0x6e, 0x11, 0x8c, 0xc9, 0xcd, 0xc6, 0xda, 0x2e, 0x35, 0x1a,
+    0xad, 0xfd, 0x9b, 0xaa, 0x8c, 0xbd, 0xd3, 0xa7, 0x6d, 0x42, 0x9a, 0x69, 0x51, 0x60, 0xd1, 0x2c,
+    0x92, 0x3a, 0xc9, 0xcc, 0x3b, 0xac, 0xa2, 0x89, 0xe1, 0x93, 0x54, 0x86, 0x08, 0xb8, 0x28, 0x01,
+];
+
+/// A chave pública da cadeia `quicknet`, idem.
+const CHAVE_BALIZA: [u8; 192] = [
+    0x03, 0xcf, 0x0f, 0x28, 0x96, 0xad, 0xee, 0x7e, 0xb8, 0xb5, 0xf0, 0x1f, 0xca, 0xd3, 0x91, 0x22,
+    0x12, 0xc4, 0x37, 0xe0, 0x07, 0x3e, 0x91, 0x1f, 0xb9, 0x00, 0x22, 0xd3, 0xe7, 0x60, 0x18, 0x3c,
+    0x8c, 0x4b, 0x45, 0x0b, 0x6a, 0x0a, 0x6c, 0x3a, 0xc6, 0xa5, 0x77, 0x6a, 0x2d, 0x10, 0x64, 0x51,
+    0x0d, 0x1f, 0xec, 0x75, 0x8c, 0x92, 0x1c, 0xc2, 0x2b, 0x0e, 0x17, 0xe6, 0x3a, 0xaf, 0x4b, 0xcb,
+    0x5e, 0xd6, 0x63, 0x04, 0xde, 0x9c, 0xf8, 0x09, 0xbd, 0x27, 0x4c, 0xa7, 0x3b, 0xab, 0x4a, 0xf5,
+    0xa6, 0xe9, 0xc7, 0x6a, 0x4b, 0xc0, 0x9e, 0x76, 0xea, 0xe8, 0x99, 0x1e, 0xf5, 0xec, 0xe4, 0x5a,
+    0x01, 0xa7, 0x14, 0xf2, 0xed, 0xb7, 0x41, 0x19, 0xa2, 0xf2, 0xb0, 0xd5, 0xa7, 0xc7, 0x5b, 0xa9,
+    0x02, 0xd1, 0x63, 0x70, 0x0a, 0x61, 0xbc, 0x22, 0x4e, 0xde, 0xdd, 0x8e, 0x63, 0xae, 0xf7, 0xbe,
+    0x1a, 0xaf, 0x8e, 0x93, 0xd7, 0xa9, 0x71, 0x8b, 0x04, 0x7c, 0xcd, 0xdb, 0x3e, 0xb5, 0xd6, 0x8b,
+    0x0e, 0x5d, 0xb2, 0xb6, 0xbf, 0xbb, 0x01, 0xc8, 0x67, 0x74, 0x9c, 0xad, 0xff, 0xca, 0x88, 0xb3,
+    0x6c, 0x24, 0xf3, 0x01, 0x2b, 0xa0, 0x9f, 0xc4, 0xd3, 0x02, 0x2c, 0x5c, 0x37, 0xdc, 0xe0, 0xf9,
+    0x77, 0xd3, 0xad, 0xb5, 0xd1, 0x83, 0xc7, 0x47, 0x7c, 0x44, 0x2b, 0x1f, 0x04, 0x51, 0x52, 0x73,
+];
+
+/// O instante em que a rodada vence. É o prazo, não um campo separado.
+fn instante_da_rodada(rodada: u64) -> u64 {
+    GENESE_BALIZA + (rodada - 1) * PERIODO_BALIZA
 }
 
 /// A cadeia daquela seção, ou o começo: 32 zeros e nenhuma cédula.
@@ -1369,14 +1520,13 @@ fn conferir_aptidao(
     p: &Proposta,
     votante: &Address,
     peso: u32,
-    secao: u32,
     indice: u32,
     caminho: &Vec<BytesN<32>>,
 ) -> Result<(), Erro> {
     if peso != 1 {
         return Err(Erro::PesoNaoUnitario);
     }
-    if !verificar_aptidao(env, votante, peso, secao, indice, caminho, &p.raiz_aptos) {
+    if !verificar_aptidao(env, votante, peso, indice, caminho, &p.raiz_aptos) {
         return Err(Erro::NaoEstaNaListaDeAptos);
     }
     Ok(())

@@ -46,7 +46,7 @@
                   ]
                 },
                 {
-                  "bytes": "a610cfcf1aaf538734df0db7919b2819f4e732a5d456ac666bafbaf1c739b4f4"
+                  "bytes": "869e6c235b680b635b59f0417a3e750a9cda9a785922150e4edd74a1fa8d7c8c"
                 },
                 {
                   "vec": []
@@ -70,10 +70,10 @@
                   "u32": 0
                 },
                 {
-                  "u64": "1791010000"
+                  "u64": "6000100"
                 },
                 {
-                  "u64": "32735545"
+                  "u64": "0"
                 }
               ]
             }
@@ -99,7 +99,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 },
                 {
-                  "bytes": "187dc5051c9dd459afe702dd26a6284bc1ac129f1aa2e7ed911920fed3878f05c0c3e249685f93c3aa00b40067d50c620f49ee85e4fb3f4f76323cfd76b933c9c279b9928506345fb79fa808b9e13932aa6b905bd1f3e251ae582f4e842f69b2"
+                  "bytes": "0c653cdb920a414452105df11d3a7586f876985883beb1040b40ccb4ee3cdfd9a9c23365920183e4383b50bf2df497f0016f5d3f320fc6180c7485aa42521d7de5bbacd468bc184534059012404c43022ba9f5a52c8fbf892fc5c6517c4fd572"
                 },
                 {
                   "vec": []
@@ -123,7 +123,7 @@
   "ledger": {
     "protocol_version": 28,
     "sequence_number": 4990000,
-    "timestamp": 1791000000,
+    "timestamp": 1710803304,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
     "min_persistent_entry_ttl": 4096,
@@ -155,7 +155,7 @@
               },
               "durability": "persistent",
               "val": {
-                "bytes": "11e5d23347eb32a0a85cd0fb91918b4b7dee1aad82857192f8a2265d63df6180b71a993c9243839682cbfaf29119e94f0f2a7ca3acbd99b9b293e2e7dfc0069912b053749e619ee50e1a04223e039dcde762bc6e743e539a87c42484480a2835"
+                "bytes": "0bf9fc167ece950bc2524e676b6fe1a6b1a673e3cb0ad3cd29c5dd3610123e64bac9882a7b1adc0a377ea38f2409c6920858cb47558413c35d7347e801c0b471bbb7e5ef0c7d9a468c5e0893bc60338adf3ad6abe6bbac6750e35f4fdb0a7871"
               }
             }
           },
@@ -188,7 +188,7 @@
               },
               "durability": "persistent",
               "val": {
-                "bytes": "152f0543cfc9de4e268ba65f4f0289a763e824e84a3ae083ed87989ecc1a962e4fe80e274163510d75944650904e811e0696183c290d3b529a8d037a77b3dd9174bd7966f5ed77892eddd64c9b04533a9c10a2fbd0906d6ea0e257ac4c5e92f1"
+                "bytes": "09e9e3920aa5087475a68cd071cfcbd7dac9949a9c3c28d9a51d1930e359f6717bf65aa54218a8d0f99f37c161accf731066b3a7cad736090ab3edd11a2d0bacdff684b2c2aa9a85f4bdd06efb38ac7001117b6144fc9be96b4d87ea79bc6003"
               }
             }
           },
@@ -220,7 +220,7 @@
               "val": {
                 "vec": [
                   {
-                    "bytes": "187dc5051c9dd459afe702dd26a6284bc1ac129f1aa2e7ed911920fed3878f05c0c3e249685f93c3aa00b40067d50c620f49ee85e4fb3f4f76323cfd76b933c9c279b9928506345fb79fa808b9e13932aa6b905bd1f3e251ae582f4e842f69b2"
+                    "bytes": "0c653cdb920a414452105df11d3a7586f876985883beb1040b40ccb4ee3cdfd9a9c23365920183e4383b50bf2df497f0016f5d3f320fc6180c7485aa42521d7de5bbacd468bc184534059012404c43022ba9f5a52c8fbf892fc5c6517c4fd572"
                   }
                 ]
               }
@@ -254,7 +254,7 @@
               "val": {
                 "vec": [
                   {
-                    "bytes": "21a41fd90c8c0535c6285d16a5c2142ea04954ec40e957bfdcf35a01ec3be538"
+                    "bytes": "a4a2ed19e154ef885c979a2783f9e5abb29c4763869daffdabed67bd8d9c8ba7"
                   },
                   {
                     "u32": 1
@@ -380,7 +380,7 @@
               },
               "durability": "persistent",
               "val": {
-                "bytes": "bb1a970b0e34061d5e1c17e36e33273a178ee4db773bc056ab3f88e02e27a702"
+                "bytes": "b15bbb4d4169a3087514a1e9b32238e023797c2736e63f2bc46566d6269780da"
               }
             }
           },
@@ -404,7 +404,7 @@
                     "bytes": "0707070707070707070707070707070707070707070707070707070707070707"
                   },
                   {
-                    "bytes": "aa945895320eefec55a26d52822ff0d55c21b9b9bebfb779423b722b0d0da76a"
+                    "bytes": "8fe2782df5dbc366ced5b19c948ef20f84cf3e082749f824a2a0d5d860a189b1"
                   }
                 ]
               },
@@ -460,14 +460,6 @@
                     },
                     "val": {
                       "u32": 4990190
-                    }
-                  },
-                  {
-                    "key": {
-                      "symbol": "fim_tempo"
-                    },
-                    "val": {
-                      "u64": "1791010000"
                     }
                   },
                   {
@@ -528,7 +520,7 @@
                       "symbol": "raiz_aptos"
                     },
                     "val": {
-                      "bytes": "a610cfcf1aaf538734df0db7919b2819f4e732a5d456ac666bafbaf1c739b4f4"
+                      "bytes": "869e6c235b680b635b59f0417a3e750a9cda9a785922150e4edd74a1fa8d7c8c"
                     }
                   },
                   {
@@ -536,7 +528,15 @@
                       "symbol": "rodada"
                     },
                     "val": {
-                      "u64": "32735545"
+                      "u64": "6000100"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "rodada_abertura"
+                    },
+                    "val": {
+                      "u64": "0"
                     }
                   },
                   {

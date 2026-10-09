@@ -66,7 +66,7 @@
                   ]
                 },
                 {
-                  "bytes": "eb551d0cd4c4b2d30b30cccaba45b26dd1ee0fb50e6c6a29ce21065ef60d3bd3"
+                  "bytes": "1050c4530fb7daaba1cb77a042d5e4d324e99c756ee547ea02508f97be4b77df"
                 },
                 {
                   "vec": [
@@ -343,14 +343,6 @@
                   },
                   {
                     "key": {
-                      "symbol": "fim_tempo"
-                    },
-                    "val": {
-                      "u64": "0"
-                    }
-                  },
-                  {
-                    "key": {
                       "symbol": "limiar"
                     },
                     "val": {
@@ -443,12 +435,20 @@
                       "symbol": "raiz_aptos"
                     },
                     "val": {
-                      "bytes": "eb551d0cd4c4b2d30b30cccaba45b26dd1ee0fb50e6c6a29ce21065ef60d3bd3"
+                      "bytes": "1050c4530fb7daaba1cb77a042d5e4d324e99c756ee547ea02508f97be4b77df"
                     }
                   },
                   {
                     "key": {
                       "symbol": "rodada"
+                    },
+                    "val": {
+                      "u64": "0"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "rodada_abertura"
                     },
                     "val": {
                       "u64": "0"

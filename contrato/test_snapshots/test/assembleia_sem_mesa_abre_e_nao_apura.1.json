@@ -101,7 +101,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "bytes": "196c140cb661cf1212bd32a2a65c85aeced10d1c1a076c12959d8d7efd3e8bc827c8704375998fa7756b45019b467fb3190ba90bf267700dce49161328d6194552c7dfc5971fae16f4ab707e1c504dfae0eb7d30ce6c85e047945085a9011228"
+                  "bytes": "0a72d82fcbdea111287c4f21e330134a0ff14338fe98a3fa72d26f1107af34692120418e63b752bc454f98f21e50a8d91136c12a6341504e1f94841a644668944e5a98f21d19b003a824f848d74c0bce0277e1f5efb75a5eec60014bc93413ef"
                 },
                 {
                   "vec": []
@@ -222,7 +222,7 @@
               "val": {
                 "vec": [
                   {
-                    "bytes": "196c140cb661cf1212bd32a2a65c85aeced10d1c1a076c12959d8d7efd3e8bc827c8704375998fa7756b45019b467fb3190ba90bf267700dce49161328d6194552c7dfc5971fae16f4ab707e1c504dfae0eb7d30ce6c85e047945085a9011228"
+                    "bytes": "0a72d82fcbdea111287c4f21e330134a0ff14338fe98a3fa72d26f1107af34692120418e63b752bc454f98f21e50a8d91136c12a6341504e1f94841a644668944e5a98f21d19b003a824f848d74c0bce0277e1f5efb75a5eec60014bc93413ef"
                   }
                 ]
               }
@@ -369,14 +369,6 @@
                   },
                   {
                     "key": {
-                      "symbol": "fim_tempo"
-                    },
-                    "val": {
-                      "u64": "0"
-                    }
-                  },
-                  {
-                    "key": {
                       "symbol": "limiar"
                     },
                     "val": {
@@ -439,6 +431,14 @@
                   {
                     "key": {
                       "symbol": "rodada"
+                    },
+                    "val": {
+                      "u64": "0"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "rodada_abertura"
                     },
                     "val": {
                       "u64": "0"

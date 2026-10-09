@@ -419,14 +419,6 @@
                   },
                   {
                     "key": {
-                      "symbol": "fim_tempo"
-                    },
-                    "val": {
-                      "u64": "0"
-                    }
-                  },
-                  {
-                    "key": {
                       "symbol": "limiar"
                     },
                     "val": {
@@ -506,6 +498,14 @@
                   },
                   {
                     "key": {
+                      "symbol": "rodada_abertura"
+                    },
+                    "val": {
+                      "u64": "0"
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "secoes"
                     },
                     "val": {
@@ -562,14 +562,6 @@
                     },
                     "val": {
                       "u32": 1000
-                    }
-                  },
-                  {
-                    "key": {
-                      "symbol": "fim_tempo"
-                    },
-                    "val": {
-                      "u64": "0"
                     }
                   },
                   {
@@ -686,6 +678,14 @@
                   {
                     "key": {
                       "symbol": "rodada"
+                    },
+                    "val": {
+                      "u64": "0"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "rodada_abertura"
                     },
                     "val": {
                       "u64": "0"

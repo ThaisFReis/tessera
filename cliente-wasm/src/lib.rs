@@ -24,7 +24,7 @@
 
 use serde::{Deserialize, Serialize};
 use tessera_core::ark::{Fr, G1Affine};
-use tessera_core::{anel, cds, merkle, pedersen, ponto, shamir, soma};
+use tessera_core::{anel, cds, merkle, pedersen, ponto, relogio, shamir, soma};
 use wasm_bindgen::prelude::*;
 
 // ---------- travessia hex ----------
@@ -120,56 +120,85 @@ pub struct ChaveDeAnel {
 pub struct CaminhoJs {
     pub irmaos: Vec<String>,
     pub indice: u32,
-    /// A seção que a lista deu a esta pessoa. Vai junto para o `comparecer`.
-    pub secao: u32,
 }
 
 // ---------- a árvore de aptos ----------
 
 /// A seção de cada apto, na ordem da lista.
 ///
-/// Derivada, não escolhida: quem organiza não decide quem se esconde atrás de
-/// quem. Qualquer pessoa com a lista recalcula isto e confere a raiz.
+/// **Derivada da assinatura da baliza, não do identificador da proposta**
+/// (DEC-012). Enquanto saía da proposta, quem organizava moía o identificador
+/// até pôr o dissidente numa seção cheia de atacantes; a assinatura da rodada de
+/// abertura não existe na hora de abrir, então não há o que moer. Qualquer
+/// pessoa com a lista e a assinatura recalcula isto.
 #[wasm_bindgen]
 pub fn secoes_de(
-    proposta_hex: String,
+    assinatura_hex: String,
     enderecos_xdr: Vec<String>,
     secoes: u32,
 ) -> Result<Vec<u32>, JsValue> {
     let es = enderecos(&enderecos_xdr)?;
-    Ok(merkle::dividir(&de_hex(&proposta_hex)?, &es, secoes))
+    Ok(merkle::dividir(&de_hex(&assinatura_hex)?, &es, secoes))
+}
+
+/// A seção de **uma** pessoa. É o que a tela precisa para declarar o footprint
+/// e para dizer à pessoa onde ela vota.
+#[wasm_bindgen]
+pub fn secao_de(assinatura_hex: String, endereco_xdr: String, secoes: u32) -> Result<u32, JsValue> {
+    Ok(merkle::secao_de(
+        &de_hex(&assinatura_hex)?,
+        &de_hex(&endereco_xdr)?,
+        secoes,
+    ))
+}
+
+/// Quantas seções para um eleitorado deste tamanho: média de 20 por seção, teto
+/// de 32 pela CPU do anel. Ver `core::merkle::ALVO_SECAO`.
+#[wasm_bindgen]
+pub fn secoes_para(aptos: usize) -> u32 {
+    merkle::secoes_para(aptos)
+}
+
+/// A assinatura comprimida da baliza nos 96 bytes que o host lê, para
+/// `registrar_abertura`. Valida o ponto de passagem.
+#[wasm_bindgen]
+pub fn assinatura_da_baliza(comprimida_hex: String) -> Result<String, JsValue> {
+    let b = relogio::assinatura_para_host(&de_hex(&comprimida_hex)?)
+        .map_err(|e| JsValue::from_str(&format!("assinatura: {:?}", e)))?;
+    Ok(hex(&b))
+}
+
+/// A rodada da baliza que vence num instante, e o inverso. A tela escolhe o
+/// prazo em tempo e o contrato confere a rodada — e a conta é a mesma dos dois
+/// lados porque vem do mesmo módulo.
+#[wasm_bindgen]
+pub fn rodada_em(instante: u64) -> Result<u64, JsValue> {
+    relogio::rodada(instante).map_err(|e| JsValue::from_str(&format!("rodada: {:?}", e)))
 }
 
 #[wasm_bindgen]
-pub fn raiz_de_aptos(
-    proposta_hex: String,
-    enderecos_xdr: Vec<String>,
-    pesos: Vec<u32>,
-    secoes: u32,
-) -> Result<String, JsValue> {
-    Ok(hex(
-        &arvore(&proposta_hex, &enderecos_xdr, &pesos, secoes)?.raiz()
-    ))
+pub fn instante_da_rodada(rodada: u64) -> u64 {
+    relogio::instante(rodada)
+}
+
+#[wasm_bindgen]
+pub fn raiz_de_aptos(enderecos_xdr: Vec<String>, pesos: Vec<u32>) -> Result<String, JsValue> {
+    Ok(hex(&arvore(&enderecos_xdr, &pesos)?.raiz()))
 }
 
 #[wasm_bindgen]
 pub fn caminho_de(
-    proposta_hex: String,
     enderecos_xdr: Vec<String>,
     pesos: Vec<u32>,
-    secoes: u32,
     indice: usize,
 ) -> Result<JsValue, JsValue> {
-    let a = arvore(&proposta_hex, &enderecos_xdr, &pesos, secoes)?;
+    let a = arvore(&enderecos_xdr, &pesos)?;
     let c = a
         .caminho(indice)
         .map_err(|e| JsValue::from_str(&format!("caminho: {:?}", e)))?;
-    let es = enderecos(&enderecos_xdr)?;
-    let d = merkle::dividir(&de_hex(&proposta_hex)?, &es, secoes);
     let js = CaminhoJs {
         irmaos: c.irmaos.iter().map(|s| hex(s)).collect(),
         indice: c.indice,
-        secao: d[indice],
     };
     serde_wasm_bindgen::to_value(&js).map_err(Into::into)
 }
@@ -178,32 +207,20 @@ fn enderecos(xdr: &[String]) -> Result<Vec<Vec<u8>>, JsValue> {
     xdr.iter().map(|e| de_hex(e)).collect()
 }
 
-/// A raiz e o caminho saem **da mesma função**, de propósito: a divisão é
-/// calculada aqui dentro, uma vez, a partir dos mesmos dados. Se o chamador
-/// pudesse passar as seções por fora, uma raiz montada com uma divisão e um
-/// caminho montado com outra dariam `NaoEstaNaListaDeAptos` sem dizer por quê.
-fn arvore(
-    proposta_hex: &str,
-    enderecos_xdr: &[String],
-    pesos: &[u32],
-    secoes: u32,
-) -> Result<merkle::Arvore, JsValue> {
+/// A árvore não sabe mais de seções: a folha é `H(0x00 ‖ endereço ‖ peso_be)`,
+/// e a seção passou a sair da baliza (DEC-012). Era a divisão calculada aqui
+/// dentro que garantia raiz e caminho coerentes; agora não há nada a coordenar,
+/// porque não há divisão na folha.
+fn arvore(enderecos_xdr: &[String], pesos: &[u32]) -> Result<merkle::Arvore, JsValue> {
     if enderecos_xdr.len() != pesos.len() {
         return Err(JsValue::from_str(
             "endereços e pesos de tamanhos diferentes",
         ));
     }
-    let es = enderecos(enderecos_xdr)?;
-    let d = merkle::dividir(&de_hex(proposta_hex)?, &es, secoes);
-    let folhas: Vec<merkle::Apto> = es
+    let folhas: Vec<merkle::Apto> = enderecos(enderecos_xdr)?
         .into_iter()
         .zip(pesos)
-        .zip(&d)
-        .map(|((endereco, p), secao)| merkle::Apto {
-            endereco,
-            peso: *p,
-            secao: *secao,
-        })
+        .map(|(endereco, p)| merkle::Apto { endereco, peso: *p })
         .collect();
     merkle::Arvore::montar(&folhas).map_err(|e| JsValue::from_str(&format!("árvore: {:?}", e)))
 }

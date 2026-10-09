@@ -112,7 +112,6 @@ fn montar_janela(
         .map(|a| merkle::Apto {
             endereco: bytes_de(&a.clone().to_xdr(&env)),
             peso: 1,
-            secao: 0,
         })
         .collect();
     let arvore = merkle::Arvore::montar(&folhas).unwrap();
@@ -1746,7 +1745,6 @@ fn o_caderno_diz_quem_faltou_e_a_urna_nao_diz_de_quem() {
         .map(|a| merkle::Apto {
             endereco: bytes_de(&a.clone().to_xdr(&env)),
             peso: 1,
-            secao: 0,
         })
         .collect();
     let arvore = merkle::Arvore::montar(&folhas).unwrap();
@@ -2030,7 +2028,6 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
         .map(|a| merkle::Apto {
             endereco: bytes_de(&a.clone().to_xdr(&env)),
             peso: 1,
-            secao: 0,
         })
         .collect();
     let arvore = merkle::Arvore::montar(&folhas).unwrap();
@@ -2248,7 +2245,7 @@ fn ate_quantas_pessoas_cabe_um_anel() {
     std::println!("{:>7}  {:>12}  {:>9}", "no anel", "instrucoes", "% de 400M");
 
     let mut anterior = 0u64;
-    for n in [5usize, 10, 20, 30] {
+    for n in [5usize, 10, 20, 30, 32] {
         let env = Env::default();
         env.mock_all_auths();
         env.ledger().set_sequence_number(4_989_900);
@@ -2261,7 +2258,6 @@ fn ate_quantas_pessoas_cabe_um_anel() {
             .map(|a| merkle::Apto {
                 endereco: bytes_de(&a.clone().to_xdr(&env)),
                 peso: 1,
-                secao: 0,
             })
             .collect();
         let arvore = merkle::Arvore::montar(&folhas).unwrap();
@@ -2450,15 +2446,14 @@ fn trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez() {
         .map(|a| bytes_de(&a.clone().to_xdr(&env)))
         .collect();
 
-    // A divisão vem da lista. Quem organiza não escolhe quem cai com quem.
-    let divisao = merkle::dividir(&proposta.to_array(), &xdrs, SECOES);
+    // **A divisão vem da baliza** (DEC-012), não da lista e não da proposta. A
+    // folha não a carrega mais, então a árvore é só endereço e peso.
+    let divisao = merkle::dividir(&assinatura_em_bytes(), &xdrs, SECOES);
     let folhas: Vetor<merkle::Apto> = xdrs
         .iter()
-        .zip(&divisao)
-        .map(|(e, s)| merkle::Apto {
+        .map(|e| merkle::Apto {
             endereco: e.clone(),
             peso: 1,
-            secao: *s,
         })
         .collect();
     let arvore = merkle::Arvore::montar(&folhas).unwrap();
@@ -2483,8 +2478,21 @@ fn trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez() {
         &true,
         &SECOES,
         &0u32,
+        // Sem fechadura de tempo: este teste é sobre o custo das seções, e a
+        // apuração dele é a da mesa. Mas **com** rodada de abertura, porque sem
+        // ela o contrato recusa seções numa votação fechada.
         &0u64,
-        &0u64,
+        &RODADA_ABERTURA,
+    );
+
+    // A rodada de abertura vence, e qualquer pessoa registra a assinatura. Sem
+    // ela não há seção para conferir, e o contrato recusa o comparecimento.
+    env.ledger().set_timestamp(instante(RODADA_ABERTURA));
+    cliente.registrar_abertura(&proposta, &assinatura_host(&env));
+    assert_eq!(
+        cliente.abertura(&proposta),
+        Some(assinatura_host(&env)),
+        "a assinatura registrada não é a que a baliza publicou"
     );
 
     let g = pedersen::gerador();
@@ -2500,7 +2508,7 @@ fn trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez() {
         (c, p.indice)
     };
 
-    // ---- a seção está presa na folha ----
+    // ---- a seção vem da baliza, e o contrato confere ----
     let (c0_, i0_) = caminho_de(0);
     let outra = (divisao[0] + 1) % SECOES;
     assert_eq!(
@@ -2515,7 +2523,7 @@ fn trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez() {
             &i0_,
             &outra,
         ),
-        Err(Ok(Erro::NaoEstaNaListaDeAptos)),
+        Err(Ok(Erro::SecaoInvalida)),
         "deu para escolher a seção: quem vota pegaria a menor"
     );
 
@@ -2819,7 +2827,6 @@ fn a_votacao_fechada_nao_virou_aberta() {
         .map(|a| merkle::Apto {
             endereco: bytes_de(&a.clone().to_xdr(&env)),
             peso: 1,
-            secao: 0,
         })
         .collect();
     let arvore = merkle::Arvore::montar(&folhas).unwrap();
@@ -3103,15 +3110,39 @@ fn limite_por_secao_nao_vale_na_fechada() {
 // `core::relogio`, e a rodada ponta a ponta é T-021.
 // =====================================================================
 
-/// Instante do fechamento e a rodada que ele determina, do mesmo módulo que o
-/// cliente usa para cifrar.
-const T0: u64 = 1_791_000_000;
-const FIM_TEMPO: u64 = T0 + 10_000;
+/// **O relógio destes testes é a rodada 6.000.000 da `quicknet`, com a
+/// assinatura que a baliza publicou de verdade.**
+///
+/// Não há vetor forjado aqui de propósito: `registrar_abertura` confere a
+/// assinatura com um pareamento, então uma rodada inventada não passaria. Por
+/// isso o `timestamp` dos testes fica logo antes do instante daquela rodada — a
+/// proposta abre com ela no futuro, como o contrato exige, e o tempo avança por
+/// cima dela.
+const RODADA_ABERTURA: u64 = 6_000_000;
+const ASSINATURA_ABERTURA: &str = "848a0288a7102249bd6a274f65414ec8ca5b12c5e6f13a322e315ab734107784cd9b7ed4ebae73980cd72730ac6eb9f7";
+/// Uma rodada depois, para a urna fechar depois de o comparecimento abrir.
+const RODADA_FIM: u64 = RODADA_ABERTURA + 100;
 const ABRE: u32 = 4_989_990;
 const FECHA: u32 = 4_990_190;
 
-fn rodada_do_fim() -> u64 {
-    tessera_core::relogio::rodada(FIM_TEMPO).unwrap()
+fn instante(rodada: u64) -> u64 {
+    tessera_core::relogio::instante(rodada)
+}
+
+/// Um instante logo antes de a rodada de abertura vencer.
+fn t0() -> u64 {
+    instante(RODADA_ABERTURA) - 60
+}
+
+/// A assinatura nos 96 bytes não comprimidos que o host lê — e que são **os
+/// bytes de que a seção é derivada**. Alimentar `secao_de` com os 48
+/// comprimidos daria outra divisão em silêncio.
+fn assinatura_em_bytes() -> [u8; 96] {
+    tessera_core::relogio::assinatura_para_host(&hex_bytes(ASSINATURA_ABERTURA)).unwrap()
+}
+
+fn assinatura_host(env: &Env) -> BytesN<96> {
+    BytesN::from_array(env, &assinatura_em_bytes())
 }
 
 struct Urna {
@@ -3133,7 +3164,7 @@ fn urna_com_fechadura(escolhas: &[u32]) -> Urna {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().set_sequence_number(4_989_900);
-    env.ledger().set_timestamp(T0);
+    env.ledger().set_timestamp(t0());
     let id = env.register(Tessera, ());
     let cliente = TesseraClient::new(&env, &id);
 
@@ -3143,7 +3174,6 @@ fn urna_com_fechadura(escolhas: &[u32]) -> Urna {
         .map(|a| merkle::Apto {
             endereco: bytes_de(&a.clone().to_xdr(&env)),
             peso: 1,
-            secao: 0,
         })
         .collect();
     let arvore = merkle::Arvore::montar(&folhas).unwrap();
@@ -3169,8 +3199,8 @@ fn urna_com_fechadura(escolhas: &[u32]) -> Urna {
         &true,
         &1u32,
         &0u32,
-        &FIM_TEMPO,
-        &rodada_do_fim(),
+        &RODADA_FIM,
+        &0u64,
     );
 
     let g = pedersen::gerador();
@@ -3280,7 +3310,7 @@ impl Urna {
     /// A janela fecha e a rodada vence: é quando o placar pode existir.
     fn fim(&self) {
         self.env.ledger().set_sequence_number(FECHA);
-        self.env.ledger().set_timestamp(FIM_TEMPO);
+        self.env.ledger().set_timestamp(instante(RODADA_FIM));
     }
 
     /// A lista ordenada de todos os compromissos da seção, achatada.
@@ -3320,39 +3350,40 @@ impl Urna {
 
 /// A aritmética da rodada é repetida no contrato para não arrastar o `core`
 /// para dentro do Wasm. Repetir é divergir, então aqui as duas se cruzam: o
-/// contrato aceita exatamente a rodada que o `core` calcula, e recusa as
-/// vizinhas.
+/// instante que o `core` calcula para uma rodada é o mesmo que o contrato usa
+/// como prazo.
+///
+/// O cruzamento é pela **fronteira**, que é o único jeito de ver por fora o
+/// número que o contrato usa por dentro: um segundo antes do instante da rodada
+/// ele recusa, e no instante exato ele aceita. Se as duas contas divergissem em
+/// um segundo, isto quebraria.
 #[test]
 fn a_rodada_do_contrato_bate_com_a_do_core() {
     let u = urna_com_fechadura(&[0]);
-    let certa = rodada_do_fim();
-    for errada in [certa - 1, certa + 1] {
-        let outra: BytesN<32> = BytesN::from_array(&u.env, &[1u8; 32]);
-        let mut perg = Vec::new(&u.env);
-        perg.push_back(Pergunta {
-            opcoes: 2,
-            confidencial: true,
-        });
-        assert_eq!(
-            u.cliente.try_abrir(
-                &Address::generate(&u.env),
-                &outra,
-                &perg,
-                &BytesN::from_array(&u.env, &[0u8; 32]),
-                &Vec::new(&u.env),
-                &0u32,
-                &ABRE,
-                &FECHA,
-                &true,
-                &1u32,
-                &0u32,
-                &FIM_TEMPO,
-                &errada,
-            ),
-            Err(Ok(Erro::RodadaNaoFecha)),
-            "o contrato aceitou a rodada {errada}, e o core diz {certa}"
-        );
-    }
+    u.env.ledger().set_sequence_number(FECHA);
+    let (abertas, totais, aberturas) = u.apuracao(&[true]);
+    let quem = Address::generate(&u.env);
+    let tentar = || {
+        u.cliente.try_apurar_secao(
+            &u.proposta,
+            &quem,
+            &0u32,
+            &u.lista(),
+            &abertas,
+            &totais,
+            &aberturas,
+        )
+    };
+
+    u.env.ledger().set_timestamp(instante(RODADA_FIM) - 1);
+    assert_eq!(
+        tentar(),
+        Err(Ok(Erro::RelogioAindaNaoAbriu)),
+        "o contrato usa um instante diferente do que o core calcula"
+    );
+    u.env.ledger().set_timestamp(instante(RODADA_FIM));
+    assert_eq!(tentar(), Ok(Ok(1)));
+
     assert_eq!(
         tessera_core::relogio::TAMANHO as u32,
         crate::TAMANHO_CRIPTOGRAMA,
@@ -3360,42 +3391,63 @@ fn a_rodada_do_contrato_bate_com_a_do_core() {
     );
 }
 
-/// **INV-22.** A rodada vem do fechamento, não da vontade de quem abre. Sem
-/// isto, quem abre cifraria para uma rodada já publicada e as cédulas abririam
-/// na hora de serem depositadas.
+/// **INV-22.** A rodada tem de estar no **futuro** na hora de abrir, e isso vale
+/// para as duas: a do fechamento e a da abertura.
+///
+/// É o mesmo motivo nos dois casos. Uma rodada já vencida tem assinatura
+/// publicada — na fechadura, as cédulas abririam na hora de serem depositadas;
+/// na abertura, quem organiza leria a assinatura e moeria até isolar alguém
+/// (DEC-012). Não existe campo de tempo separado para conferir contra: a rodada
+/// **é** o prazo.
 #[test]
-fn a_rodada_vem_do_fechamento_e_nao_da_vontade_de_quem_abre() {
+fn a_rodada_tem_de_estar_no_futuro() {
     let u = urna_com_fechadura(&[0]);
     let mut perg = Vec::new(&u.env);
     perg.push_back(Pergunta {
         opcoes: 2,
         confidencial: true,
     });
-    let abrir_com = |fim: u64, rodada: u64| {
+    let abrir_com = |rodada: u64, abertura: u64, secoes: u32| {
         u.cliente.try_abrir(
             &Address::generate(&u.env),
             &BytesN::from_array(&u.env, &[2u8; 32]),
             &perg,
-            &BytesN::from_array(&u.env, &[0u8; 32]),
+            // Raiz não nula: 32 zeros seriam **votação aberta**, e aí a
+            // seção vem da ordem de chegada, não da lista.
+            &BytesN::from_array(&u.env, &[3u8; 32]),
             &Vec::new(&u.env),
             &0u32,
             &ABRE,
             &FECHA,
             &true,
-            &1u32,
+            &secoes,
             &0u32,
-            &fim,
             &rodada,
+            &abertura,
         )
     };
-    // Fechamento no passado: o relógio é do ledger, não de quem abre.
-    let passado = T0 - 1;
+
+    // A rodada 1 venceu em 2023: a assinatura dela está publicada há anos.
+    assert_eq!(abrir_com(1, 0, 1), Err(Ok(Erro::RodadaNaoFecha)));
     assert_eq!(
-        abrir_com(passado, tessera_core::relogio::rodada(passado).unwrap()),
+        abrir_com(RODADA_FIM, 1, 1),
+        Err(Ok(Erro::RodadaNaoFecha)),
+        "aceitou uma rodada de abertura já publicada"
+    );
+    // E o comparecimento abre antes de a urna fechar.
+    assert_eq!(
+        abrir_com(RODADA_ABERTURA, RODADA_FIM, 1),
         Err(Ok(Erro::PrazoNoPassado))
     );
-    // E a rodada da gênese, que já está publicada há anos.
-    assert_eq!(abrir_com(FIM_TEMPO, 1), Err(Ok(Erro::RodadaNaoFecha)));
+
+    // **Seções numa votação fechada exigem a baliza.** Sem ela a seção não tem
+    // contra o que ser conferida, e quem comparece escolheria a sua.
+    assert_eq!(
+        abrir_com(RODADA_FIM, 0, 3),
+        Err(Ok(Erro::SecaoInvalida)),
+        "abriu votação fechada com seções e sem baliza: a seção fica à escolha"
+    );
+    assert_eq!(abrir_com(RODADA_FIM, RODADA_ABERTURA, 3), Ok(Ok(())));
 }
 
 /// **INV-18.** Nenhum resultado, nem parcial, antes do fechamento — e o portão
@@ -3425,7 +3477,7 @@ fn antes_do_fechamento_nao_existe_placar() {
     // cédulas não existe no mundo, e o contrato não publica placar que ninguém
     // poderia ter calculado honestamente.
     u.env.ledger().set_sequence_number(FECHA);
-    u.env.ledger().set_timestamp(FIM_TEMPO - 1);
+    u.env.ledger().set_timestamp(instante(RODADA_FIM) - 1);
     assert_eq!(
         u.cliente.try_apurar_secao(
             &u.proposta,
@@ -3824,4 +3876,129 @@ fn o_host_confere_a_baliza_e_a_ordem_de_g2_e_medida() {
         gasto < 100_000_000,
         "conferir a baliza custou {gasto}, inviável dentro de uma cédula"
     );
+}
+
+/// **DEC-012, no contrato.** A seção vem da baliza e o contrato **confere** —
+/// aceitar a que a chamada afirma devolveria a escolha para quem vota.
+///
+/// E a assinatura tem de ser a da rodada daquela proposta: uma assinatura válida
+/// de **outra** rodada é recusada, senão um relé escolheria a divisão
+/// apresentando a rodada que lhe conviesse.
+#[test]
+fn a_seccao_vem_da_baliza_e_o_contrato_confere() {
+    use tessera_core::anel;
+
+    const N: usize = 40;
+    const SECOES: u32 = 2;
+
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(4_989_900);
+    env.ledger().set_timestamp(t0());
+    let id = env.register(Tessera, ());
+    let cliente = TesseraClient::new(&env, &id);
+
+    let proposta: BytesN<32> = BytesN::from_array(&env, &[13u8; 32]);
+    let aptos: Vetor<Address> = (0..N).map(|_| Address::generate(&env)).collect();
+    let xdrs: Vetor<Vetor<u8>> = aptos
+        .iter()
+        .map(|a| bytes_de(&a.clone().to_xdr(&env)))
+        .collect();
+    let folhas: Vetor<merkle::Apto> = xdrs
+        .iter()
+        .map(|e| merkle::Apto {
+            endereco: e.clone(),
+            peso: 1,
+        })
+        .collect();
+    let arvore = merkle::Arvore::montar(&folhas).unwrap();
+
+    let mut perg = Vec::new(&env);
+    perg.push_back(Pergunta {
+        opcoes: 2,
+        confidencial: true,
+    });
+    cliente.abrir(
+        &Address::generate(&env),
+        &proposta,
+        &perg,
+        &BytesN::from_array(&env, &arvore.raiz()),
+        &Vec::new(&env),
+        &0u32,
+        &4_989_990u32,
+        &4_990_190u32,
+        &true,
+        &SECOES,
+        &0u32,
+        &0u64,
+        &RODADA_ABERTURA,
+    );
+
+    let g = pedersen::gerador();
+    let caminho_de = |i: usize| {
+        let p = arvore.caminho(i).unwrap();
+        let mut c = Vec::new(&env);
+        for irmao in &p.irmaos {
+            c.push_back(BytesN::from_array(&env, irmao));
+        }
+        (c, p.indice)
+    };
+    let chave = |_: usize| {
+        g1(
+            &env,
+            &anel::chave_publica(&g, &pedersen::acaso_fr().unwrap()),
+        )
+    };
+
+    // **Sem a assinatura registrada ninguém comparece.** Não é cosmético: sem
+    // ela o contrato não tem contra o que conferir a seção.
+    let (c0, i0) = caminho_de(0);
+    assert_eq!(
+        cliente.try_comparecer(&proposta, &aptos[0], &chave(0), &c0, &i0, &0u32),
+        Err(Ok(Erro::BalizaNaoRegistrada))
+    );
+
+    // E antes de a rodada vencer não há o que registrar: a assinatura não
+    // existe no mundo.
+    assert_eq!(
+        cliente.try_registrar_abertura(&proposta, &assinatura_host(&env)),
+        Err(Ok(Erro::AberturaAindaNaoVenceu))
+    );
+
+    env.ledger().set_timestamp(instante(RODADA_ABERTURA));
+
+    // Uma assinatura válida, mas de outra rodada, é recusada. É o que impede um
+    // relé de escolher a divisão apresentando a rodada que lhe convém.
+    let outra: BytesN<96> = BytesN::from_array(
+        &env,
+        &tessera_core::relogio::assinatura_para_host(&hex_bytes(
+            "aa0ffe277142bf0bb52caa6037770b4f135e9a8325efb88f691420ca93f635ceda8c5e64eddff9cee9b2f29ba2e44d17",
+        ))
+        .unwrap(),
+    );
+    assert_eq!(
+        cliente.try_registrar_abertura(&proposta, &outra),
+        Err(Ok(Erro::BalizaNaoConfere)),
+        "aceitou a assinatura de outra rodada"
+    );
+
+    cliente.registrar_abertura(&proposta, &assinatura_host(&env));
+
+    // Agora a seção é determinada, e **só** ela é aceita.
+    let divisao = merkle::dividir(&assinatura_em_bytes(), &xdrs, SECOES);
+    for i in 0..3 {
+        let (c, idx) = caminho_de(i);
+        let errada = (divisao[i] + 1) % SECOES;
+        assert_eq!(
+            cliente.try_comparecer(&proposta, &aptos[i], &chave(i), &c, &idx, &errada),
+            Err(Ok(Erro::SecaoInvalida)),
+            "o membro {i} escolheu a seção"
+        );
+        cliente.comparecer(&proposta, &aptos[i], &chave(i), &c, &idx, &divisao[i]);
+        assert_eq!(cliente.secao_de(&proposta, &aptos[i]), Some(divisao[i]));
+    }
+
+    // E o dimensionamento: 40 aptos em 2 seções é média 20, a faixa que
+    // `core::merkle` mede como segura.
+    assert_eq!(merkle::secoes_para(N), SECOES);
 }
