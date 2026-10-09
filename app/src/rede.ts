@@ -18,7 +18,7 @@ export const REDE = {
   horizon: "https://horizon-testnet.stellar.org",
   friendbot: "https://friendbot.stellar.org",
   passphrase: Networks.TESTNET,
-  contrato: "CCQHRQZP3R3QMMKEEOOOS7XXINR7WGSMTKGNR4GD6BDNLC6JSPUZIDHZ",
+  contrato: "CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH",
   explorer: "https://stellar.expert/explorer/testnet",
 };
 
@@ -246,6 +246,26 @@ export const lerSecoes = async (id: string): Promise<number> =>
 /** Em que seção a pessoa caiu, segundo a cadeia. */
 export const lerSecao = async (id: string, g: string): Promise<number | null> =>
   ((await ler("secao_de", bytesN(id), endereco(g))) as number | null) ?? null;
+
+/// A assinatura da baliza da rodada de abertura, já conferida pelo contrato,
+/// nos 96 bytes não comprimidos. É dela que a seção é derivada (DEC-012) — e
+/// são **estes** bytes, não os 48 comprimidos que a baliza publica.
+export const lerAbertura = async (id: string): Promise<string | null> => {
+  const b = (await ler("abertura", bytesN(id))) as Uint8Array | null;
+  return b ? bytesParaHex(b) : null;
+};
+
+/// Registra a assinatura. Qualquer pessoa, uma vez, depois que a rodada venceu
+/// — e o contrato confere com um pareamento antes de guardar, senão quem a
+/// apresentasse escolheria as seções.
+export const registrarAbertura = (c: Carteira, id: string, assinaturaHost: string, d?: Diario) =>
+  enviar(
+    c,
+    "registrar_abertura",
+    [bytesN(id), bytesN(assinaturaHost)],
+    d,
+    `proposta ${id.slice(0, 8)}… · assinatura da baliza, 96 bytes`,
+  );
 
 export const lerAnel = async (id: string, secao: number): Promise<string[]> =>
   ((await ler("anel", bytesN(id), u32(secao))) as Uint8Array[]).map(bytesParaHex);
@@ -518,14 +538,16 @@ export const abrir = (
   anel: boolean,
   secoes: number,
   limiteSecao: number,
-  /** Fechamento em **tempo**, e a rodada da baliza que ele determina.
+  /** A rodada da baliza que destranca as cédulas, e a que **abre o
+   *  comparecimento** e decide as seções.
    *
-   *  `fecha_em` é sequência de ledger e a fechadura precisa de relógio. Zero
-   *  nos dois é proposta sem fechadura — a da mesa. Quem calcula a rodada é
-   *  `relogio.rodada(fimTempo)` no wasm, o mesmo código que o contrato
-   *  confere. */
-  fimTempo = 0,
+   *  Não há campo de tempo: o prazo **é** `instante(rodada)`, e guardar os dois
+   *  só criaria divergência. As duas têm de estar no futuro na hora de abrir —
+   *  uma rodada já vencida tem assinatura publicada, e aí as cédulas abririam
+   *  na hora e as seções seriam moíveis. Quem calcula é `rodada_em` no wasm, o
+   *  mesmo código que o contrato confere. */
   rodada = 0,
+  rodadaAbertura = 0,
   d?: Diario,
 ) =>
   enviar(
@@ -550,8 +572,8 @@ export const abrir = (
       xdr.ScVal.scvBool(anel),
       u32(secoes),
       u32(limiteSecao),
-      u64(fimTempo),
       u64(rodada),
+      u64(rodadaAbertura),
     ],
     d,
     `proposta ${id.slice(0, 8)}… · ${perguntas.length} pergunta${perguntas.length === 1 ? "" : "s"} · ` +

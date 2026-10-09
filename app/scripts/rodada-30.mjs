@@ -60,7 +60,7 @@ const HORIZON = "https://horizon-testnet.stellar.org";
 const FRIENDBOT = "https://friendbot.stellar.org";
 const PASSPHRASE = Networks.TESTNET;
 const CONTRATO = process.env.TESSERA_CONTRATO ??
-  "CCQHRQZP3R3QMMKEEOOOS7XXINR7WGSMTKGNR4GD6BDNLC6JSPUZIDHZ";
+  "CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH";
 
 const N = Number(process.env.N ?? 30);
 const OPCOES = 2;
@@ -74,6 +74,8 @@ const TAXA_INCLUSAO = Number(process.env.TAXA_INCLUSAO ?? 1_000_000);
 const FOLGA = Number(process.env.FOLGA ?? 96 * 40 + 1024);
 /** Em quantas seções dividir. 1 reproduz o anel único. */
 const SECOES = Number(process.env.SECOES ?? 1);
+/** A cadeia `quicknet` da drand. Ver docs/SOURCES.md. */
+const CADEIA_BALIZA = "52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971";
 /** ABERTA=1 abre sem lista: raiz de 32 zeros, qualquer carteira comparece. */
 const ABERTA = process.env.ABERTA === "1";
 /** Pessoas por seção na aberta. 0 = uma seção só. */
@@ -257,15 +259,20 @@ async function main() {
   const pesos = membros.map(() => 1);
   // O id nasce antes da raiz: a divisão em seções é derivada dele.
   const id = bytesHex(Keypair.random().rawPublicKey().subarray(0, 32));
-  const raiz = ABERTA ? "0".repeat(64) : wasm.raiz_de_aptos(id, enderecos, pesos, SECOES);
+  const raiz = ABERTA ? "0".repeat(64) : wasm.raiz_de_aptos(enderecos, pesos);
   // Na aberta a seção vem do contrato; aqui guardamos o que ele devolver.
-  const divisao = ABERTA
+  // A rodada da baliza que abre o comparecimento e decide as seções (DEC-012).
+  // Tem de estar no futuro na hora de `abrir`; meio minuto é folga de sobra.
+  const RODADA_ABERTURA = !ABERTA && SECOES > 1
+    ? Number(wasm.rodada_em(BigInt(Math.floor(Date.now() / 1000) + 30)))
+    : 0;
+  let assinaturaHost = null;
+  let divisao = ABERTA
     ? new Array(N).fill(0)
-    : Array.from(wasm.secoes_de(id, enderecos, SECOES));
+    : new Array(N).fill(0);
   diz(`raiz de aptos = ${raiz.slice(0, 16)}…`);
-  if (SECOES > 1) {
-    const tam = Array.from({ length: SECOES }, (_, s) => divisao.filter((x) => x === s).length);
-    diz(`${SECOES} seções de ${tam.join(", ")} — sorteadas pela lista, não escolhidas`);
+  if (!ABERTA && SECOES > 1) {
+    diz(`${SECOES} seções — a divisão sai da baliza, e nem quem abre a conhece agora`);
   }
 
   titulo("abrir");
@@ -281,7 +288,7 @@ async function main() {
       { type: { opcoes: ["symbol", "u32"], confidencial: ["symbol", "bool"] } })]),
     bN(raiz), vec(mesa.map(addr)), u32(1), u32(abreEm), u32(fechaEm),
     xdr.ScVal.scvBool(true), u32(ABERTA ? 1 : SECOES), u32(ABERTA ? LIMITE : 0),
-    u64(0), u64(0),
+    u64(0), u64(RODADA_ABERTURA),
   ]);
   if (ABERTA) diz("aberta: raiz de 32 zeros, sem lista");
   if (!r1.ok) throw new Error(`abrir falhou — ${r1.fase}: ${r1.erro}`);
@@ -296,12 +303,31 @@ async function main() {
   if (RETENTATIVAS) {
     diz(`com até ${RETENTATIVAS} retentativas por pessoa — re-simula contra o estado novo`);
   }
+  // **A baliza publica, e qualquer pessoa registra.** Sem isso o contrato
+  // recusa o comparecimento: não há contra o que conferir a seção.
+  if (RODADA_ABERTURA) {
+    const venceEm = Number(wasm.instante_da_rodada(BigInt(RODADA_ABERTURA)));
+    while (Math.floor(Date.now() / 1000) < venceEm) {
+      diz(`espera a rodada ${RODADA_ABERTURA} da baliza — ${venceEm - Math.floor(Date.now() / 1000)}s`);
+      await dorme(3000);
+    }
+    const r = await fetch(`https://api.drand.sh/v2/chains/${CADEIA_BALIZA}/rounds/${RODADA_ABERTURA}`);
+    const { signature } = await r.json();
+    assinaturaHost = wasm.assinatura_da_baliza(signature);
+    const ra = await tentar(membros[0], "registrar_abertura", [bN(id), bN(assinaturaHost)]);
+    if (!ra.ok) throw new Error(`registrar_abertura: ${ra.fase} ${ra.erro}`);
+    diz(`assinatura da rodada ${RODADA_ABERTURA} registrada · tx ${ra.hash}`);
+    divisao = enderecos.map((e) => wasm.secao_de(assinaturaHost, e, SECOES));
+    const tam = Array.from({ length: SECOES }, (_, s) => divisao.filter((x) => x === s).length);
+    diz(`seções de ${tam.join(", ")} — derivadas da baliza, não escolhidas`);
+  }
+
   const tentativas = new Array(N).fill(1);
   const rc = await Promise.all(membros.map(async (m, i) => {
     const prevista = ABERTA ? Math.max(0, (await ler("secoes", bN(id))) - 1) : 0;
     const c = ABERTA
       ? { irmaos: [], indice: 0, secao: prevista }
-      : wasm.caminho_de(id, enderecos, pesos, SECOES, i);
+      : { ...wasm.caminho_de(enderecos, pesos, i), secao: divisao[i] };
     const extras = ABERTA && LIMITE > 0 ? chavesDeAnel(id, prevista, prevista + JANELA) : [];
     const args = [bN(id), addr(m.publicKey()), bN(chaves[i].publica),
                   vec(c.irmaos.map(bN)), u32(c.indice), u32(c.secao)];

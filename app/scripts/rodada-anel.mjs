@@ -38,7 +38,7 @@ const HORIZON = "https://horizon-testnet.stellar.org";
 const FRIENDBOT = "https://friendbot.stellar.org";
 const PASSPHRASE = Networks.TESTNET;
 const CONTRATO = process.env.TESSERA_CONTRATO ??
-  "CCQHRQZP3R3QMMKEEOOOS7XXINR7WGSMTKGNR4GD6BDNLC6JSPUZIDHZ";
+  "CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH";
 
 const ELEITORADO = 10;
 const COMPARECEM = 7;
@@ -157,7 +157,7 @@ async function main() {
   const enderecos = membros.map((m) => xdrDe(m.publicKey()));
   const pesos = membros.map(() => 1);
   const id = bytesHex(Keypair.random().rawPublicKey().subarray(0, 32));
-  const raiz = wasm.raiz_de_aptos(id, enderecos, pesos, 1);
+  const raiz = wasm.raiz_de_aptos(enderecos, pesos);
   diz(`raiz de aptos = ${raiz.slice(0, 16)}…${raiz.slice(-8)}`);
 
   titulo("abrir, com o caderno separado da urna");
@@ -198,10 +198,10 @@ async function main() {
   for (let i = 0; i < COMPARECEM; i++) {
     const k = wasm.nova_chave_de_anel();
     chaves.push(k);
-    const c = wasm.caminho_de(id, enderecos, pesos, 1, i);
+    const c = wasm.caminho_de(enderecos, pesos, i);
     const r = await enviar(membros[i], "comparecer", [
       bN(id), addr(membros[i].publicKey()), bN(k.publica),
-      vec(c.irmaos.map(bN)), u32(c.indice), u32(c.secao),
+      vec(c.irmaos.map(bN)), u32(c.indice), u32(0), // seção 0: um anel só
     ]);
     diz(`${membros[i].publicKey().slice(0, 8)}…  compareceu · anel com ${i + 1}`);
     if (i === 0) diz(`   cpu ${r.cpu} · taxa ${r.taxa} stroops`);

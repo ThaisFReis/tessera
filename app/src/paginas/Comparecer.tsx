@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CarteiraLocal } from "../carteira";
 import { guardarChaveDeAnel, guardarLista, lerLista } from "../lista";
-import { comparecer, ehAberta, enderecoXdr, lerProposta, lerSecao, lerSecoes } from "../rede";
+import { comparecer, ehAberta, enderecoXdr, lerAbertura, lerProposta, lerSecao, lerSecoes } from "../rede";
 import { carregar } from "../wasm";
 import { Aviso, Icone, LinkBastidores, Passos, Trilha } from "../ui";
 import { useDiario } from "./comum";
@@ -56,26 +56,42 @@ export default function Comparecer() {
         );
       }
 
-      // As seções vêm do contrato, não de um palpite: montar o caminho com uma
-      // divisão diferente da que gerou a raiz devolve `NaoEstaNaListaDeAptos`,
-      // que não diz por quê.
       const prop = await lerProposta(id);
       if (!prop) throw new Error("Esta votação não foi encontrada.");
 
       // Na votação aberta não há lista, logo não há caminho de Merkle — e a
-      // seção não é pedida: o contrato dá, por ordem de chegada.
-      // Na aberta a seção é a de agora; quem entrar no meio empurra. Por isso a
-      // janela no footprint, logo abaixo.
+      // seção vem da ordem de chegada; quem entrar no meio empurra, e é por
+      // isso que há janela no footprint logo abaixo.
       const caminho = ehAberta(prop)
-        ? { irmaos: [] as string[], indice: 0, secao: Math.max(0, (await lerSecoes(id)) - 1) }
-        : (w.caminho_de(id, lista.map(enderecoXdr), new Uint32Array(lista.length).fill(1), prop.secoes, indice) as {
+        ? { irmaos: [] as string[], indice: 0 }
+        : (w.caminho_de(lista.map(enderecoXdr), new Uint32Array(lista.length).fill(1), indice) as {
             irmaos: string[];
             indice: number;
-            secao: number;
           });
       diario({ tipo: "val", txt: `caminho de Merkle com ${caminho.irmaos.length} irmão${caminho.irmaos.length === 1 ? "" : "s"}` });
-      if (prop.secoes > 1) {
-        diario({ tipo: "val", txt: `seção ${caminho.secao} de ${prop.secoes} — sorteada pela lista` });
+
+      // **A seção vem da baliza** (DEC-012), não da lista e não do
+      // identificador da proposta. Enquanto saía da proposta, quem organizava
+      // moía o identificador até pôr alguém numa seção cheia de atacantes.
+      // A assinatura da rodada de abertura não existe quando a votação é
+      // aberta, então não há o que moer — e o contrato confere a seção que esta
+      // tela calcula.
+      let seccao: number;
+      if (ehAberta(prop)) {
+        seccao = Math.max(0, (await lerSecoes(id)) - 1);
+      } else if (prop.secoes > 1) {
+        const assinatura = await lerAbertura(id);
+        if (!assinatura) {
+          throw new Error(
+            "A rodada da baliza que decide as seções ainda não foi registrada. " +
+              "Qualquer pessoa pode registrá-la assim que a rodada vencer, e sem " +
+              "ela o contrato recusa o comparecimento.",
+          );
+        }
+        seccao = w.secao_de(assinatura, enderecoXdr(meu), prop.secoes) as number;
+        diario({ tipo: "val", txt: `seção ${seccao} de ${prop.secoes} — derivada da baliza, não escolhida` });
+      } else {
+        seccao = 0;
       }
 
       setProgresso(1);
@@ -85,7 +101,7 @@ export default function Comparecer() {
 
       setProgresso(2);
       await comparecer(
-        c, id, chave.publica, caminho.irmaos, caminho.indice, caminho.secao, diario,
+        c, id, chave.publica, caminho.irmaos, caminho.indice, seccao, diario,
         Math.max(lista.length, 40),
         // Três seções além da prevista: cobre uma rajada de 3× o limite
         // entrando entre a simulação e a aplicação.
@@ -93,8 +109,8 @@ export default function Comparecer() {
       );
       // Na aberta quem decide a seção é o contrato: pergunta a ele, não ao
       // palpite do cliente.
-      const secao = (await lerSecao(id, meu)) ?? caminho.secao;
-      if (secao !== caminho.secao) {
+      const secao = (await lerSecao(id, meu)) ?? seccao;
+      if (secao !== seccao) {
         diario({ tipo: "val", txt: `o contrato pôs você na seção ${secao}, por ordem de chegada` });
       }
       // Sem ela não há voto depois. Perder esta aba é perder o voto.

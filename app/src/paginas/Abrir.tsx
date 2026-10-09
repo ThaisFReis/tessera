@@ -62,16 +62,32 @@ export default function Abrir() {
       const pesos = new Uint32Array(lista.length).fill(1);
       // 32 zeros é o sentinela de votação aberta: não há lista, e o contrato
       // pula a prova de Merkle.
-      const raiz = aberta ? RAIZ_ABERTA : w.raiz_de_aptos(proposta, xdrs, pesos, secoes);
+      const raiz = aberta ? RAIZ_ABERTA : w.raiz_de_aptos(xdrs, pesos);
       diario({ tipo: "val", txt: aberta ? "sem lista: votação aberta" : `raiz de aptos = ${raiz}` });
       if (!aberta) {
         diario({ tipo: "nota", txt: "32 bytes vão para o contrato. A lista não vai." });
       }
+      // **A seção não é decidida aqui, e isso é o ponto** (DEC-012). Ela sai da
+      // assinatura da rodada da baliza que abre o comparecimento — uma
+      // assinatura que ainda não existe neste instante. Enquanto a seção saía
+      // do identificador da proposta, quem organizava moía o identificador até
+      // pôr alguém numa seção cheia de atacantes, e o anonimato efetivo virava
+      // 1. Agora não há o que moer, e nem esta tela sabe a divisão.
       if (!aberta && secoes > 1) {
-        const d = Array.from(w.secoes_de(proposta, xdrs, secoes) as Uint32Array);
-        const tam = Array.from({ length: secoes }, (_, s) => d.filter((x) => x === s).length);
-        diario({ tipo: "nota", txt: `seções de ${tam.join(", ")} — sorteadas pela lista, não escolhidas` });
+        diario({
+          tipo: "nota",
+          txt: `${secoes} seções — a divisão sai da baliza depois, e nem quem abre a conhece agora`,
+        });
       }
+
+      // A rodada da baliza que abre o comparecimento. Tem de estar no futuro —
+      // uma rodada já vencida tem assinatura publicada, e aí a divisão seria
+      // moível. Rodadas saem a cada 3 segundos; meio minuto à frente é folga de
+      // sobra para a transação entrar.
+      const rodadaAbertura =
+        !aberta && secoes > 1
+          ? Number(w.rodada_em(BigInt(Math.floor(Date.now() / 1000) + 30)))
+          : 0;
 
       const agora = await ledgerAtual();
       // Ledger da testnet ≈ 6 s.
@@ -90,8 +106,10 @@ export default function Abrir() {
       await abrir(
         c, proposta, [{ opcoes: n, confidencial: true }], raiz, membros,
         k, abre, fecha, anel, aberta ? 1 : secoes, aberta ? limite : 0,
-        // Sem fechadura de tempo ainda: a tela que a oferece é T-020.
-        0, 0, diario,
+        // A fechadura de tempo é T-020; a rodada de abertura entra já, porque
+        // sem ela o contrato recusa seções numa votação fechada — e é ela que
+        // impede escolher quem se esconde atrás de quem.
+        0, rodadaAbertura, diario,
       );
       setProgresso(2);
 
