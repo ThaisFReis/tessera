@@ -1006,7 +1006,19 @@ ver se 36 cabe.
 
 Eu começaria medindo — é um teste e responde sozinho.
 
-### §11-M — o "30/30 · zero recusas" do README é condicional, e não diz disso
+### §11-M — o "30/30 · zero recusas" do README é condicional — **resolvido no número** (2026-10-09)
+
+Refeito com `RETENTATIVAS=12`: **30 de 30 aceitas, zero recusadas**, em 10
+ledgers e 239,7 s, com nenhuma pessoa precisando de mais de uma tentativa no
+caderno. A afirmação é reproduzível — e é condicional.
+
+O README passou a dizer as duas coisas: o resultado com retentativas e o que
+acontece sem elas (16 de 30). A condição é mais interessante que o número nu,
+porque diz o que um cliente de votação real precisa ter. O número de instruções
+foi para o medido, 148.911.943.
+
+Fica para você só a palavra sobre o texto novo do README, que é §2. O registro
+original segue.
 
 Medido em 2026-10-09, com o contrato de T-023 e **sem** retentativas: a urna
 aceitou **16 de 30**, com 10 cédulas preteridas até expirar e 4 recusadas com

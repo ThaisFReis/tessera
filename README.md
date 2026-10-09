@@ -161,10 +161,17 @@ por cédula para de depender do tamanho da votação. Trinta pessoas em três se
 de dez, na testnet:
 
 ```
-caderno   30/30 aceitas · 30 transações · 25 no mesmo ledger
-urna      30/30 aceitas · 3 por ledger · zero recusas
-cédula    148.889.608 instruções · 37,2% do teto
+caderno   30/30 aceitas · 30 transações · todas no mesmo ledger
+urna      30/30 aceitas · 3 por ledger · 10 ledgers · 240 s
+cédula    148.911.943 instruções · 37,2% do teto
 ```
+
+**Com retentativas no cliente, e isso é parte do resultado.** A mesma rodada sem
+elas aceitou 16 de 30: dez cédulas preteridas até expirar e quatro recusadas por
+taxa. Não é limite do contrato — é o leilão de inclusão da rede, e quem escreve
+um cliente de votação precisa saber que reenviar é obrigatório, não otimização.
+Com `RETENTATIVAS=12` nenhuma pessoa precisou de mais de uma tentativa no
+caderno.
 
 **O resultado continua único.** O acumulador é por proposta e não sabe de que
 seção veio cada cédula. Publicar totais por seção abriria a brecha da seção
