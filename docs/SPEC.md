@@ -736,6 +736,66 @@ Se o campo sair, sai por economia, não por sigilo.
 público (acima). Seção sorteada pelo PRNG do host no `comparecer`: é estado da
 aplicação, e cai no mesmo muro de footprint medido em DEC-006.
 
+### DEC-013: A seção derivada em O(1), a rodada no começo do comparecimento, e o teto medido (2026-10-08, T-023)
+
+**Contexto.** Implementar a DEC-012 expôs três coisas que ela não previa.
+
+**1. A derivação tem de ser conferível pelo contrato.** A DEC-012 falava de
+`dividir`, que ordena por hash e faz rodízio — equilibra por construção, e exige
+a lista inteira do eleitorado dentro da transação para ser verificada. Sem
+verificação, quem comparece afirma a seção que quiser e o ataque volta por outra
+porta. Então a seção passa a ser `H(0x03 ‖ assinatura ‖ endereço) mod secoes`:
+um hash e uma divisão, que o contrato confere em O(1).
+
+O preço é o desequilíbrio, e ele é pago pelo **dimensionamento**: `ALVO_SECAO`
+de 20 e `MAX_SECAO` de 32. A garantia mudou de lugar — era "o algoritmo
+equilibra", passa a ser "o tamanho torna o desequilíbrio desprezível, e o piso
+de `τ` continua recusando em vez de vazar". Medido por simulação: 0,002% de
+chance de uma seção abaixo de `τ` na pior faixa pequena, 0,071% em mil aptos.
+
+**2. A rodada vai para o começo do comparecimento, não para `abre_em`** (§11-J).
+A DEC-012 derivava da rodada de `abre_em`, mas o comparecimento **termina** ali e
+é durante ele que o anel é montado — a seção teria de ser conhecida antes de a
+assinatura existir. Agora `abrir` exige a rodada no futuro e `comparecer` só
+aceita depois que ela venceu e a assinatura foi registrada. Quem organiza não
+mói, porque na hora de abrir a assinatura não existe; quem comparece já sabe a
+sua seção.
+
+**3. O teto do anel são 32, não 30** (§11-K). Nunca tinha sido medido acima de
+30: 387.387.254 instruções, 96,8% do teto, e 34 estoura. Era o que faltava para
+fechar a faixa de 33 a 39 aptos.
+
+**Decisão.** As três acima, mais dois portões novos que caíram no caminho:
+`abrir` **recusa** votação fechada com seções e sem rodada de baliza — sem ela a
+seção não tem contra o que ser conferida —, e a seção é derivada dos **96 bytes
+não comprimidos** que o host guarda, não dos 48 que a baliza publica.
+
+**Alternativas.** Manter o rodízio e congelar os digestos por seção numa chamada
+única depois de `abre_em`: funciona, custa uma transação que lê o eleitorado
+inteiro e acrescenta um passo humano. Descartada por isso.
+
+**Consequências.** §4 reescreveu INV-08 e ganhou a nota de onde `τ` é imposto;
+§5 congelou a folha sem `secao_be`, o formato dos pontos G2 e as constantes da
+baliza; §6 ganhou o teto de 32. `fim_tempo` saiu da proposta por ser redundante
+— o prazo **é** `instante(rodada)` —, e a ABI trocou `fim_tempo, rodada` por
+`rodada, rodada_abertura`, com redeploy. Fica aberta a §11-L.
+
+### §11-L — vazão contra conjunto de anonimato, e a landing fala de um só
+
+`secoes_para(30)` devolve **uma** seção, porque o alvo é 20 por seção e 30 cabe
+num anel. Mas `rodada-30.mjs` usa três de propósito: três seções deixam três
+cédulas entrarem por ledger, uma deixa uma. Os dois objetivos são opostos —
+menos seções dá conjunto de anonimato maior e `τ` folgado, mais seções dá vazão.
+
+A regra que escrevi otimiza o anonimato, que é o que uma votação real quer. A
+demonstração desvia dela para mostrar escala, e com média 10 carrega os 3,5% de
+risco medidos.
+
+Hoje a landing cita "30 votantes em 3 seções" como prova de escala **sem dizer**
+que a configuração recomendada para 30 pessoas é outra. Isso precisa aparecer nos
+dois lugares, e é §2: a frase que falta é que seções compram vazão pagando com
+tamanho do conjunto de anonimato. Entra em T-022 ou vira tarefa própria?
+
 ---
 
 ## §11 Perguntas em aberto
@@ -890,7 +950,10 @@ com ele, **outro bump de ABI e outro redeploy**. Duas saídas:
 Eu faria a 1 — um redeploy a menos, e o campo é inerte até T-023 usá-lo —, mas é
 interface congelada e escopo, então é sua.
 
-### §11-J — a DEC-012 tem um problema de ordenação, e o conserto muda o fluxo
+### §11-J — a DEC-012 tem um problema de ordenação — **respondida** (2026-10-08)
+
+Pela saída 2: a rodada passou para o **começo** do comparecimento. Ver DEC-013.
+O registro original segue.
 
 Achado implementando a T-023. A DEC-012 deriva a seção da assinatura da rodada
 de `abre_em`. Mas o **comparecimento termina** em `abre_em`, e é durante o
@@ -920,7 +983,11 @@ assinatura da baliza por 24.053.490 instruções (6% do teto), a ordem de Fp2 em
 G2 é `c1` antes de `c0`, e o dimensionamento das seções tem uma faixa cega —
 ver §11-K.
 
-### §11-K — a faixa de 31 a 39 aptos não fecha
+### §11-K — a faixa de 31 a 39 aptos não fecha — **respondida** (2026-10-08)
+
+Medindo o teto do anel, que nunca tinha sido medido acima de 30: são **32**, com
+387.387.254 instruções (96,8%), e 34 estoura. Com teto 32 e alvo 20 a faixa cega
+desaparece. Ver DEC-013. O registro original segue.
 
 A seção derivada por hash desequilibra, então o dimensionamento é o que mantém
 toda seção acima de `τ = 5`. Medido por simulação: com média 20 por seção a
