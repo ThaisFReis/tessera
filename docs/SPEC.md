@@ -1005,3 +1005,27 @@ o eleitorado; ou medir o teto real do anel acima de 30, que nunca foi medido, e
 ver se 36 cabe.
 
 Eu começaria medindo — é um teste e responde sozinho.
+
+### §11-M — o "30/30 · zero recusas" do README é condicional, e não diz disso
+
+Medido em 2026-10-09, com o contrato de T-023 e **sem** retentativas: a urna
+aceitou **16 de 30**, com 10 cédulas preteridas até expirar e 4 recusadas com
+`txInsufficientFee`. O caderno foi melhor que o registrado: 30 de 30 num único
+ledger, contra "25 no mesmo ledger" no README.
+
+**Não é regressão de contrato.** A cédula custa 148.911.943 instruções contra as
+148.889.608 do README — 0,015% a mais, que é a checagem de forma do criptograma
+de T-018 e nada além. O que falhou foi o leilão de inclusão.
+
+O que mudou é a **condição**: o `rodada-30.mjs` tem `RETENTATIVAS` com padrão 0,
+e o cabeçalho dele documenta `RETENTATIVAS=12` como uso. Então o "30/30 · zero
+recusas" do README é um resultado **com** retentativas, e o README não diz isso —
+que é §2: a afirmação omite a condição que a torna verdadeira.
+
+Duas coisas a decidir, e a primeira é quase mecânica:
+
+1. O número de instruções no README passa para o medido hoje. É §0.
+2. O "30/30 · zero recusas" ganha a condição ao lado — quantas retentativas, e
+   quanto tempo do disparo à última confirmação — ou sai. Eu escreveria a
+   condição: ela é o resultado honesto e é *mais* interessante que o número
+   nu, porque diz o que uma votação real precisa ter no cliente.
