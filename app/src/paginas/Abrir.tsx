@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CarteiraLocal } from "../carteira";
 import { guardarLista } from "../lista";
-import { abrir, enderecoXdr, ledgerAtual, RAIZ_ABERTA } from "../rede";
+import { abrir, enderecoXdr, ledgerAtual, MAX_OPCOES, RAIZ_ABERTA } from "../rede";
 import { carregar } from "../wasm";
+import { explicar, secaoNasceuPequena } from "../secoes";
 import { Aviso, Icone, LinkBastidores, Passos } from "../ui";
 import { useDiario } from "./comum";
 
@@ -14,6 +15,7 @@ export default function Abrir() {
   const [aptos, setAptos] = useState("");
   const [opcoes, setOpcoes] = useState("aprovar, rejeitar");
   const [anel, setAnel] = useState(true);
+  const [fechadura, setFechadura] = useState(true);
   const [mesa, setMesa] = useState("");
   const [limiar, setLimiar] = useState(3);
   const [secoes, setSecoes] = useState(1);
@@ -42,11 +44,26 @@ export default function Abrir() {
       }
       const n = linhas(opcoes).length;
       if (n < 2) throw new Error("a pergunta precisa de ao menos duas opções");
+      // O teto é do orçamento de CPU: cada opção sigilosa custa uma prova
+      // disjuntiva, e o contrato recusa com `OpcoesForaDaFaixa`.
+      if (n > MAX_OPCOES) {
+        throw new Error(`a pergunta cabe em até ${MAX_OPCOES} opções, e esta tem ${n}`);
+      }
 
       if (secoes < 1 || (!aberta && secoes > lista.length)) {
         throw new Error(
           aberta ? "as seções precisam ser ao menos uma" : `as seções têm de estar entre 1 e ${lista.length}`,
         );
+      }
+
+      // **O piso de anonimato, antecipado.** O contrato recusa apurar uma
+      // seção com menos de τ cédulas, e essa recusa chega no fim da votação,
+      // quando já não há o que fazer. Aqui ainda dá para escolher diferente.
+      // Na votação aberta não dá para conferir: o eleitorado não existe na
+      // hora de abrir, e é por isso que ali o aviso é outro.
+      if (!aberta) {
+        const pequena = secaoNasceuPequena(lista.length, secoes);
+        if (pequena) throw new Error(explicar(lista.length, secoes, pequena));
       }
 
       const w = await carregar();
@@ -89,15 +106,46 @@ export default function Abrir() {
           ? Number(w.rodada_em(BigInt(Math.floor(Date.now() / 1000) + 30)))
           : 0;
 
-      const agora = await ledgerAtual();
-      // Ledger da testnet ≈ 6 s.
-      const abre = agora + Math.round((minCaderno * 60) / 6);
-      const fecha = abre + Math.round((minVoto * 60) / 6);
       // Mesa vazia exige limiar zero, e limiar zero exige mesa vazia.
       const membros = linhas(mesa);
       const k = membros.length === 0 ? 0 : limiar;
       if (membros.length > 0 && (k < 1 || k > membros.length)) {
         throw new Error(`o limiar tem de estar entre 1 e ${membros.length}`);
+      }
+      // O contrato recusa com `MembroRepetido`: um endereço duas vezes na mesa
+      // conta duas parcelas para a mesma pessoa, e o limiar deixa de significar
+      // o que diz.
+      if (new Set(membros).size !== membros.length) {
+        throw new Error("a mesa tem um endereço repetido, e o contrato recusa");
+      }
+
+      const agora = await ledgerAtual();
+      // Ledger da testnet ≈ 6 s.
+      const abre = agora + Math.round((minCaderno * 60) / 6);
+      const fecha = abre + Math.round((minVoto * 60) / 6);
+
+      // **A fechadura de tempo.** A rodada que destranca as cédulas é a que
+      // vence pouco depois de a janela fechar — a janela é contada em ledgers,
+      // e a rodada num instante, então a conversão é pelos mesmos minutos que a
+      // pessoa digitou. O minuto de folga cobre a diferença entre o ledger
+      // previsto e o ledger de verdade.
+      //
+      // Só faz sentido sem mesa: com mesa já há quem abra, e as duas coisas não
+      // se somam. E só em anel, porque é a cédula em anel que não reparte o
+      // fator com ninguém.
+      const comFechadura = anel && fechadura && membros.length === 0;
+      const rodada = comFechadura
+        ? Number(w.rodada_em(BigInt(Math.floor(Date.now() / 1000) + (minCaderno + minVoto) * 60 + 60)))
+        : 0;
+      if (comFechadura) {
+        diario({
+          tipo: "nota",
+          txt: `fechadura na rodada ${rodada} da baliza — a chave que abre as cédulas nasce sozinha quando a janela fechar`,
+        });
+      }
+      // `abre >= fecha` é votação de duração zero, recusada com `PrazoNoPassado`.
+      if (fecha <= abre) {
+        throw new Error("a janela de votação precisa durar ao menos um minuto");
       }
       if (membros.length === 0) {
         diario({ tipo: "nota", txt: "sem mesa: ninguém poderá apurar, e é isso que se quis" });
@@ -106,10 +154,7 @@ export default function Abrir() {
       await abrir(
         c, proposta, [{ opcoes: n, confidencial: true }], raiz, membros,
         k, abre, fecha, anel, aberta ? 1 : secoes, aberta ? limite : 0,
-        // A fechadura de tempo é T-020; a rodada de abertura entra já, porque
-        // sem ela o contrato recusa seções numa votação fechada — e é ela que
-        // impede escolher quem se esconde atrás de quem.
-        0, rodadaAbertura, diario,
+        rodada, rodadaAbertura, diario,
       );
       setProgresso(2);
 
@@ -244,16 +289,20 @@ export default function Abrir() {
                 />
               </label>
               <p>
-                <strong>Você não escolhe quem fica com quem.</strong> A divisão é sorteada a
-                partir da lista e do identificador da votação, e qualquer pessoa com a lista
-                recalcula e confere. Se o organizador escolhesse, poria um dissidente numa seção
-                sozinho e leria o voto dele.
+                <strong>Você não escolhe quem fica com quem</strong>, e nem pode: a divisão sai
+                da assinatura de uma rodada da baliza que <em>ainda não venceu</em> neste
+                instante. Não há o que moer. Quando ela for publicada, qualquer pessoa com a
+                lista recalcula e confere. Se o organizador escolhesse, poria um dissidente numa
+                seção sozinho e leria o voto dele.
               </p>
             </>
           )}
           <p>
             O preço é o conjunto de anonimato: ele passa a ser a sua seção, não a votação inteira.
-            O resultado continua único — o acumulador não sabe de que seção veio cada cédula.
+            Com mesa, o resultado é único — o acumulador não sabe de que seção veio cada cédula.
+            Com fechadura de tempo os totais são <strong>por seção</strong>, e a consequência tem
+            de ser dita: numa seção unânime, qualquer pessoa sabe em que cada um dos seus membros
+            votou. Abaixo de 40 pessoas, uma seção só é a configuração recomendada.
           </p>
         </section>
       )}
@@ -291,7 +340,45 @@ export default function Abrir() {
           ninguém publica total. Sem mesa, o contrato diz isso em vez de a tela pedir desculpas —
           qualquer total afirmado cai em <code>AberturaNaoFecha</code>.
         </p>
-        <p>O preço é este: o sigilo é absoluto, e o resultado é impossível.</p>
+        {anel && !mesa.trim() ? (
+          <>
+            <label className="escolha-modo">
+              <input
+                type="checkbox"
+                checked={fechadura}
+                onChange={(e) => setFechadura(e.target.checked)}
+              />
+              <span>
+                <strong>fechadura de tempo</strong>
+                <span className="campo-ajuda">
+                  {fechadura
+                    ? "o placar aparece sozinho quando a janela fechar, sem mesa e sem ninguém de confiança"
+                    : "sem fechadura: o sigilo é absoluto, e o resultado é impossível"}
+                </span>
+              </span>
+            </label>
+            {fechadura ? (
+              <>
+                <p>
+                  A cédula sai cifrada para uma rodada de uma baliza pública que vence quando a
+                  janela fechar. <strong>Antes daquele instante ninguém abre</strong> — nem você,
+                  que está abrindo esta votação. Depois dele, qualquer pessoa abre e apura, e é
+                  isso que torna o placar impossível de travar: não depende de ninguém voltar.
+                </p>
+                <p>
+                  O que isso custa: a baliza é uma suposição de confiança. Um conluio de um limiar
+                  dos seus operadores abriria o conteúdo das cédulas antes da hora, e{" "}
+                  <strong>se ela parar de publicar, o placar não sai e não há plano B</strong>. O
+                  que não depende dela é o sigilo até o fim da janela, que é o relógio do ledger.
+                </p>
+              </>
+            ) : (
+              <p>O preço é este: o sigilo é absoluto, e o resultado é impossível.</p>
+            )}
+          </>
+        ) : (
+          <p>O preço é este: o sigilo é absoluto, e o resultado é impossível.</p>
+        )}
       </section>
 
       <section>

@@ -213,6 +213,11 @@ export type PropostaRede = {
 export const lerProposta = (id: string) =>
   ler("proposta", bytesN(id)) as Promise<PropostaRede | null>;
 
+/** Os tetos do contrato, espelhados de `contrato/src/tipos.rs`. O teto de
+ *  opções é do orçamento de CPU: cada opção sigilosa custa uma disjuntiva. */
+export const MAX_PERGUNTAS = 8;
+export const MAX_OPCOES = 16;
+
 /** A raiz de 32 zeros é o sentinela de votação aberta. */
 export const RAIZ_ABERTA = "0".repeat(64);
 export const ehAberta = (p: PropostaRede) => bytesParaHex(p.raiz_aptos) === RAIZ_ABERTA;
