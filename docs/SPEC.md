@@ -392,7 +392,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-001 | README volta a dizer a verdade | — | — | review | PR #1 |
 | T-002 | `cargo fmt` passa | T-000 | §8 | review | `cargo fmt --check` passa nos 5 crates; nenhum teste muda de resultado |
 | T-003 | `cargo clippy` sem avisos | T-002 | §8 | review | 0 avisos nos **5** crates; `-D warnings` no portão |
-| T-004 | Vídeo da demonstração | T-001 | §2 | todo | roteiro + gravação com `/bastidores` na segunda janela; nada encenado |
+| T-004 | Vídeo da demonstração | T-001 | §2 | blocked | roteiro escrito em `docs/VIDEO.md` — 7 minutos, dapp à esquerda e `/bastidores` à direita, com os tempos medidos da testnet, as frases a dizer e a lista do que §2 proíbe afirmar. **A gravação é sua**: eu não gravo vídeo |
 | T-005 | Publicar o dapp | T-001 | §7 | blocked | §11-P — o `dist` foi verificado servido como estático e **quebrava em todo link profundo**; corrigido com roteador de fragmento (DEC-016) e guardado por teste. O que falta é humano: onde o Pages serve, CI com `wasm-pack`, e o `git push` |
 | T-006 | Atualizar os decks | T-001 | §2 | review | slide novo **06 / O caderno e a urna** nos dois decks, com o anel, a imagem de chave, as seções e a troca que elas são; a desvinculação sai de "etapa futura" e vira entregue no slide de limites e no de entrega; o slide de evidência troca a rodada de mesa pelas duas rodadas atuais. 15 slides, numeração refeita. Resta: o slide 07 (Tansu) é uma leitura de março de 2026 e continua histórica |
 | T-007 | "O modo" em `/abrir` | T-001 | §4 | review | a tela ganha os portões que faltavam — teto de opções, mesa com endereço repetido, janela de duração zero — e passa a **oferecer a fechadura de tempo**, que era o único modo do contrato sem caminho na interface. O custo da baliza e a falta de plano B aparecem ao lado da opção |
@@ -412,7 +412,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-010 | `/abrir` avisa quando a seção nasce pequena | T-013 | §10 | review | `app/src/secoes.ts`, sozinho e testado: recusa abrir quando a média por seção cai abaixo de `τ`, diz quantas pessoas cada seção teria e quantas seções cabem, e separa o caso do eleitorado pequeno demais. Conferido no navegador: a recusa chega antes de qualquer transação |
 | T-011 | Parar o churn de `test_snapshots/` | T-002 | §5 | review | saem do git (DEC-015). A causa é o `r` sorteado a cada execução, então torná-los determinísticos exigiria semear o único sorteio que não pode ser previsível. 62 arquivos e 115.433 linhas fora de todo diff futuro |
 | T-013 | Votação aberta e votação fechada | T-003 | §2, §4, §5 | review | `raiz_aptos` de 32 zeros = aberta; `comparecer` pula Merkle; seção por ordem de chegada; a tela diz o que cada modo não garante; redeploy junto de T-009 |
-| T-012 | Migrar os eventos para `#[contractevent]` | T-003 | §5 | todo | `env.events().publish()` sai; `app/src/rede.ts` lê o formato novo; a lista de votações continua funcionando |
+| T-012 | Migrar os eventos para `#[contractevent]` | T-003 | §5 | blocked | §11-N — são os 8 `publish()` do contrato, e qualquer mudança neles exige redeploy. **Vai de carona com o §11-N**, que também mexe em evento, em vez de pagar dois redeploys. Verificado em T-012: o macro aceita `topics = [...]` e formato `vec`, então dá para migrar **sem** mudar um byte do formato — o critério antigo supunha que mudaria |
 
 ---
 
@@ -1146,6 +1146,12 @@ já é público, e votar já exige declarar a seção na própria chamada. Junto
 isso, um getter `cadeia(proposta, secao) -> (bytes32, u32)`, para que o cliente
 saiba quantas cédulas ele *deveria* ter encontrado e possa dizer "faltam 2 no
 que eu li" em vez de levar `ArgumentoMalFormado` sem explicação.
+
+**T-012 vai de carona.** Migrar os 8 `env.events().publish()` para
+`#[contractevent]` também só vale num redeploy, e o macro aceita `topics = [...]`
+e formato `vec` — ou seja, dá para migrar **sem mudar um byte** do formato e
+acrescentar a seção na mesma passada. Fazer os dois juntos custa um redeploy em
+vez de dois.
 
 **Por que paro aqui:** o formato do evento e a ABI são §5 — congelados, e
 mudá-los é redeploy, que invalida toda votação aberta e repontar 13 arquivos.
