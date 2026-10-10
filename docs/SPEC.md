@@ -402,7 +402,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-021 | Rodada ponta a ponta na testnet | T-020 | §8 | review | `app/scripts/rodada-relogio.mjs` rodado em 2026-10-10: proposta `d06750b2…` **sem mesa**, 5 cédulas cifradas para a rodada 32.935.517, uma sabotada. Os dois portões recusaram em sequência (`#7` com a urna aberta, `#35` com ela fechada e a rodada por vencer); a chave nasceu, 4 de 5 abriram, placar `2 · 2`. Apuração parcial de 2 entrou primeiro e foi **sobreposta** por outra carteira que não votou; voltar atrás levou `#37`. Hashes em `docs/SOURCES.md` |
 | T-024 | Os scripts de carga voltam a medir CPU | — | §0, §8 | todo | `sim.cost?.cpuInsns` não existe no SDK 14.6.1 e devolve `undefined`; `rodada-30.mjs` o converte em **0** com `?? 0`, que é número inventado e §0 proíbe. Trocar pelo que `rede.ts` já usa — `transactionData.resources().instructions()` — e fazer o script **falhar** em vez de imprimir zero quando a medição não vier |
 | T-023 | A seção vem da baliza, não do identificador | T-017 | §4, §5, §10 | review | `dividir` troca `proposta` por assinatura da rodada de `abre_em`; a folha perde `secao_be`; teste de que moer o identificador não isola ninguém; dados-ouro regerados; a tela da votação aberta diz por que ela usa uma seção só (DEC-012) |
-| T-022 | Alinhar README, UX e decks à fechadura | T-021 | §2 | todo | o que §2 passa a permitir e o que passa a proibir aparece nos três; a suposição da baliza e a falta de plano B ficam escritas, não implícitas |
+| T-022 | Alinhar README, UX e decks à fechadura | T-021 | §2 | review | README com a seção da fechadura, os dois portões, a não-travabilidade e os números medidos; `docs/UX.md §6.3` com a apuração sem mesa e as três telas de "ainda não"; os dois decks nos slides 04, 05, 06, 07, 09, 12 e no fecho. A suposição da baliza e a **falta de plano B** estão escritas nos três. Corrigidas no caminho sete afirmações que a fechadura ou T-023 tornaram falsas — ver §11-O, que é decisão sua |
 | T-008 | ~~`/apurar` junta as parcelas da mesa~~ | — | §11 | substituída | §11-E respondida por DEC-008: o retentor deixa de ser a mesa. Ver T-017 a T-022 |
 | T-009 | Assembleia sem mesa nenhuma | T-000 | §5, §10 | review | `limiar == 0` aceito sse `mesa` vazia; redeploy; os 12 arquivos repontados; `/abrir` e `/apurar` param de exigir mesa |
 | T-014 | Limite por seção, com split automático na aberta | T-013 | §4, §5 | blocked | §11-D — contrato e testes prontos; a rajada ainda não entra | `abrir` troca `secoes` por `limite_secao`; a aberta enche e abre a próxima; o cliente declara uma janela de anéis no footprint; rajada de 20 com limite 10 entra |
@@ -1113,3 +1113,55 @@ Eu iria de (1) se houver qualquer outro motivo de bump no caminho de T-020 a
 T-022, e de (2) se não houver — porque um redeploy custa uma rodada inteira de
 reverificação, e a §11-L já diz que a configuração recomendada para 30 pessoas é
 uma seção só.
+
+---
+
+### §11-O — a apuração por seção publica totais por seção, e o README diz que o desenho evita isso (bloqueia a parte de §2 de T-022)
+
+Achado em T-022, lendo o README contra o código de T-018.
+
+O README diz, sobre as seções: *"O resultado continua único. O acumulador é por
+proposta e não sabe de que seção veio cada cédula. Publicar totais por seção
+abriria a brecha da seção unânime, que entrega todo mundo que caiu nela; aqui
+não é preciso."*
+
+Era verdade no caminho da mesa: `apurar` publica **um** total por proposta.
+**Não é mais verdade no caminho da fechadura.** `apurar_secao` guarda
+`ResultadoSecao(proposta, secao)` e `resultado_secao` o devolve — totais por
+seção, públicos, por construção. E a seção de cada pessoa é pública: o anel de
+cada seção é um getter.
+
+Então numa seção unânime, qualquer pessoa sabe em que cada um dos seus membros
+votou. Com `ALVO_SECAO = 20` e `τ = 5`, uma seção pequena unânime não é
+hipótese remota — é o caso que a rodada de 30 produziu duas vezes (seções de 6).
+
+**Por que é por seção, e não um total só.** A cadeia de compromissos é por
+seção, o anel é por seção, e a regra monotônica compara conjuntos abertos por
+seção. Um total agregado exigiria todas as seções apuradas antes de publicar
+qualquer coisa — e aí uma seção que ninguém apure trava o placar inteiro, que é
+exatamente a falha de liveness que a INV-21 existe para fechar. A troca é real:
+**ou totais por seção, ou um placar travável.**
+
+**O que eu não decido.** Isto é modelo de segurança e §2, as duas colunas de
+"pergunte ao humano". Os caminhos que vejo:
+
+1. **Aceitar e declarar.** O README para de dizer que o desenho evita a brecha e
+   passa a dizer o que ele faz: na fechadura os totais são por seção, e uma
+   seção unânime revela o voto dos seus membros. É o mais honesto e custa zero
+   de código. É o que eu faria para a submissão.
+2. **Agregar na leitura, e só quando todas fecharem.** `resultado` passa a somar
+   as seções e devolver `None` enquanto faltar uma. Esconde o detalhe de quem lê
+   pelo caminho fácil, mas **não** esconde nada de quem lê `resultado_secao`
+   direto ou os eventos — então é conforto, não garantia, e §2 proibiria chamar
+   de proteção.
+3. **Uma seção só quando o eleitorado é pequeno.** Já é o que `secoes_para`
+   recomenda abaixo de 40 pessoas (§11-L), e com uma seção a brecha é a do
+   resultado unânime global, que todo sistema de votação tem. Não resolve
+   eleitorados grandes.
+4. **Piso de `τ` sobre o subconjunto aberto.** Rejeitado pela DEC-011: dá a
+   qualquer um o poder de travar a apuração sabotando o próprio criptograma.
+
+Enquanto você não decidir, deixei o README **dizendo a verdade** (opção 1 na
+redação), porque a alternativa era deixá-lo afirmando o que o código não faz, e
+isso §2 não permite em nenhuma hipótese. Se você escolher outra opção, o texto
+muda com ela.
