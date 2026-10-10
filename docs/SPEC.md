@@ -392,6 +392,10 @@ python3 console/guarda.py
 
 A linha de base não tem mais falha nenhuma.
 
+**Hoje (2026-10-10, fim de T-012/§11-N/T-025/T-026/T-014):** `core` 81,
+`contrato` 60, `cli` 33, `bls-smoke` 13, app 8 — **195 testes**, `fmt` e
+`clippy -D warnings` limpos nos cinco crates, build ✓, `guarda.py` ✓.
+
 Rodada ponta a ponta na testnet (lenta, sob demanda):
 
 ```bash
@@ -399,6 +403,7 @@ cd app && node scripts/rodada-anel.mjs              # anel único, 7 votantes
 cd app && SECOES=3 node scripts/rodada-30.mjs       # 30 votantes, 3 seções
 cd app && node scripts/folga.mjs                    # contenção de escrita
 cd app && node scripts/rodada-relogio.mjs           # fechadura: cédulas, fim
+cd app && N=6 LIMITE=2 JANELA=2 node scripts/rajada-secao.mjs   # §11-D
                                                     # da janela, apuração
                                                     # automática, e uma cédula
                                                     # sabotada que não trava
