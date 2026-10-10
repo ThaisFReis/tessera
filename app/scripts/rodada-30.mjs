@@ -52,6 +52,8 @@ import {
   TransactionBuilder, nativeToScVal, rpc, scValToNative, xdr,
 } from "@stellar/stellar-sdk";
 
+import { instrucoes } from "./medir.mjs";
+
 const require = createRequire(import.meta.url);
 const wasm = require("../../cliente-wasm/pacote-node/tessera_cliente.js");
 
@@ -170,7 +172,7 @@ async function tentar(par, metodo, args, lance = TAXA_INCLUSAO, folga = 0, extra
     if (rpc.Api.isSimulationError(sim)) {
       return { ok: false, fase: "simulação", erro: sim.error.split("\n")[0] };
     }
-    const cpu = Number(sim.cost?.cpuInsns ?? 0);
+    const cpu = instrucoes(sim, metodo);
     let pronta = rpc.assembleTransaction(bruta, sim).build();
     if (folga > 0 || extras.length > 0) {
       const dados = new SorobanDataBuilder(

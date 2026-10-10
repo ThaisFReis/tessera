@@ -16,6 +16,7 @@ no teste que as produz, que é o que as mantém verdadeiras. Ver
 | 2026-10-07 | Hash da cadeia quicknet da drand | `52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971` | — | https://api.drand.sh/v2/chains |
 | 2026-10-07 | Esquema, gênese e período da quicknet | `bls-unchained-g1-rfc9380`, 1692803367, 3 s | — | https://api.drand.sh/v2/chains/52db9ba7…/info |
 | 2026-10-07 | Chave pública da quicknet | 96 bytes, G2 comprimido (byte alto `0x83`) | — | idem, comprimento medido |
+| 2026-10-10 | `sim.cost` no `@stellar/stellar-sdk` | **não existe** — a propriedade inteira vem `undefined`, e `cpuInsns` não aparece em nenhum arquivo do pacote instalado | 14.6.1 | medido: simulação de `gerador_h` na testnet imprimiu `sim.cost = undefined`; os recursos da mesma simulação deram 657.855 instruções |
 | 2026-10-10 | `votar_anonimo` com fechadura, anel de 5, 320 B de criptograma | 100.684.411 instruções | testnet | `app/scripts/rodada-relogio.mjs`, tx das cédulas da proposta `d06750b2…` |
 | 2026-10-10 | `apurar_secao` de 5 cédulas e 2 opções, 4 abertas | 13.709.833 instruções | testnet | idem, tx `dd030deb74c9e9b8…` — **11,5% acima** da fórmula medida no `Env` local (11.033.699 + 252.722/cédula = 12.297.309): a diferença é autorização, evento e estado, que o teste local não cobra |
 | 2026-10-10 | Rodada ponta a ponta da fechadura, sem mesa | proposta `d06750b29f715aecb3cd636ebc48751e3af098203c1d4789b4bcb157163960bc`, rodada 32.935.517 | testnet | `abrir` `5d479a706c7be721…` · `apurar_secao` parcial `9149b9359e84e0c2…` · completa `dd030deb74c9e9b8…` |

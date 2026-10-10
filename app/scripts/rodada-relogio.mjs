@@ -33,6 +33,8 @@ import {
   TransactionBuilder, nativeToScVal, rpc, scValToNative, xdr,
 } from "@stellar/stellar-sdk";
 
+import { comTeto, instrucoes } from "./medir.mjs";
+
 const require = createRequire(import.meta.url);
 const wasm = require("../../cliente-wasm/pacote-node/tessera_cliente.js");
 
@@ -113,11 +115,10 @@ async function tentar(par, metodo, args, lance = TAXA_INCLUSAO) {
     if (rpc.Api.isSimulationError(sim)) {
       return { ok: false, fase: "simulação", erro: sim.error.split("\n")[0] };
     }
-    // T-024: `sim.cost.cpuInsns` não existe no SDK 14.6.1. O número que a rede
-    // cobra está nos recursos da transação montada, e é esse que vale.
+    // `sim.cost.cpuInsns` não existe no SDK 14.6.1 — ver `medir.mjs`, que
+    // lança em vez de devolver um zero que ninguém mediu.
+    const cpu = instrucoes(sim, metodo);
     const pronta = rpc.assembleTransaction(bruta, sim).build();
-    const cpu = pronta.toEnvelope().v1().tx().ext().sorobanData()
-      .resources().instructions();
     pronta.sign(par);
     const envio = await servidor.sendTransaction(pronta);
     if (envio.status === "ERROR") {
@@ -284,7 +285,7 @@ async function main() {
     enviadas.push({ compromissos: c.cedula.compromissos, escolha: escolhas[i], sabota });
     diz(`cédula ${i + 1} de ${anel.length} · ${c.cedula.cripto.length / 2} bytes de criptograma` +
         (sabota ? "  ← um byte trocado, de propósito" : ""));
-    if (i === 0) diz(`   cpu ${Number(r.cpu).toLocaleString("pt-BR")} instruções`);
+    if (i === 0) diz(`   ${comTeto(r.cpu)}`);
   }
   diz("o contrato aceitou a sabotada: ele confere a **forma** do criptograma, e");
   diz("não pode conferir o conteúdo — o host não tem pareamento com valor.");
@@ -401,7 +402,7 @@ async function main() {
   ]));
   if (!rc2.ok) throw new Error(`a apuração completa falhou: ${rc2.fase} ${rc2.erro}`);
   diz(`outra carteira, que não votou, incluiu as ${a.abriram} e sobrepôs · tx ${rc2.hash}`);
-  diz(`  cpu ${Number(rc2.cpu).toLocaleString("pt-BR")} instruções`);
+  diz(`  ${comTeto(rc2.cpu)}`);
 
   const volta = await tentar(apurador, "apurar_secao", [
     bN(id), addr(apurador.publicKey()), u32(0),

@@ -30,6 +30,8 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 
+import { comTeto, instrucoes } from "./medir.mjs";
+
 const require = createRequire(import.meta.url);
 const wasm = require("../../cliente-wasm/pacote-node/tessera_cliente.js");
 
@@ -104,6 +106,9 @@ async function enviar(par, metodo, args) {
     .build();
   const sim = await servidor.simulateTransaction(bruta);
   if (rpc.Api.isSimulationError(sim)) throw new Error(`${metodo}: ${sim.error}`);
+  // Mede **antes** de enviar: se o SDK mudar de forma, o script para aqui em
+  // vez de gastar uma rodada inteira e imprimir um custo que não foi medido.
+  const cpu = instrucoes(sim, metodo);
   const pronta = rpc.assembleTransaction(bruta, sim).build();
   pronta.sign(par);
   const envio = await servidor.sendTransaction(pronta);
@@ -113,7 +118,7 @@ async function enviar(par, metodo, args) {
   for (let i = 0; i < 60; i++) {
     const r = await servidor.getTransaction(envio.hash);
     if (r.status === rpc.Api.GetTransactionStatus.SUCCESS) {
-      return { hash: envio.hash, cpu: sim.cost?.cpuInsns, taxa: pronta.fee };
+      return { hash: envio.hash, cpu, taxa: pronta.fee };
     }
     if (r.status === rpc.Api.GetTransactionStatus.FAILED) {
       throw new Error(`${metodo} falhou on-chain: ${envio.hash}`);
@@ -204,7 +209,7 @@ async function main() {
       vec(c.irmaos.map(bN)), u32(c.indice), u32(0), // seção 0: um anel só
     ]);
     diz(`${membros[i].publicKey().slice(0, 8)}…  compareceu · anel com ${i + 1}`);
-    if (i === 0) diz(`   cpu ${r.cpu} · taxa ${r.taxa} stroops`);
+    if (i === 0) diz(`   ${comTeto(r.cpu)} · taxa ${r.taxa} stroops`);
   }
 
   const faltaram = membros.slice(COMPARECEM).map((m) => m.publicKey().slice(0, 8));
@@ -241,7 +246,7 @@ async function main() {
       semCripto(),
     ]);
     diz(`cédula ${i + 1} de ${COMPARECEM} · de ${par.publicKey().slice(0, 8)}… · imagem ${c.imagem.slice(0, 12)}…`);
-    if (i === 0) diz(`   cpu ${r.cpu} · taxa ${r.taxa} stroops · anel de ${anel.length}`);
+    if (i === 0) diz(`   ${comTeto(r.cpu)} · taxa ${r.taxa} stroops · anel de ${anel.length}`);
   }
 
   titulo("o que o ledger sabe, e o que não sabe");
