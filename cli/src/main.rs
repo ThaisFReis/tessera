@@ -9,6 +9,7 @@ mod chave;
 mod comandos;
 mod estado;
 mod recibo;
+mod rpc;
 mod tela;
 
 use clap::{Parser, Subcommand};
@@ -122,9 +123,24 @@ enum Comando {
         forcar_total: Option<String>,
     },
     /// Relê e refaz tudo. Não confia em ninguém.
+    ///
+    /// Sem `--contrato`, relê o caminho identificado a partir de
+    /// `estado/<proposta>.json` — que é um arquivo que esta CLI grava, e por
+    /// isso só serve a uma votação que esta CLI conduziu.
+    ///
+    /// **Com `--contrato`, relê o caminho anônimo e não lê arquivo nenhum**
+    /// (T-025): os compromissos vêm dos eventos, as assinaturas em anel das
+    /// transações, a chave que abre as cédulas vem da baliza, e o placar
+    /// recontado é comparado com o publicado. É o caminho de uma votação do
+    /// dapp, que não tem estado local em lugar nenhum.
     Verificar {
         #[arg(long)]
         proposta: String,
+        /// O contrato a reler. Liga o verificador do caminho anônimo.
+        #[arg(long)]
+        contrato: Option<String>,
+        #[arg(long, default_value = "testnet")]
+        rede: String,
     },
 }
 
@@ -175,7 +191,14 @@ fn main() {
             proposta,
             forcar_total,
         } => comandos::apurar(proposta, forcar_total.as_deref()),
-        Comando::Verificar { proposta } => comandos::verificar(proposta),
+        Comando::Verificar {
+            proposta,
+            contrato,
+            rede,
+        } => match contrato {
+            Some(c) => comandos::verificar_anonima(proposta, c, rede),
+            None => comandos::verificar(proposta),
+        },
     };
     if let Err(e) = r {
         tela::recusa(&e);

@@ -136,6 +136,29 @@ pub fn hp(proposta: &[u8]) -> G1Affine {
     unreachable!("256 tentativas sem um ponto na curva é impossível na prática")
 }
 
+/// **O `Hp` que o contrato usa**, recalculado aqui.
+///
+/// `hp()` acima é try-and-increment, e é o que o `core` usa nos seus próprios
+/// testes. O contrato usa o `hash_to_g1` do host, que é o RFC 9380 — e é **esse**
+/// o `Hp` contra o qual toda imagem de chave do ledger é formada. Os dois são
+/// pontos honestos e nenhum dos dois é "o errado": são dois geradores
+/// diferentes, e usar o de cá para conferir uma assinatura de lá recusa cédulas
+/// boas.
+///
+/// Isto existe para que o verificador independente **não precise ler `Hp` do
+/// contrato**. Ler e usar seria confiar no contrato para dizer qual é o gerador
+/// contra o qual a imagem de chave é formada — e a imagem de chave é o que
+/// impede o voto duplo. O cruzamento com `cripto::calcular_hp` tem teste no
+/// contrato.
+///
+/// A mensagem é `DST ‖ proposta`, com o mesmo DST também como *domain
+/// separation tag* do hash-to-curve. É o que `calcular_hp` monta.
+pub fn hp_do_contrato(proposta: &[u8]) -> G1Affine {
+    let mut msg = DST_DESAFIO.to_vec();
+    msg.extend_from_slice(proposta);
+    crate::ponto::para_g1(&msg, DST_DESAFIO)
+}
+
 /// A chave pública do anel: `P = x·G`.
 pub fn chave_publica(g: &G1Affine, x: &Fr) -> G1Affine {
     (*g * x).into()

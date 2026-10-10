@@ -47,7 +47,10 @@ const CONTRATO = process.env.TESSERA_CONTRATO ??
 /** A cadeia `quicknet` da drand. Ver docs/SOURCES.md. */
 const CADEIA_BALIZA = "52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971";
 
-const N = Number(process.env.N ?? 5);
+// Sete, não cinco: uma vai sabotada, e o piso agregado de τ = 5 (T-026) exige
+// cinco cédulas abertas para o placar em claro sair. Com cinco votantes a
+// rodada pararia no quórum em vez de chegar ao placar.
+const N = Number(process.env.N ?? 7);
 const OPCOES = 2;
 /** Quem leva o byte trocado no criptograma. `-1` desliga a sabotagem. */
 const SABOTADA = Number(process.env.SABOTADA ?? 2);
@@ -298,8 +301,6 @@ async function main() {
     bN(id), addr(apurador.publicKey()), u32(0),
     vec(listaCompleta.map(bN)),
     vec(enviadas.map(() => bool(true))),
-    vec([u32(0), u32(0)]),
-    vec(["0".repeat(64), "0".repeat(64)].map(fr)),
   ]);
   if (cedo.ok) throw new Error("apurou com a votação aberta");
   diz(`recusado: ${cedo.fase} · ${cedo.erro}`);
@@ -321,8 +322,6 @@ async function main() {
       bN(id), addr(apurador.publicKey()), u32(0),
       vec(listaCompleta.map(bN)),
       vec(enviadas.map(() => bool(true))),
-      vec([u32(0), u32(0)]),
-      vec(["0".repeat(64), "0".repeat(64)].map(fr)),
     ]);
     if (antes.ok) throw new Error("apurou antes de a rodada vencer");
     diz(`recusado: ${antes.fase} · ${antes.erro}`);
@@ -369,37 +368,22 @@ async function main() {
   titulo("quem omite cédulas honestas é sobreposto");
   const parcial = a.abertas.map((b, i) => b && i < 2);
   const quantasParciais = parcial.filter(Boolean).length;
-  const totaisParciais = new Array(OPCOES).fill(0);
-  const aberturasParciais = new Array(OPCOES).fill(0n);
-  // Refaz a conta só sobre as duas primeiras: a abertura é a soma dos fatores,
-  // e sem elas o MSM não fecharia.
-  const so2 = wasm.abertura_da_secao(
-    doLedger.slice(0, 2).flatMap((c) => c.compromissos),
-    doLedger.slice(0, 2).map((c) => c.cripto),
-    OPCOES, h, BigInt(rodada), signature,
-  );
-  for (let j = 0; j < OPCOES; j++) {
-    totaisParciais[j] = so2.totais[j];
-    aberturasParciais[j] = so2.aberturas[j];
-  }
   const rp = anotar("apurar_secao (parcial)", await tentar(apurador, "apurar_secao", [
     bN(id), addr(apurador.publicKey()), u32(0),
     vec(compromissos.map(bN)),
     vec(parcial.map(bool)),
-    vec(totaisParciais.map((n) => u32(Number(n)))),
-    vec(aberturasParciais.map((x) => fr(x))),
   ]));
   if (!rp.ok) throw new Error(`a apuração parcial falhou: ${rp.fase} ${rp.erro}`);
   diz(`uma apuração de ${quantasParciais} cédulas entrou primeiro · tx ${rp.hash}`);
-  diz(`  no ledger: ${JSON.stringify(await ler("resultado_secao", bN(id), u32(0)))}`);
+  const guardado = await ler("resultado_secao", bN(id), u32(0));
+  diz(`  no ledger: ${guardado[0]} cédulas abertas e ${guardado[1].length} pontos`);
+  diz("  e nenhum número de voto: desde T-026 a seção guarda Σ Cᵢ, não o total");
 
   const outro = await nascer();
   const rc2 = anotar("apurar_secao (completa)", await tentar(outro, "apurar_secao", [
     bN(id), addr(outro.publicKey()), u32(0),
     vec(compromissos.map(bN)),
     vec(a.abertas.map(bool)),
-    vec(Array.from(a.totais).map((n) => u32(Number(n)))),
-    vec(a.aberturas.map((x) => fr(x))),
   ]));
   if (!rc2.ok) throw new Error(`a apuração completa falhou: ${rc2.fase} ${rc2.erro}`);
   diz(`outra carteira, que não votou, incluiu as ${a.abriram} e sobrepôs · tx ${rc2.hash}`);
@@ -409,17 +393,39 @@ async function main() {
     bN(id), addr(apurador.publicKey()), u32(0),
     vec(compromissos.map(bN)),
     vec(parcial.map(bool)),
-    vec(totaisParciais.map((n) => u32(Number(n)))),
-    vec(aberturasParciais.map((x) => fr(x))),
   ]);
   if (volta.ok) throw new Error("voltar atrás no placar foi aceito");
   diz(`tentar voltar ao placar menor: recusado · ${volta.erro}`);
   diz("é o #37 NaoMelhora — só um conjunto estritamente maior substitui o guardado");
 
+  // ---- 7. o placar, numa transação a mais ----
+  titulo("o placar da votação: uma transação, um MSM, um número em claro");
+  const rpr = anotar("publicar_resultado", await tentar(outro, "publicar_resultado", [
+    bN(id), addr(outro.publicKey()),
+    vec([u32(0)]),
+    vec(Array.from(a.totais).map((n) => u32(Number(n)))),
+    vec(a.aberturas.map((x) => fr(x))),
+  ]));
+  if (!rpr.ok) throw new Error(`publicar o placar falhou: ${rpr.fase} ${rpr.erro}`);
+  diz(`placar publicado · tx ${rpr.hash}`);
+  diz(`  ${comTeto(rpr.cpu)}`);
+
+  // E um agregado que mente é recusado aqui, que é onde a solidez mora agora.
+  const mentira = await tentar(outro, "publicar_resultado", [
+    bN(id), addr(outro.publicKey()),
+    vec([u32(0)]),
+    vec([u32(Number(a.totais[0]) + 1), u32(Math.max(0, Number(a.totais[1]) - 1))]),
+    vec(a.aberturas.map((x) => fr(x))),
+  ]);
+  if (mentira.ok) throw new Error("um agregado que mente foi aceito");
+  diz(`mover um voto de uma opção para a outra: recusado · ${mentira.erro}`);
+
   titulo("o que ficou no ledger");
-  const final = await ler("resultado_secao", bN(id), u32(0));
-  diz(`placar ............ ${final[1].join(" · ")}`);
-  diz(`cédulas abertas ... ${final[0]} de ${enviadas.length}`);
+  const porSecao = await ler("resultado_secao", bN(id), u32(0));
+  const final = await ler("resultado", bN(id));
+  diz(`placar ............ ${final.join(" · ")}`);
+  diz(`cédulas abertas ... ${porSecao[0]} de ${enviadas.length}`);
+  diz(`a seção guarda .... ${porSecao[1].length} pontos e nenhum total`);
   diz(`a sabotada ........ custou um voto, e só o dela`);
   diz(`mesa .............. nenhuma, em nenhum momento`);
   console.log("");

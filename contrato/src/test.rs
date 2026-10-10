@@ -5048,3 +5048,37 @@ fn abaixo_de_tau_no_agregado_o_placar_nao_sai() {
     );
     assert_eq!(u.cliente.resultado(&u.proposta), None);
 }
+
+/// **O `Hp` do host e o `Hp` do `core` são o mesmo ponto.** T-025.
+///
+/// A imagem de chave — `I = x·Hp` — é o que impede a segunda cédula. Ela é
+/// formada contra o `Hp` que o **contrato** calcula, com o `hash_to_g1` do
+/// host. Um verificador independente que lesse `Hp` do contrato estaria
+/// confiando no contrato para dizer qual é o gerador contra o qual o voto duplo
+/// é detectado — e é exatamente o que um verificador não pode fazer.
+///
+/// Então o `core` recalcula, com a mesma curva e o mesmo mapa do RFC 9380, e
+/// este teste é o cruzamento: se o host e o arkworks divergirem, aqui quebra, e
+/// não numa auditoria que recusa cédulas boas sem dizer por quê.
+#[test]
+fn o_hp_do_host_bate_com_o_do_core() {
+    let env = Env::default();
+    for id in [[0u8; 32], [7u8; 32], [0xffu8; 32]] {
+        let proposta: BytesN<32> = BytesN::from_array(&env, &id);
+        let do_host = cripto::calcular_hp(&env, &proposta);
+        let do_core = tessera_core::anel::hp_do_contrato(&id);
+        assert_eq!(
+            ponto_hex(&do_host.to_array()),
+            ponto::para_hex(&do_core),
+            "o hash_to_g1 do host divergiu do RFC 9380 do arkworks"
+        );
+    }
+
+    // E não é o try-and-increment do `core`, que é outro gerador — confundir os
+    // dois recusaria toda assinatura em anel do ledger.
+    let sete = [7u8; 32];
+    assert_ne!(
+        ponto::para_hex(&tessera_core::anel::hp_do_contrato(&sete)),
+        ponto::para_hex(&tessera_core::anel::hp(&sete)),
+    );
+}
