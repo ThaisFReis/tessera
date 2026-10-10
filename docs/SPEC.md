@@ -235,10 +235,12 @@ T-013, no mesmo redeploy.
 `app/scripts/xdr.test.mjs` (o vetor de 44 bytes, espelhado em
 `cli/src/chave.rs`).
 
-`contrato/test_snapshots/` **não é dado-ouro**, apesar do nome. Medido em
-T-002: rodar o mesmo teste sem tocar no código altera o arquivo. Eles sujam
-todo diff com milhares de linhas que ninguém lê — e um arquivo que muda sozinho
-não prende nada. Ver T-011.
+`contrato/test_snapshots/` **não é dado-ouro**, apesar do nome, e desde T-011
+**não está no git** (DEC-015). Medido em T-002: rodar o mesmo teste sem tocar
+no código altera o arquivo. A causa foi achada em T-011 — é o `r` da cédula,
+sorteado de novo a cada execução, que muda todo compromisso e toda prova. Torná-los
+determinísticos exigiria semear o sorteio, que é a única coisa do sistema que
+não pode ser previsível. Então saem do git e ficam no disco, para depurar.
 
 **Não congelado, mas frágil:** `console/` — qualquer mudança nas telas passa por
 `guarda.py` (INV-16).
@@ -393,7 +395,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-004 | Vídeo da demonstração | T-001 | §2 | todo | roteiro + gravação com `/bastidores` na segunda janela; nada encenado |
 | T-005 | Publicar o dapp | T-001 | §7 | todo | estático no ar; o README deixa de dizer "não publicado" |
 | T-006 | Atualizar os decks | T-001 | §2 | review | slide novo **06 / O caderno e a urna** nos dois decks, com o anel, a imagem de chave, as seções e a troca que elas são; a desvinculação sai de "etapa futura" e vira entregue no slide de limites e no de entrega; o slide de evidência troca a rodada de mesa pelas duas rodadas atuais. 15 slides, numeração refeita. Resta: o slide 07 (Tansu) é uma leitura de março de 2026 e continua histórica |
-| T-007 | "O modo" em `/abrir` | T-001 | §4 | todo | a tela não oferece votação que `/votar` recusa |
+| T-007 | "O modo" em `/abrir` | T-001 | §4 | review | a tela ganha os portões que faltavam — teto de opções, mesa com endereço repetido, janela de duração zero — e passa a **oferecer a fechadura de tempo**, que era o único modo do contrato sem caminho na interface. O custo da baliza e a falta de plano B aparecem ao lado da opção |
 | T-016 | O placar aparece no dapp quando existe | T-013 | §2 | review | `/apurar` e `/votacao` leem `resultado()`; sem mesa, explicam por que nunca haverá |
 | T-017 | `core/relogio`: a fechadura de tempo | T-016 | §5, §6 | review | cifra e decifra o fator para uma rodada; INV-24 com o vetor congelado da rodada 6.000.000; recusa assinatura que não confere **antes** de decifrar; roda offline; `core` não faz rede |
 | T-018 | Contrato: subconjunto, cadeia e regra monotônica | T-017 | §4, §5, §7 | review | criptograma no evento `anonimo`; `Cadeia(proposta, secao)` de 32 bytes que não cresce; `apurar` por seção com lista ordenada + bitmap, conferindo a cadeia e o MSM de dois termos; INV-18 a INV-22 com teste cada; rodada presa a `fecha_em` (INV-22); bump de ABI e redeploy com os arquivos repontados; custo medido e citado junto do número; `τ` conferido contra o anel da seção e **não** contra o subconjunto aberto (INV-25, DEC-011) |
@@ -407,8 +409,8 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-009 | Assembleia sem mesa nenhuma | T-000 | §5, §10 | review | `limiar == 0` aceito sse `mesa` vazia; redeploy; os 12 arquivos repontados; `/abrir` e `/apurar` param de exigir mesa |
 | T-014 | Limite por seção, com split automático na aberta | T-013 | §4, §5 | blocked | §11-D — contrato e testes prontos; a rajada ainda não entra | `abrir` troca `secoes` por `limite_secao`; a aberta enche e abre a próxima; o cliente declara uma janela de anéis no footprint; rajada de 20 com limite 10 entra |
 | T-015 | O texto da coação descreve o código, não a v1 | T-001 | §2 | review | README e UX param de afirmar que quem vota consegue provar o voto depois; o que sobra de ameaça fica escrito |
-| T-010 | `/abrir` avisa quando a seção nasce pequena | T-013 | §10 | todo | recusa abrir com `aptos / secoes < TAU`, dizendo o tamanho que daria; teste do cálculo |
-| T-011 | Parar o churn de `test_snapshots/` | T-002 | §5 | todo | ou viram determinísticos, ou saem do git; nenhum diff futuro os carrega |
+| T-010 | `/abrir` avisa quando a seção nasce pequena | T-013 | §10 | review | `app/src/secoes.ts`, sozinho e testado: recusa abrir quando a média por seção cai abaixo de `τ`, diz quantas pessoas cada seção teria e quantas seções cabem, e separa o caso do eleitorado pequeno demais. Conferido no navegador: a recusa chega antes de qualquer transação |
+| T-011 | Parar o churn de `test_snapshots/` | T-002 | §5 | review | saem do git (DEC-015). A causa é o `r` sorteado a cada execução, então torná-los determinísticos exigiria semear o único sorteio que não pode ser previsível. 62 arquivos e 115.433 linhas fora de todo diff futuro |
 | T-013 | Votação aberta e votação fechada | T-003 | §2, §4, §5 | review | `raiz_aptos` de 32 zeros = aberta; `comparecer` pula Merkle; seção por ordem de chegada; a tela diz o que cada modo não garante; redeploy junto de T-009 |
 | T-012 | Migrar os eventos para `#[contractevent]` | T-003 | §5 | todo | `env.events().publish()` sai; `app/src/rede.ts` lê o formato novo; a lista de votações continua funcionando |
 
@@ -779,6 +781,28 @@ inteiro e acrescenta um passo humano. Descartada por isso.
 baliza; §6 ganhou o teto de 32. `fim_tempo` saiu da proposta por ser redundante
 — o prazo **é** `instante(rodada)` —, e a ABI trocou `fim_tempo, rodada` por
 `rodada, rodada_abertura`, com redeploy. Fica aberta a §11-L.
+
+### DEC-015: Os instantâneos de teste saem do git (2026-10-10, T-011)
+
+**Contexto.** `contrato/test_snapshots/` tem 62 arquivos e 3,9 MB, e **todos**
+mudam a cada `cargo test`, mesmo sem uma linha de código tocada. Eram 115.433
+linhas acompanhando cada commit do contrato, que ninguém lê e que nenhum teste
+confere.
+
+T-011 perguntava "ou viram determinísticos, ou saem do git". A causa, achada
+agora, responde sozinha: o que muda são os **compromissos e as provas**, porque
+`montar` sorteia um `r` novo a cada execução. Não é instabilidade de
+ferramenta; é a aleatoriedade do protocolo aparecendo no arquivo.
+
+**Decisão.** Saem do git, via `.gitignore`, e continuam sendo escritos no disco.
+
+**Alternativas.** Semear o sorteio nos testes os tornaria determinísticos — e
+poria no `core` um caminho que produz `r` previsível. É a única coisa do sistema
+que não pode ser previsível, e um caminho desses existindo "só para teste" é o
+tipo de atalho que vaza para produção. Rejeitada sem hesitação.
+
+**Consequências.** Diffs do contrato voltam a caber numa tela. Quem quiser o
+instantâneo de um teste roda o teste. §5 atualizada.
 
 ### DEC-014: Os caminhos que o teste nativo chama erram em `String`, não em `JsValue` (2026-10-10, T-019)
 
