@@ -24,6 +24,13 @@ Vale o `CLAUDE.md` da raiz, com estas adições deste projeto:
 3. **`console/` e `console/ponte.py` não são apagados.** São o ambiente
    controlado da gravação e a rede de proteção se o prazo apertar.
 4. **O `git push` é do humano.** Nunca sai sem a palavra dele na sessão corrente.
+5. **Texto público para antes de mudar, sempre.** README, landing, decks, cópia
+   de tela e qualquer frase que o projeto diga sobre si: eu apresento a mudança
+   proposta e **espero a resposta** antes de escrever. Não é relaxamento do
+   `CLAUDE.md` — é a mesma regra, reafirmada em 2026-10-10 depois de eu a ter
+   tratado como "execução da §2 já aprovada" em T-022 e T-006 e mudado os três
+   artefatos sozinho. Corrigir uma afirmação falsa também espera: o que não
+   espera é **avisar** que ela é falsa.
 
 ---
 
@@ -392,6 +399,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-001 | README volta a dizer a verdade | — | — | review | PR #1 |
 | T-002 | `cargo fmt` passa | T-000 | §8 | review | `cargo fmt --check` passa nos 5 crates; nenhum teste muda de resultado |
 | T-003 | `cargo clippy` sem avisos | T-002 | §8 | review | 0 avisos nos **5** crates; `-D warnings` no portão |
+| T-025 | O verificador alcança o anel e a fechadura | T-021 | §2, §3 | todo | hoje `tessera verificar` só roda sobre `estado/<proposta>.json`, que **só a própria CLI grava**, e a CLI não sabe abrir com fechadura — então ele não verifica nenhuma rodada do dapp. Passar a ler os compromissos dos **eventos** em vez do arquivo local; conferir o anel e a imagem de chave; conferir a cadeia de compromissos e a decifragem contra a rodada da baliza. Enquanto não existir, §2 não permite dizer que o verificador cobre o caminho anônimo |
 | T-004 | Vídeo da demonstração | T-001 | §2 | blocked | roteiro escrito em `docs/VIDEO.md` — 7 minutos, dapp à esquerda e `/bastidores` à direita, com os tempos medidos da testnet, as frases a dizer e a lista do que §2 proíbe afirmar. **A gravação é sua**: eu não gravo vídeo |
 | T-005 | Publicar o dapp | T-001 | §7 | blocked | §11-P — o `dist` foi verificado servido como estático e **quebrava em todo link profundo**; corrigido com roteador de fragmento (DEC-016) e guardado por teste. O que falta é humano: onde o Pages serve, CI com `wasm-pack`, e o `git push` |
 | T-006 | Atualizar os decks | T-001 | §2 | review | slide novo **06 / O caderno e a urna** nos dois decks, com o anel, a imagem de chave, as seções e a troca que elas são; a desvinculação sai de "etapa futura" e vira entregue no slide de limites e no de entrega; o slide de evidência troca a rodada de mesa pelas duas rodadas atuais. 15 slides, numeração refeita. Resta: o slide 07 (Tansu) é uma leitura de março de 2026 e continua histórica |
