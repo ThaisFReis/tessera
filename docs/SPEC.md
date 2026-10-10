@@ -436,7 +436,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-022 | Alinhar README, UX e decks à fechadura | T-021 | §2 | done | README com a seção da fechadura, os dois portões, a não-travabilidade e os números medidos; `docs/UX.md §6.3` com a apuração sem mesa e as três telas de "ainda não"; os dois decks nos slides 04, 05, 06, 07, 09, 12 e no fecho. A suposição da baliza e a **falta de plano B** estão escritas nos três. Corrigidas no caminho sete afirmações que a fechadura ou T-023 tornaram falsas — ver §11-O, que é decisão sua |
 | T-008 | ~~`/apurar` junta as parcelas da mesa~~ | — | §11 | substituída | §11-E respondida por DEC-008: o retentor deixa de ser a mesa. Ver T-017 a T-022 |
 | T-009 | Assembleia sem mesa nenhuma | T-000 | §5, §10 | done | `limiar == 0` aceito sse `mesa` vazia; redeploy; os 12 arquivos repontados; `/abrir` e `/apurar` param de exigir mesa |
-| T-014 | Limite por seção, com split automático na aberta | T-013 | §4, §5 | blocked | §11-D — contrato e testes prontos; a rajada ainda não entra | `abrir` troca `secoes` por `limite_secao`; a aberta enche e abre a próxima; o cliente declara uma janela de anéis no footprint; rajada de 20 com limite 10 entra |
+| T-014 | Limite por seção, com split automático na aberta | T-013 | §4, §5 | review | §11-D **medida**: o split funciona, e o que travava a rajada eram duas coisas de cliente — a taxa reembolsável reservada para o estado de antes (`InsufficientRefundableFee`) e a janela do footprint com uma entrada além do teto de recursos (`ResourceLimitExceeded`). Corrigidas as duas: 6 simultâneos com limite 2 passaram de 2 para **6 de 6, três seções no mesmo ledger**; 20 com limite 10 passaram de 10 para **17 de 20**, em duas seções. **O critério literal — 20 numa tentativa só — não está cumprido:** as 3 que sobram levam teto de ledger, estável em duas medições, e entrariam na segunda tentativa que o `enviar` do dapp já faz. Decisão sua: aceitar assim ou manter aberto |
 | T-015 | O texto da coação descreve o código, não a v1 | T-001 | §2 | done | README e UX param de afirmar que quem vota consegue provar o voto depois; o que sobra de ameaça fica escrito |
 | T-010 | `/abrir` avisa quando a seção nasce pequena | T-013 | §10 | done | `app/src/secoes.ts`, sozinho e testado: recusa abrir quando a média por seção cai abaixo de `τ`, diz quantas pessoas cada seção teria e quantas seções cabem, e separa o caso do eleitorado pequeno demais. Conferido no navegador: a recusa chega antes de qualquer transação |
 | T-011 | Parar o churn de `test_snapshots/` | T-002 | §5 | done | saem do git (DEC-015). A causa é o `r` sorteado a cada execução, então torná-los determinísticos exigiria semear o único sorteio que não pode ser previsível. 62 arquivos e 115.433 linhas fora de todo diff futuro |
@@ -1011,7 +1011,50 @@ tamanho do conjunto de anonimato. Entra em T-022 ou vira tarefa própria?
 §11-A, §11-B e §11-C foram respondidas em 2026-10-07 e viraram DEC-003, DEC-004
 e DEC-005.
 
-### §11-D — a rajada não abre seção nova (bloqueia T-014)
+### §11-D — a rajada não abre seção nova — **medida** (2026-10-10, T-014)
+
+> **Resposta: nenhuma das duas hipóteses estava certa, e os dois erros têm
+> nome.** O diagnóstico está em `app/scripts/rajada-secao.mjs`, e o que ele
+> acrescentou primeiro foi parar de reportar `txFailed` sem o código — um
+> `txFailed` cru é indistinguível entre "o contrato recusou" e "a declaração de
+> recursos não cobriu o que a aplicação precisou", e foi essa confusão que
+> manteve esta entrada aberta.
+>
+> **1. `InsufficientRefundableFee`.** A simulação precifica o aluguel das
+> entradas que existem naquele instante. Sob rajada, quem acaba escrevendo a
+> seção seguinte cria uma entrada **nova**, e a reserva não cobre. Com a reserva
+> de antes, seis simultâneos com limite 2 davam 2 — exatamente o limite da seção
+> 0, o mesmo padrão de "10 de 20 com limite 10". Reservando **4×** a taxa
+> reembolsável: **6 de 6, três seções nascendo no mesmo ledger** (2 + 2 + 2). A
+> diferença volta, porque reembolsável não usada é devolvida.
+>
+> **2. `ResourceLimitExceeded`.** Cada entrada `Anel` declarada na janela entra
+> no orçamento de recursos da transação, e a **quinta estoura o teto** — com uma
+> pessoa só, sequencialmente. O dapp declarava três seções além da prevista, que
+> são quatro entradas: passava raspando no caso sequencial e deixava 5 de 6 na
+> rajada. Com duas, 6 de 6. Esta entrada dizia que a janela estava descartada —
+> estava para o caso que ela mediu, e não para este.
+>
+> Nada disso é contrato. As duas correções são de cliente, em `app/src/rede.ts`
+> (`RESERVA_DE_ALUGUEL`) e `app/src/paginas/Comparecer.tsx`.
+>
+> Na rajada de 20 com limite 10, que é o critério de aceitação de T-014: **17 de
+> 20 num ledger só**, em duas seções (10 + 7), contra 10 antes. As 3 restantes
+> levam `ResourceLimitExceeded`, e o número é **estável** — repetido com 2.048 e
+> com 8.192 bytes de folga declarada, 17 nas duas. Então não é a folga: é teto
+> de ledger, 17 transações com operação Soroban no mesmo. É escala, e a escala
+> aqui tem remédio trivial — o `enviar` do dapp já tenta de novo com taxa
+> escalonada, e as 3 não foram recusadas pelo contrato, foram preteridas pelo
+> ledger.
+>
+> **O critério "rajada de 20 com limite 10 entra" não está cumprido numa
+> tentativa só**, e é essa a leitura honesta: cumprido pelo caminho do dapp, que
+> tenta de novo; não cumprido por um disparo único, que é o que o script mede.
+> O que a §11-D afirmava — que as que precisariam abrir a seção seguinte eram
+> justamente as que falhavam — **deixou de ser verdade**: as seções novas
+> nascem, no mesmo ledger, e quem sobra sobra por limite de ledger.
+
+### §11-D — o problema, como ele estava
 
 O split automático funciona **sequencialmente**: com limite 2, a terceira pessoa
 abre a seção 1, declarando no footprint a janela `Anel(proposta, 0..3)`.
