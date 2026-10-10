@@ -393,7 +393,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-002 | `cargo fmt` passa | T-000 | §8 | review | `cargo fmt --check` passa nos 5 crates; nenhum teste muda de resultado |
 | T-003 | `cargo clippy` sem avisos | T-002 | §8 | review | 0 avisos nos **5** crates; `-D warnings` no portão |
 | T-004 | Vídeo da demonstração | T-001 | §2 | todo | roteiro + gravação com `/bastidores` na segunda janela; nada encenado |
-| T-005 | Publicar o dapp | T-001 | §7 | todo | estático no ar; o README deixa de dizer "não publicado" |
+| T-005 | Publicar o dapp | T-001 | §7 | blocked | §11-P — o `dist` foi verificado servido como estático e **quebrava em todo link profundo**; corrigido com roteador de fragmento (DEC-016) e guardado por teste. O que falta é humano: onde o Pages serve, CI com `wasm-pack`, e o `git push` |
 | T-006 | Atualizar os decks | T-001 | §2 | review | slide novo **06 / O caderno e a urna** nos dois decks, com o anel, a imagem de chave, as seções e a troca que elas são; a desvinculação sai de "etapa futura" e vira entregue no slide de limites e no de entrega; o slide de evidência troca a rodada de mesa pelas duas rodadas atuais. 15 slides, numeração refeita. Resta: o slide 07 (Tansu) é uma leitura de março de 2026 e continua histórica |
 | T-007 | "O modo" em `/abrir` | T-001 | §4 | review | a tela ganha os portões que faltavam — teto de opções, mesa com endereço repetido, janela de duração zero — e passa a **oferecer a fechadura de tempo**, que era o único modo do contrato sem caminho na interface. O custo da baliza e a falta de plano B aparecem ao lado da opção |
 | T-016 | O placar aparece no dapp quando existe | T-013 | §2 | review | `/apurar` e `/votacao` leem `resultado()`; sem mesa, explicam por que nunca haverá |
@@ -781,6 +781,31 @@ inteiro e acrescenta um passo humano. Descartada por isso.
 baliza; §6 ganhou o teto de 32. `fim_tempo` saiu da proposta por ser redundante
 — o prazo **é** `instante(rodada)` —, e a ABI trocou `fim_tempo, rodada` por
 `rodada, rodada_abertura`, com redeploy. Fica aberta a §11-L.
+
+### DEC-016: O dapp usa roteador de fragmento (2026-10-10, T-005)
+
+**Contexto.** Verificando o `dist` servido como arquivo estático — e não o
+servidor de desenvolvimento —, abrir `/demo/votar` direto devolveu 404 em
+`/demo/assets/index-*.js`. A causa é `base: "./"`: caminhos de asset relativos,
+resolvidos contra o segmento da rota. Navegar por dentro do app funcionava, e é
+por isso que o bug nunca apareceu em `npm run dev`.
+
+O caso quebrado é o caso normal deste produto: uma votação chega a quem vota
+como link, e `/votacao/<id>` é exatamente a forma que quebra.
+
+**Decisão.** `HashRouter` no lugar de `BrowserRouter`. A rota passa a viver no
+fragmento, que nenhum servidor estático precisa entender.
+
+**Alternativas.** (a) `base` absoluto com o subcaminho do Pages: exige saber o
+destino antes de publicar, e quebra de novo se ele mudar. (b) Copiar
+`index.html` para `404.html`, que é o truque de SPA no Pages: só funciona com
+`base` absoluto, então herda o problema de (a). (c) Servir na raiz de um
+domínio próprio: não é uma decisão que eu tome.
+
+**Consequências.** As URLs ganham `#`. `app/scripts/rotas.test.mjs` guarda a
+escolha lendo o fonte — e lendo o **código**, não os comentários, porque a
+primeira versão do guarda encontrou a si mesma no comentário que explica a
+regra.
 
 ### DEC-015: Os instantâneos de teste saem do git (2026-10-10, T-011)
 
@@ -1189,3 +1214,35 @@ Enquanto você não decidir, deixei o README **dizendo a verdade** (opção 1 na
 redação), porque a alternativa era deixá-lo afirmando o que o código não faz, e
 isso §2 não permite em nenhuma hipótese. Se você escolher outra opção, o texto
 muda com ela.
+
+---
+
+### §11-P — publicar o dapp precisa de três decisões suas (bloqueia T-005)
+
+O código está pronto e verificado: o `dist` serve como arquivo estático, as
+rotas sobrevivem a um link compartilhado desde a DEC-016, e o teste
+`rotas.test.mjs` impede a regressão. O que falta não é código.
+
+1. **Onde o Pages serve.** Hoje a raiz do repositório é publicada — é de lá que
+   saem os decks e `console/`, que os próprios decks já citam como
+   `thaisfreis.github.io/tessera/console`. O dapp precisa de um lugar:
+   `/app/` na mesma raiz, um branch `gh-pages`, ou um domínio próprio. Com
+   roteador de fragmento qualquer um funciona, então a escolha é sua e não tem
+   consequência técnica.
+
+2. **O build.** O dapp depende de `cliente-wasm/pacote`, que é gerado por
+   `wasm-pack` e **não está no git** (e não deve estar). Então publicar exige
+   ou um workflow do GitHub Actions com Rust e `wasm-pack` instalados, ou
+   commitar o `dist` pronto. As duas são decisões suas: a primeira é
+   infraestrutura nova, que o §0 diz para eu não adicionar sozinho; a segunda
+   põe artefato de build no repositório.
+
+3. **O `git push`.** É seu, sempre.
+
+Enquanto isso, o README continua dizendo "não publicado", que é a verdade.
+
+**Uma observação sobre o método, que vale além desta tarefa.** O bug do link
+profundo existia desde que o dapp existe, e nenhum portão o pegaria: `npm run
+build` compila, `tsc` passa, e navegando por dentro do app tudo funciona. Ele
+só apareceu porque desta vez o `dist` foi **servido e aberto num link direto**,
+em vez de confiado. Vale manter esse passo na publicação.

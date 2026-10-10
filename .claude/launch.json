@@ -4,8 +4,28 @@
     {
       "name": "tessera-app",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--dir", "app", "dev", "--port", "5273", "--strictPort"],
+      "runtimeArgs": [
+        "--dir",
+        "app",
+        "dev",
+        "--port",
+        "5273",
+        "--strictPort"
+      ],
       "port": 5273
+    },
+    {
+      "name": "tessera-dist",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "app",
+        "preview",
+        "--port",
+        "5274",
+        "--strictPort"
+      ],
+      "port": 5274
     }
   ]
 }
