@@ -569,7 +569,7 @@ Todo comando escreve `./estado/<proposta>.json`:
     { "texto": "Eleger a cadeira 3",
       "opcoes": ["ana", "bruno", "carla"], "confidencial": true }
   ],
-  "contrato": "CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH",
+  "contrato": "CDWGDWDPCXAAA3FO24NRRYS77HEMFHWDIBK4O3GB6L6BQGYWC7JYW3YS",
   "raiz_aptos": "7c3a...b219",
   "aptos": ["GB4V...", "GAO2..."],
   "sigilo_minimo": 5,

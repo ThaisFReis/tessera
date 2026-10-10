@@ -1145,7 +1145,7 @@ contrato recusa.
 | Recusa por `τ` demonstrada na rede (D3) | ✅ feito |
 | Vídeo de demonstração ponta a ponta | **pendente** |
 
-Contrato na testnet: `CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH`.
+Contrato na testnet: `CDWGDWDPCXAAA3FO24NRRYS77HEMFHWDIBK4O3GB6L6BQGYWC7JYW3YS`.
 129 testes passando em quatro pacotes, Wasm de 29,2 KB otimizado.
 
 **Congelamento de código: 2026-10-04, 12:00.** Submissão fecha 2026-10-05 19:00.

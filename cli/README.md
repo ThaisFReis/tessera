@@ -3,7 +3,7 @@
 ```bash
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
-export TESSERA_CONTRATO=CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH
+export TESSERA_CONTRATO=CDWGDWDPCXAAA3FO24NRRYS77HEMFHWDIBK4O3GB6L6BQGYWC7JYW3YS
 ```
 
 Requer a `stellar` CLI com identidades criadas e financiadas. Quem vota paga a

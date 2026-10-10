@@ -96,6 +96,7 @@ foi auditado por terceiros.
 | "o sigilo da escolha e a desvinculação valem nos dois modos" | o anel e o compromisso não dependem da lista; DEC-006 |
 | custo em instruções de qualquer operação | o teste que o mede, citado junto do número |
 | "roda na testnet" | hash da transação, verificável no explorer |
+| "qualquer pessoa recalcula o resultado do ledger, **inclusive no caminho anônimo**" | `tessera verificar --proposta <id> --contrato <C>` — cadeia re-encadeada, imagens de chave distintas, assinaturas em anel refeitas e criptogramas decifrados em `v ∈ {0,1}`, sem arquivo local nenhum. Rodado na testnet em 2026-10-10 contra a proposta `7021e473…`: 7 anéis refeitos, 6 de 7 abertas, placar recontado igual ao publicado. **Com o limite escrito:** as assinaturas em anel só são refazíveis enquanto a transação estiver na janela de retenção do RPC, e o verificador imprime a faixa que alcança antes de qualquer veredito |
 | "não há servidor que veja o fator de aleatoriedade" | o dapp é estático; as provas nascem no navegador |
 | "depois de votar, nem quem votou reabre a própria cédula" | `r` não é persistido em nenhum cliente; `cli` `nenhum_comando_grava_recibo` lê o próprio fonte, e `queimar_sobrescreve_antes_de_remover` |
 | "abrir uma cédula anônima revela o que ela votou, nunca de quem é" | INV-04b; o vínculo não é guardado em lugar nenhum |
@@ -118,6 +119,12 @@ difícil de descobrir. Não é: o anel é nomeado, as seções particionam, e qu
 os anéis lê a seção de todo mundo (DEC-012). O que se pode afirmar é que ela é
 **imprevisível até a abertura** — que é o que impede escolher quem se esconde
 atrás de quem.
+
+Desde T-026, também **proibido afirmar que a seção publica o seu total** — ela
+não publica mais, guarda uma contagem e um ponto (INV-26) — e **proibido omitir
+que o placar agregado é público**. O que a mudança fechou foi a seção unânime; o
+resultado unânime global continua revelando todo mundo, como em qualquer
+sistema, e dizer o contrário seria pior que o limite que estava escrito antes.
 
 **Proibido afirmar sobre a fechadura de tempo:** que abrir o **conteúdo** antes
 da hora é *impossível*. Não é: é conluio de um limiar dos operadores da baliza —
@@ -302,7 +309,7 @@ tabela em [`SOURCES.md`](SOURCES.md)):
 Nenhuma dependência nova: `ark-bls12-381 0.5` com a feature `curve`, que já está
 no `core`, entrega pareamento e *hash-to-curve* em G1 (medido).
 
-Contrato na testnet: `CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH`
+Contrato na testnet: `CDWGDWDPCXAAA3FO24NRRYS77HEMFHWDIBK4O3GB6L6BQGYWC7JYW3YS`
 — **substituído no redeploy de T-018.**
 
 `[VERIFY]` em aberto: nenhum.
