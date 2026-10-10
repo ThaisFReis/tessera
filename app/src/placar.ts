@@ -27,6 +27,7 @@ import {
   abrirSecao,
   apurarSecao,
   cedulasDaSecao,
+  lerCadeia,
   lerResultadoSecao,
   type Abertura,
   type Diario,
@@ -34,6 +35,7 @@ import {
 } from "./rede";
 import { CarteiraEfemera } from "./carteira";
 import { portao } from "./portao";
+import { somarSecoes, type ParcialDaSecao } from "./secoes";
 import { carregar } from "./wasm";
 
 export type FasePlacar =
@@ -47,7 +49,7 @@ export type FasePlacar =
   | { tipo: "decifrando"; cedulas: number }
   | { tipo: "publicando" }
   | { tipo: "vazia" }
-  /** Várias seções, e o evento não diz de qual seção é cada cédula. §11-N. */
+  /** Alguma seção não deu para ler ou apurar: a soma parcial não é o placar. */
   | { tipo: "multissecao"; secoes: number; publicadas: number }
   | {
       tipo: "pronto";
@@ -96,106 +98,115 @@ export async function apurarSozinho(
     if (qual.tipo !== "pode-apurar") return avancar(qual);
 
     const nConf = opcoesConfidenciais(p);
-    const jaNoLedger = await lerResultadoSecao(id, 0);
+    const secoes = Math.max(1, p.secoes);
 
-    // **§11-N.** A lista ordenada de cada seção vem dos eventos, e o tópico do
-    // evento tem a proposta e não a seção. Com uma seção, todas as cédulas são
-    // dela; com várias, não há como separá-las — e tentar por eliminação é
-    // testar as partições possíveis, o que é inviável, não só caro. Então aqui
-    // o dapp só mostra o que já estiver publicado.
-    if (p.secoes > 1) {
-      const todas = await Promise.all(
-        Array.from({ length: p.secoes }, (_, s) => lerResultadoSecao(id, s)),
-      );
-      const publicadas = todas.filter((r) => r !== null).length;
-      if (publicadas === p.secoes) {
-        const totais = todas[0]!.totais.map((_, j) =>
-          todas.reduce((a, r) => a + r!.totais[j], 0),
-        );
-        return avancar({
-          tipo: "pronto",
-          totais,
-          abriram: todas.reduce((a, r) => a + r!.abriram, 0),
-          cedulas: null,
-          publicado: true,
+    // **§11-N, resolvida.** O tópico do evento passou a dizer a seção, então
+    // quem apura separa as cédulas lendo só o ledger. O laço é por seção, e
+    // cada uma é independente: uma seção que não dê para ler não impede as
+    // outras, e o que sair incompleto não é apresentado como placar.
+    avancar({ tipo: "lendo" });
+    const parciais: ParcialDaSecao[] = [];
+    let lidas = 0;
+    let publicadaAlguma = false;
+    let tx: string | undefined;
+
+    for (let s = 0; s < secoes; s++) {
+      const jaNoLedger = await lerResultadoSecao(id, s);
+      // Quantas a cadeia registrou. É o denominador verdadeiro: se a leitura
+      // dos eventos trouxer menos, o problema é a janela do RPC, e dizer isso
+      // é melhor que levar `CadeiaNaoFecha` sem explicação.
+      const { quantas } = await lerCadeia(id, s);
+      const cedulas = await cedulasDaSecao(id, p.abre_em, s);
+
+      if (cedulas.length !== quantas) {
+        if (jaNoLedger) {
+          parciais.push({ secao: s, ...jaNoLedger, cedulas: null });
+          continue;
+        }
+        diario?.({
+          tipo: "nota",
+          txt:
+            `seção ${s}: a cadeia registrou ${quantas} cédula${quantas === 1 ? "" : "s"} e ` +
+            `eu li ${cedulas.length} dos eventos. Não apuro com lista incompleta.`,
+        });
+        continue;
+      }
+      if (quantas === 0) continue;
+
+      lidas += cedulas.length;
+      avancar({ tipo: "decifrando", cedulas: lidas });
+      const a: Abertura = await abrirSecao(cedulas, nConf, p.rodada);
+      diario?.({
+        tipo: "nota",
+        txt:
+          `seção ${s}: a assinatura da rodada ${p.rodada} conferiu no pareamento, e ` +
+          `${a.abriram} de ${a.cedulas} cédulas abriram`,
+      });
+      if (a.abriram < a.cedulas) {
+        diario?.({
+          tipo: "nota",
+          txt: `${a.cedulas - a.abriram} criptograma${a.cedulas - a.abriram === 1 ? "" : "s"} não abriu — cada um custa só o próprio voto, e o placar segue`,
         });
       }
-      return avancar({ tipo: "multissecao", secoes: p.secoes, publicadas });
+
+      // Já está no ledger e ninguém abre mais que isso: nada a publicar.
+      if (jaNoLedger && jaNoLedger.abriram >= a.abriram) {
+        parciais.push({ secao: s, ...jaNoLedger, cedulas: a.cedulas });
+        publicadaAlguma = true;
+        continue;
+      }
+
+      // Publicar não é o que torna o placar verdadeiro — a conta acima é
+      // conferível por quem quiser, e o contrato recusaria um total que não
+      // fechasse. Publicar serve a quem abrir esta página depois e não quiser
+      // refazer a conta.
+      avancar({ tipo: "publicando" });
+      try {
+        // Uma carteira descartável: apurar não é um ato de identidade, e
+        // assinar com a carteira de identidade só acrescentaria um vínculo
+        // inútil ao ledger. O contrato aceita qualquer endereço aqui — é isso
+        // que faz a apuração não travável.
+        const c = await CarteiraEfemera.nascer();
+        tx = await apurarSecao(
+          c,
+          id,
+          s,
+          cedulas.flatMap((x) => x.compromissos),
+          a,
+          diario,
+        );
+        publicadaAlguma = true;
+      } catch (e) {
+        const porque = String((e as Error).message ?? e);
+        diario?.({
+          tipo: "nota",
+          txt: `o placar da seção ${s} não foi gravado no ledger: ${porque}. A conta acima não depende disso.`,
+        });
+      }
+      parciais.push({
+        secao: s,
+        totais: Array.from(a.totais),
+        abriram: a.abriram,
+        cedulas: a.cedulas,
+      });
     }
 
-    avancar({ tipo: "lendo" });
-    const cedulas = await cedulasDaSecao(id, p.abre_em);
-    if (cedulas.length === 0) {
-      if (jaNoLedger) {
-        return avancar({
-          tipo: "pronto",
-          ...jaNoLedger,
-          cedulas: null,
-          publicado: true,
-        });
-      }
+    if (parciais.length === 0) {
       return avancar({ tipo: "vazia" });
     }
-    diario?.({
-      tipo: "nota",
-      txt: `${cedulas.length} cédula${cedulas.length === 1 ? "" : "s"} na urna, lidas dos eventos do contrato`,
+
+    const soma = somarSecoes(parciais, secoes);
+    if (!soma.completo) {
+      return avancar({ tipo: "multissecao", secoes, publicadas: parciais.length });
+    }
+    avancar({
+      tipo: "pronto",
+      totais: soma.totais,
+      abriram: soma.abriram,
+      cedulas: soma.cedulas,
+      publicado: publicadaAlguma,
+      tx,
     });
-
-    avancar({ tipo: "decifrando", cedulas: cedulas.length });
-    const a: Abertura = await abrirSecao(cedulas, nConf, p.rodada);
-    diario?.({
-      tipo: "nota",
-      txt:
-        `a assinatura da rodada ${p.rodada} conferiu no pareamento, e ` +
-        `${a.abriram} de ${a.cedulas} cédulas abriram`,
-    });
-    if (a.abriram < a.cedulas) {
-      diario?.({
-        tipo: "nota",
-        txt: `${a.cedulas - a.abriram} criptograma${a.cedulas - a.abriram === 1 ? "" : "s"} não abriu — cada um custa só o próprio voto, e o placar segue`,
-      });
-    }
-
-    const pronto = {
-      tipo: "pronto" as const,
-      totais: Array.from(a.totais),
-      abriram: a.abriram,
-      cedulas: a.cedulas,
-    };
-
-    // Já está no ledger e ninguém abre mais que isso: nada a publicar.
-    if (jaNoLedger && jaNoLedger.abriram >= a.abriram) {
-      return avancar({ ...pronto, totais: jaNoLedger.totais, publicado: true });
-    }
-
-    // Publicar não é o que torna o placar verdadeiro — a conta acima é
-    // conferível por quem quiser, e o contrato recusaria um total que não
-    // fechasse. Publicar serve a quem abrir esta página depois e não quiser
-    // refazer a conta.
-    avancar({ tipo: "publicando" });
-    try {
-      // Uma carteira descartável: apurar não é um ato de identidade, e assinar
-      // com a carteira de identidade só acrescentaria um vínculo inútil ao
-      // ledger. O contrato aceita qualquer endereço aqui — é isso que faz a
-      // apuração não travável.
-      const c = await CarteiraEfemera.nascer();
-      const tx = await apurarSecao(
-        c,
-        id,
-        0,
-        cedulas.flatMap((x) => x.compromissos),
-        a,
-        diario,
-      );
-      avancar({ ...pronto, publicado: true, tx });
-    } catch (e) {
-      const porque = String((e as Error).message ?? e);
-      diario?.({
-        tipo: "nota",
-        txt: `o placar não foi gravado no ledger: ${porque}. A conta acima não depende disso.`,
-      });
-      avancar({ ...pronto, publicado: false });
-    }
   } catch (e) {
     avancar({ tipo: "falha", porque: String((e as Error).message ?? e) });
   }

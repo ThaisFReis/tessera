@@ -63,3 +63,44 @@ export function explicar(aptos: number, secoes: number, p: SecaoPequena): string
     `média, então é prudente ficar bem acima do piso.`
   );
 }
+
+/** O que a apuração de **uma** seção produziu. */
+export type ParcialDaSecao = {
+  secao: number;
+  totais: number[];
+  abriram: number;
+  /** Quantas cédulas havia. `null` quando o número veio do ledger, que guarda
+   *  quantas abriram e não quantas existiam. */
+  cedulas: number | null;
+};
+
+/**
+ * O placar da votação é a soma das seções — e só é o placar quando todas estão
+ * lá.
+ *
+ * Isto é o §11-N do lado da conta: separar as cédulas por seção passou a ser
+ * possível porque o tópico do evento diz a seção, e o que falta é somar. Duas
+ * decisões ficam aqui, longe de rede e de tela, para terem teste:
+ *
+ * - `completo` é falso enquanto faltar seção, e a tela não pode apresentar uma
+ *   soma parcial como resultado;
+ * - `cedulas` é `null` se **qualquer** parcela veio do ledger sem denominador.
+ *   Somar 8 + 0 daria "14 de 8", que é pior que não dizer.
+ */
+export function somarSecoes(
+  parciais: ParcialDaSecao[],
+  secoes: number,
+): { totais: number[]; abriram: number; cedulas: number | null; completo: boolean } {
+  const n = parciais[0]?.totais.length ?? 0;
+  if (parciais.some((p) => p.totais.length !== n)) {
+    throw new Error("seções com número de opções diferente não somam");
+  }
+  return {
+    totais: Array.from({ length: n }, (_, j) => parciais.reduce((a, p) => a + p.totais[j], 0)),
+    abriram: parciais.reduce((a, p) => a + p.abriram, 0),
+    cedulas: parciais.some((p) => p.cedulas === null)
+      ? null
+      : parciais.reduce((a, p) => a + (p.cedulas ?? 0), 0),
+    completo: parciais.length === Math.max(1, secoes),
+  };
+}

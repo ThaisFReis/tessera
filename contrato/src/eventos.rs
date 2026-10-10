@@ -64,11 +64,24 @@ pub struct Comparec {
 /// A ordem dos campos é interface congelada: `rede.ts` desempacota
 /// `[imagem, compromissos, escolhas, cripto]` por posição, e quem apura
 /// re-encadeia os compromissos nesta ordem contra `Cadeia(proposta, secao)`.
+///
+/// **A `secao` no tópico é a §11-N.** Sem ela, quem lê os eventos de uma
+/// votação de várias seções não tem como dizer de que seção é cada cédula — e a
+/// informação não está em lugar nenhum do ledger que o cliente alcance: o
+/// criptograma não diz nada antes de ser decifrado e decifrar não revela a
+/// seção; a assinatura em anel não revela qual anel assinou, que é o ponto
+/// dela; e a cadeia é sequencial, então "descobrir" a atribuição seria testar
+/// as partições possíveis. Com ela, a apuração de várias seções fecha.
+///
+/// Não revela nada novo: `secao_de` já é um getter, o anel de cada seção já é
+/// público, e votar já exige declarar a seção na própria chamada.
 #[contractevent(topics = ["anonimo"], data_format = "vec")]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Anonimo {
     #[topic]
     pub proposta: BytesN<32>,
+    #[topic]
+    pub secao: u32,
     pub imagem: Bls12381G1Affine,
     pub compromissos: Vec<Bls12381G1Affine>,
     pub escolhas: Vec<u32>,

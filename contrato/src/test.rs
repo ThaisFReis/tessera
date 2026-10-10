@@ -4028,12 +4028,24 @@ struct UrnaDoNavegador {
     cliente: TesseraClient<'static>,
     proposta: BytesN<32>,
     h_hex: std::string::String,
-    /// Por cédula, na ordem da cadeia: os compromissos em hexadecimal e o
-    /// criptograma concatenado. É exatamente o que o evento carrega.
-    cedulas: Vetor<(Vetor<std::string::String>, std::string::String)>,
+    secoes: u32,
+    /// Por cédula, na ordem da cadeia **dentro da seção**: a seção **lida do
+    /// tópico do evento**, os compromissos em hexadecimal e o criptograma
+    /// concatenado. É exatamente o que quem apura tem, e nada mais.
+    cedulas: Vetor<(u32, Vetor<std::string::String>, std::string::String)>,
 }
 
 fn urna_do_navegador(escolhas: &[u32]) -> UrnaDoNavegador {
+    urna_em_secoes(escolhas, 1)
+}
+
+/// O mesmo cenário da fechadura, em `secoes` seções.
+///
+/// Com mais de uma seção a divisão vem da baliza (DEC-012), então a proposta
+/// nasce com `rodada_abertura` e alguém registra a assinatura antes de o
+/// caderno abrir — é a ordem que o contrato exige. Cada seção tem o seu anel, e
+/// a cédula é assinada contra o anel da seção de quem a monta.
+fn urna_em_secoes(escolhas: &[u32], secoes: u32) -> UrnaDoNavegador {
     use tessera_cliente::{anonima, PerguntaJs};
     use tessera_core::anel;
 
@@ -4071,11 +4083,15 @@ fn urna_do_navegador(escolhas: &[u32]) -> UrnaDoNavegador {
         &ABRE,
         &FECHA,
         &true,
-        &1u32,
+        &secoes,
         &0u32,
         &RODADA_FIM,
-        &0u64,
+        &if secoes == 1 { 0 } else { RODADA_ABERTURA },
     );
+    if secoes > 1 {
+        env.ledger().set_timestamp(instante(RODADA_ABERTURA));
+        cliente.registrar_abertura(&proposta, &assinatura_host(&env));
+    }
 
     let g = pedersen::gerador();
     let h_hex = ponto::para_hex(&ponto::desserializar(&cliente.gerador_h().to_array()).unwrap());
@@ -4083,6 +4099,19 @@ fn urna_do_navegador(escolhas: &[u32]) -> UrnaDoNavegador {
 
     let xs: Vetor<ArkFr> = (0..n).map(|_| pedersen::acaso_fr().unwrap()).collect();
     let anel_ark: Vetor<ArkG1> = xs.iter().map(|x| anel::chave_publica(&g, x)).collect();
+    // A seção de cada um sai da baliza, não da nossa escolha — e o contrato
+    // confere: declarar outra leva `SecaoInvalida`. Com uma seção só, é zero
+    // para todos.
+    let minha_secao: Vetor<u32> = if secoes == 1 {
+        std::vec![0; n]
+    } else {
+        let xdrs: Vetor<Vetor<u8>> = aptos
+            .iter()
+            .map(|a| bytes_de(&a.clone().to_xdr(&env)))
+            .collect();
+        merkle::dividir(&assinatura_em_bytes(), &xdrs, secoes)
+    };
+    let mut aneis: Vetor<Vetor<ArkG1>> = (0..secoes).map(|_| Vetor::new()).collect();
     for (i, pk) in anel_ark.iter().enumerate() {
         let c = arvore.caminho(i).unwrap();
         let mut irmaos = Vec::new(&env);
@@ -4095,16 +4124,26 @@ fn urna_do_navegador(escolhas: &[u32]) -> UrnaDoNavegador {
             &g1(&env, pk),
             &irmaos,
             &c.indice,
-            &0u32,
+            &minha_secao[i],
         );
+        aneis[minha_secao[i] as usize].push(*pk);
     }
     env.ledger().set_sequence_number(ABRE + 10);
 
-    let anel_hex: Vetor<std::string::String> = anel_ark.iter().map(ponto::para_hex).collect();
-    let mut anel_sdk: Vec<Bls12381G1Affine> = Vec::new(&env);
-    for p in &anel_ark {
-        anel_sdk.push_back(g1(&env, p));
-    }
+    let aneis_hex: Vetor<Vetor<std::string::String>> = aneis
+        .iter()
+        .map(|a| a.iter().map(ponto::para_hex).collect())
+        .collect();
+    let aneis_sdk: Vetor<Vec<Bls12381G1Affine>> = aneis
+        .iter()
+        .map(|a| {
+            let mut v: Vec<Bls12381G1Affine> = Vec::new(&env);
+            for p in a {
+                v.push_back(g1(&env, p));
+            }
+            v
+        })
+        .collect();
     let perguntas_js = [PerguntaJs {
         opcoes: 2,
         confidencial: true,
@@ -4116,12 +4155,17 @@ fn urna_do_navegador(escolhas: &[u32]) -> UrnaDoNavegador {
             .iter()
             .map(|b| std::format!("{:02x}", b))
             .collect();
+        let secao = minha_secao[i];
+        let dentro = aneis[secao as usize]
+            .iter()
+            .position(|p| *p == anel_ark[i])
+            .expect("a chave do anel nao esta no anel da propria secao");
         let a = anonima(
             &ponto_hex(&proposta.to_array()),
             &ponto::para_hex(&hp),
             &h_hex,
-            &anel_hex,
-            i,
+            &aneis_hex[secao as usize],
+            dentro,
             &segredo,
             &perguntas_js,
             &[escolha],
@@ -4167,8 +4211,8 @@ fn urna_do_navegador(escolhas: &[u32]) -> UrnaDoNavegador {
         }
         cliente.votar_anonimo(
             &proposta,
-            &0u32,
-            &anel_sdk,
+            &secao,
+            &aneis_sdk[secao as usize],
             &g1(&env, &ponto::de_hex(&a.imagem).unwrap()),
             &escalar(&env, &pedersen::fr_de_bytes_be(&hex_bytes(&a.c0))),
             &z_sdk,
@@ -4178,7 +4222,15 @@ fn urna_do_navegador(escolhas: &[u32]) -> UrnaDoNavegador {
             &Vec::new(&env),
             &cripto_sdk,
         );
-        cedulas.push((c.compromissos.clone(), c.cripto.clone()));
+        // **A seção sai do evento, não da nossa variável.** É o §11-N: quem
+        // apura só tem os eventos, e se o tópico não disser a seção, não há de
+        // onde tirá-la. Ler aqui é o que faz o teste falhar antes da mudança.
+        let (topicos, _) = ultimo(&env);
+        let do_evento = match topicos.get(2) {
+            Some(soroban_sdk::xdr::ScVal::U32(x)) => *x,
+            _ => std::panic!("o topico do anonimo nao diz a secao: {:?}", topicos),
+        };
+        cedulas.push((do_evento, c.compromissos.clone(), c.cripto.clone()));
     }
 
     UrnaDoNavegador {
@@ -4186,6 +4238,7 @@ fn urna_do_navegador(escolhas: &[u32]) -> UrnaDoNavegador {
         cliente,
         proposta,
         h_hex,
+        secoes,
         cedulas,
     }
 }
@@ -4199,24 +4252,41 @@ impl UrnaDoNavegador {
     /// Os compromissos de todas as cédulas, achatados na ordem da cadeia — o
     /// que quem apura junta lendo os eventos.
     fn compromissos(&self) -> Vetor<std::string::String> {
-        self.cedulas
-            .iter()
-            .flat_map(|(cs, _)| cs.iter().cloned())
-            .collect()
+        self.compromissos_de(0)
     }
 
     fn criptos(&self) -> Vetor<std::string::String> {
-        self.cedulas.iter().map(|(_, c)| c.clone()).collect()
+        self.criptos_de(0)
+    }
+
+    fn compromissos_de(&self, secao: u32) -> Vetor<std::string::String> {
+        self.cedulas
+            .iter()
+            .filter(|(s, _, _)| *s == secao)
+            .flat_map(|(_, cs, _)| cs.iter().cloned())
+            .collect()
+    }
+
+    fn criptos_de(&self, secao: u32) -> Vetor<std::string::String> {
+        self.cedulas
+            .iter()
+            .filter(|(s, _, _)| *s == secao)
+            .map(|(_, _, c)| c.clone())
+            .collect()
     }
 
     /// Entrega ao contrato o que a decifragem reconstruiu.
     fn apurar(&self, a: &tessera_cliente::AberturaJs) -> Result<u32, Erro> {
+        self.apurar_secao(0, a)
+    }
+
+    fn apurar_secao(&self, secao: u32, a: &tessera_cliente::AberturaJs) -> Result<u32, Erro> {
         let mut abertas = Vec::new(&self.env);
         for b in &a.abertas {
             abertas.push_back(*b);
         }
         let mut compr = Vec::new(&self.env);
-        for c in self.compromissos() {
+        for c in self.compromissos_de(secao) {
             compr.push_back(g1(&self.env, &ponto::de_hex(&c).unwrap()));
         }
         let mut totais = Vec::new(&self.env);
@@ -4231,7 +4301,7 @@ impl UrnaDoNavegador {
             .try_apurar_secao(
                 &self.proposta,
                 &Address::generate(&self.env),
-                &0u32,
+                &secao,
                 &compr,
                 &abertas,
                 &totais,
@@ -4492,8 +4562,12 @@ fn o_formato_dos_eventos_do_caminho_anonimo_esta_congelado() {
     let (t, d) = ultimo(e);
     assert_eq!(
         t,
-        std::vec![scv(e, sim("anonimo")), scv(e, u.proposta.clone())],
-        "o anonimo nao carrega endereco nenhum, e e esse o ponto dele"
+        std::vec![
+            scv(e, sim("anonimo")),
+            scv(e, u.proposta.clone()),
+            scv(e, 0u32)
+        ],
+        "o anonimo carrega a secao e NENHUM endereco — §11-N"
     );
     match &d {
         soroban_sdk::xdr::ScVal::Vec(Some(v)) => {
@@ -4644,4 +4718,78 @@ fn o_formato_dos_eventos_do_caderno_esta_congelado() {
         }
         outro => std::panic!("comparec tinha de publicar um Vec, veio {:?}", outro),
     }
+}
+
+/// **§11-N: quem apura separa as seções lendo só o ledger.**
+///
+/// Antes desta mudança o tópico do `anonimo` era `(anonimo, proposta)`, e com
+/// várias seções quem lia os eventos não tinha como dizer de que seção era cada
+/// cédula — nem por tentativa e erro, que são 3³⁰ partições numa rodada de 30
+/// em 3. A informação não estava no ledger em lugar nenhum: o criptograma não
+/// diz, a assinatura em anel não diz (é o ponto dela), e a cadeia é sequencial.
+///
+/// Agora o tópico é `(anonimo, proposta, secao)`, e isto é o teste de que a
+/// apuração de várias seções fecha com o que o ledger publica. **Não revela
+/// nada novo:** `secao_de` já é um getter, o anel de cada seção já é público, e
+/// votar já exige declarar a seção na própria chamada.
+#[test]
+fn a_apuracao_de_varias_secoes_separa_as_cedulas_pelo_evento() {
+    let u = urna_em_secoes(&[0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1], 2);
+    let e = &u.env;
+    assert_eq!(u.secoes, 2);
+
+    // Cada seção tem anel acima de τ — senão o contrato teria recusado a
+    // cédula, e o teste estaria passando por outro motivo.
+    let mut quantas: Vetor<u32> = std::vec![0; u.secoes as usize];
+    for (s, _, _) in &u.cedulas {
+        quantas[*s as usize] += 1;
+    }
+    std::println!("\n== §11-N: {} cedulas em {:?} ==", u.cedulas.len(), quantas);
+    for s in 0..u.secoes {
+        assert!(
+            u.cliente.anel(&u.proposta, &s).len() >= TAU,
+            "a secao {} nasceu abaixo de τ e o teste nao prova nada",
+            s
+        );
+        // O getter novo: quantas cédulas a cadeia daquela seção registrou.
+        // Sem ele, quem lê os eventos não sabe se achou todas.
+        let (_, n) = u.cliente.cadeia(&u.proposta, &s);
+        assert_eq!(
+            n, quantas[s as usize],
+            "a cadeia da secao {} nao bate com o que os eventos mostraram",
+            s
+        );
+    }
+
+    // E agora o que §11-N bloqueava: apurar **cada** seção, com a lista
+    // ordenada que saiu dos eventos daquela seção.
+    u.fim();
+    let mut placar = [0u32; 2];
+    for s in 0..u.secoes {
+        let a = tessera_cliente::abertura(
+            &u.compromissos_de(s),
+            &u.criptos_de(s),
+            2,
+            &u.h_hex,
+            RODADA_FIM,
+            ASSINATURA_FIM,
+        )
+        .expect("a abertura da secao falhou");
+        assert_eq!(a.cedulas, quantas[s as usize]);
+        assert_eq!(a.abriram, quantas[s as usize], "todas tinham de abrir");
+        assert_eq!(
+            u.apurar_secao(s, &a),
+            Ok(quantas[s as usize]),
+            "o contrato recusou o placar da secao {}",
+            s
+        );
+        for j in 0..2 {
+            placar[j] += a.totais[j];
+        }
+        std::println!("secao {} .......... {:?}", s, a.totais);
+    }
+
+    // 6 zeros e 8 uns na lista acima.
+    assert_eq!(placar, [6, 8], "a soma das secoes nao e o placar da votacao");
+    let _ = e;
 }

@@ -639,6 +639,7 @@ impl Tessera {
         // maior que qualquer janela de votação.
         eventos::Anonimo {
             proposta,
+            secao,
             imagem,
             compromissos,
             escolhas,
@@ -1076,6 +1077,19 @@ impl Tessera {
         }
         .publish(&env);
         Ok(())
+    }
+
+    /// **A cadeia de uma seção: o encadeamento e quantas cédulas ele prendeu.**
+    ///
+    /// Quem apura lê os compromissos dos eventos, e sem este getter não tem como
+    /// saber se achou todos — levaria `CadeiaNaoFecha` sem explicação, que é
+    /// indistinguível de uma cadeia adulterada. Com ele, o cliente diz "faltam 2
+    /// no que eu li" e a pessoa sabe que o problema é a janela do RPC.
+    ///
+    /// Numa votação sem fechadura devolve o começo — 32 zeros e nenhuma cédula —
+    /// porque a cadeia só existe quando a apuração é sem mesa.
+    pub fn cadeia(env: Env, proposta: BytesN<32>, secao: u32) -> (BytesN<32>, u32) {
+        cadeia_de(&env, &proposta, secao)
     }
 
     /// A assinatura registrada, para o cliente calcular a própria seção.

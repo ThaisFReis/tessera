@@ -282,6 +282,21 @@ export const lerResultadoSecao = async (
   return r ? { abriram: r[0], totais: Array.from(r[1]) } : null;
 };
 
+/**
+ * A cadeia de uma seção: o encadeamento e **quantas cédulas** ele prendeu.
+ *
+ * É como quem lê os eventos sabe se achou todas. Sem isto, uma leitura
+ * incompleta — janela do RPC, página perdida — levaria `CadeiaNaoFecha`, que é
+ * indistinguível de uma cadeia adulterada.
+ */
+export const lerCadeia = async (
+  id: string,
+  secao: number,
+): Promise<{ elo: string; quantas: number }> => {
+  const r = (await ler("cadeia", bytesN(id), u32(secao))) as [Uint8Array, number] | undefined;
+  return r ? { elo: bytesParaHex(r[0]), quantas: Number(r[1]) } : { elo: "", quantas: 0 };
+};
+
 /** Quantas seções existem agora. Na aberta cresce com o comparecimento. */
 export const lerSecoes = async (id: string): Promise<number> =>
   ((await ler("secoes", bytesN(id))) as number | undefined) ?? 1;
@@ -470,11 +485,16 @@ export type CedulaNoLedger = {
  * que `apurar_secao` re-encadeia: ler na ordem errada é recusado com
  * `CadeiaNaoFecha`, não aceito em silêncio.
  *
- * Hoje isto só serve a uma votação de **uma** seção: o tópico do evento tem a
- * proposta e não a seção, então não há como separar as cédulas por seção sem
- * um bump de ABI. Ver §11-N.
+ * A seção vem do **tópico** do evento (§11-N). Sem ela, uma votação de várias
+ * seções era ilegível para quem apura: o criptograma não diz a seção, a
+ * assinatura em anel não diz qual anel assinou, e a cadeia é sequencial — então
+ * separar as cédulas seria testar as partições possíveis.
  */
-export async function cedulasDaSecao(id: string, desdeLedger: number): Promise<CedulaNoLedger[]> {
+export async function cedulasDaSecao(
+  id: string,
+  desdeLedger: number,
+  secao: number,
+): Promise<CedulaNoLedger[]> {
   const todas: CedulaNoLedger[] = [];
   let cursor: string | undefined;
   for (;;) {
@@ -489,6 +509,7 @@ export async function cedulasDaSecao(id: string, desdeLedger: number): Promise<C
     for (const e of r.events) {
       if (scValToNative(e.topic[0]) !== "anonimo") continue;
       if (bytesParaHex(scValToNative(e.topic[1]) as Uint8Array) !== id) continue;
+      if (Number(scValToNative(e.topic[2])) !== secao) continue;
       const v = scValToNative(e.value) as [Uint8Array, Uint8Array[], number[], Uint8Array];
       todas.push({
         imagem: bytesParaHex(v[0]),

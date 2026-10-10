@@ -161,7 +161,7 @@ const trocarUmByte = (h) =>
  * que entraram — que é a ordem da cadeia de compromissos que o contrato
  * re-encadeia. É o mesmo caminho de `rede.ts::cedulasDaSecao`.
  */
-async function cedulasDosEventos(id, desde) {
+async function cedulasDosEventos(id, desde, secao = 0) {
   const r = await servidor.getEvents({
     startLedger: desde,
     filters: [{ type: "contract", contractIds: [CONTRATO] }],
@@ -169,6 +169,7 @@ async function cedulasDosEventos(id, desde) {
   return r.events
     .filter((e) => scValToNative(e.topic[0]) === "anonimo")
     .filter((e) => bytesHex(scValToNative(e.topic[1])) === id)
+    .filter((e) => Number(scValToNative(e.topic[2])) === secao)
     .map((e) => {
       const v = scValToNative(e.value);
       return { compromissos: v[1].map(bytesHex), cripto: bytesHex(v[3]) };
