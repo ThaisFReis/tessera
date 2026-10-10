@@ -4793,3 +4793,200 @@ fn a_apuracao_de_varias_secoes_separa_as_cedulas_pelo_evento() {
     assert_eq!(placar, [6, 8], "a soma das secoes nao e o placar da votacao");
     let _ = e;
 }
+
+// ===================== T-026: o texto claro sai da seção =====================
+//
+// A DEC-017 declarou o vazamento: `apurar_secao` publicava o total **daquela
+// seção** em claro, e numa seção unânime isso é o voto de cada membro dela. A
+// resposta foi declarar agora e consertar na estrutura — é este bloco.
+//
+// Agora a seção guarda `(quantas abriram, Σ compromissos abertos)`: uma
+// contagem e um ponto por opção, e ponto de Pedersen é perfeitamente ocultante.
+// O placar sai de uma transação a mais, `publicar_resultado`, que soma os
+// pontos das seções nomeadas e faz **um** MSM — com um piso sobre a contagem
+// **agregada**, que, ao contrário do piso por seção que a DEC-011 rejeitou, não
+// é travável: quem sabota retém só a própria cédula, e o agregado se alimenta
+// do eleitorado inteiro.
+
+impl UrnaDoNavegador {
+    /// O agregado que a decifragem de **todas** as seções produz: os totais
+    /// somados e a soma dos fatores. É o que quem apura calcula no navegador.
+    fn agregado(&self, por_secao: &[tessera_cliente::AberturaJs]) -> (Vetor<u32>, Vetor<ArkFr>) {
+        let n = por_secao[0].totais.len();
+        let mut totais = std::vec![0u32; n];
+        let mut rs = std::vec![ArkFr::from(0u64); n];
+        for a in por_secao {
+            for j in 0..n {
+                totais[j] += a.totais[j];
+                rs[j] += pedersen::fr_de_bytes_be(&hex_bytes(&a.aberturas[j]));
+            }
+        }
+        (totais, rs)
+    }
+
+    /// `publicar_resultado`, com as seções nomeadas e o agregado em claro.
+    fn publicar(
+        &self,
+        secoes: &[u32],
+        totais: &[u32],
+        aberturas: &[ArkFr],
+    ) -> Result<Vec<u32>, Erro> {
+        let mut ss = Vec::new(&self.env);
+        for s in secoes {
+            ss.push_back(*s);
+        }
+        let mut ts = Vec::new(&self.env);
+        for t in totais {
+            ts.push_back(*t);
+        }
+        let mut rs = Vec::new(&self.env);
+        for r in aberturas {
+            rs.push_back(escalar(&self.env, r));
+        }
+        self.cliente
+            .try_publicar_resultado(
+                &self.proposta,
+                &Address::generate(&self.env),
+                &ss,
+                &ts,
+                &rs,
+            )
+            .map_err(|e| e.unwrap())
+            .map(|r| r.unwrap())
+    }
+
+    /// Decifra uma seção e a apura, devolvendo a abertura para o agregado.
+    fn decifrar_e_apurar(&self, secao: u32) -> tessera_cliente::AberturaJs {
+        let a = tessera_cliente::abertura(
+            &self.compromissos_de(secao),
+            &self.criptos_de(secao),
+            2,
+            &self.h_hex,
+            RODADA_FIM,
+            ASSINATURA_FIM,
+        )
+        .expect("a abertura da secao falhou");
+        assert!(
+            self.apurar_secao(secao, &a).is_ok(),
+            "o contrato recusou a apuracao da secao {}",
+            secao
+        );
+        a
+    }
+}
+
+/// **A seção não guarda mais total em claro.** É o conserto da DEC-017.
+#[test]
+fn a_apuracao_de_secao_nao_guarda_total_em_claro() {
+    let u = urna_em_secoes(&[0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1], 2);
+    u.fim();
+    let a0 = u.decifrar_e_apurar(0);
+
+    // O que a seção guarda: a contagem e **um ponto por opção**. Nenhum número
+    // de voto, nem para quem lê o ledger inteiro.
+    let (abriram, pontos) = u
+        .cliente
+        .resultado_secao(&u.proposta, &0u32)
+        .expect("a secao nao foi apurada");
+    assert_eq!(abriram, a0.cedulas, "a contagem continua pública, e deve");
+    assert_eq!(pontos.len(), 2, "um ponto por opção confidencial");
+
+    // E o ponto é a soma dos compromissos abertos, que é o que a conferência
+    // do agregado vai usar. Que ele **não** é o total em claro é o ponto: um
+    // ponto de Pedersen é perfeitamente ocultante.
+    assert_ne!(
+        pontos.get(0).unwrap(),
+        pontos.get(1).unwrap(),
+        "dois pontos iguais indicariam que nada foi somado"
+    );
+
+    // O placar da votação não existe: falta a segunda seção e falta a
+    // transação que soma.
+    assert_eq!(u.cliente.resultado(&u.proposta), None);
+}
+
+/// **O placar sai de uma transação a mais, somando as seções nomeadas.**
+#[test]
+fn publicar_resultado_soma_as_secoes_e_e_o_placar_da_votacao() {
+    let u = urna_em_secoes(&[0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1], 2);
+    u.fim();
+    let a0 = u.decifrar_e_apurar(0);
+    let a1 = u.decifrar_e_apurar(1);
+    let (totais, rs) = u.agregado(&[a0, a1]);
+
+    assert_eq!(totais, std::vec![6, 8], "6 zeros e 8 uns na lista de escolhas");
+    assert_eq!(
+        u.publicar(&[0, 1], &totais, &rs),
+        Ok(Vec::from_array(&u.env, [6, 8]))
+    );
+    assert_eq!(
+        u.cliente.resultado(&u.proposta),
+        Some(Vec::from_array(&u.env, [6, 8]))
+    );
+}
+
+/// **Um agregado que mente é recusado** — e a solidez inteira passou a morar
+/// aqui, que é o preço de a seção não abrir mais nada.
+#[test]
+fn o_placar_agregado_que_mente_e_recusado() {
+    let u = urna_em_secoes(&[0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1], 2);
+    u.fim();
+    let a0 = u.decifrar_e_apurar(0);
+    let a1 = u.decifrar_e_apurar(1);
+    let (totais, rs) = u.agregado(&[a0, a1]);
+
+    // Mover um voto de uma opção para a outra mantém a soma e não abre.
+    assert_eq!(
+        u.publicar(&[0, 1], &[totais[0] + 1, totais[1] - 1], &rs),
+        Err(Erro::AberturaNaoFecha)
+    );
+    // Nomear uma seção que ninguém apurou.
+    assert_eq!(
+        u.publicar(&[0, 1, 1], &totais, &rs),
+        Err(Erro::ArgumentoMalFormado),
+        "a mesma secao duas vezes contaria as cedulas dela duas vezes"
+    );
+    assert_eq!(u.cliente.resultado(&u.proposta), None);
+}
+
+/// **Monotônico em (quantas seções, quantas cédulas).** Uma seção só publica,
+/// as duas sobrepõem, e voltar para uma é recusado.
+#[test]
+fn o_placar_agregado_nao_volta_atras() {
+    let u = urna_em_secoes(&[0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1], 2);
+    u.fim();
+    let a0 = u.decifrar_e_apurar(0);
+    let a1 = u.decifrar_e_apurar(1);
+    let (t0_, r0) = u.agregado(std::slice::from_ref(&a0));
+    let (t01, r01) = u.agregado(&[a0.clone(), a1]);
+
+    // Uma seção só: é um placar honesto de uma seção, e entra.
+    assert!(u.publicar(&[0], &t0_, &r0).is_ok());
+    // As duas: estritamente mais seções e mais cédulas, sobrepõe.
+    assert_eq!(
+        u.publicar(&[0, 1], &t01, &r01),
+        Ok(Vec::from_array(&u.env, [6, 8]))
+    );
+    // E voltar para uma só é recusado, ainda que a conta feche.
+    assert_eq!(u.publicar(&[0], &t0_, &r0), Err(Erro::NaoMelhora));
+}
+
+/// **O piso agregado.** Abaixo de `τ` cédulas abertas no total, nenhum placar
+/// em claro sai — e isto **não** é travável, porque quem sabota retém só a
+/// própria cédula e o agregado se alimenta do eleitorado inteiro.
+#[test]
+fn abaixo_de_tau_no_agregado_o_placar_nao_sai() {
+    let u = urna_do_navegador(&[0, 1, 1, 0]);
+    u.fim();
+    let a = u.decifrar_e_apurar(0);
+    let (totais, rs) = u.agregado(std::slice::from_ref(&a));
+
+    // A seção apurou: a contagem e o ponto estão no ledger, e revelam nada.
+    assert_eq!(u.cliente.resultado_secao(&u.proposta, &0u32).unwrap().0, 4);
+    // O placar em claro, não: 4 abaixo de τ = 5.
+    assert_eq!(
+        u.publicar(&[0], &totais, &rs),
+        Err(Erro::AnonimatoInsuficiente)
+    );
+    assert_eq!(u.cliente.resultado(&u.proposta), None);
+}
