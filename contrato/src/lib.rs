@@ -885,8 +885,6 @@ impl Tessera {
         secao: u32,
         compromissos: Vec<Bls12381G1Affine>,
         abertas: Vec<bool>,
-        totais: Vec<u32>,
-        aberturas: Vec<Bls12381Fr>,
     ) -> Result<u32, Erro> {
         quem.require_auth();
         let p = abrir_proposta(&env, &proposta)?;
@@ -910,11 +908,7 @@ impl Tessera {
 
         let (n_conf, _, _) = formato(&p);
         let (cadeia, quantas) = cadeia_de(&env, &proposta, secao);
-        if abertas.len() != quantas
-            || compromissos.len() != quantas * n_conf
-            || totais.len() != n_conf
-            || aberturas.len() != n_conf
-        {
+        if abertas.len() != quantas || compromissos.len() != quantas * n_conf {
             return Err(Erro::ArgumentoMalFormado);
         }
 
@@ -944,31 +938,28 @@ impl Tessera {
             }
         }
         let kr = Chave::ResultadoSecao(proposta.clone(), secao);
-        let antes: Option<(u32, Vec<u32>)> = env.storage().persistent().get(&kr);
+        let antes: Option<(u32, Vec<Bls12381G1Affine>)> = env.storage().persistent().get(&kr);
         if let Some((ja, _)) = &antes {
             if quantas_abertas <= *ja {
                 return Err(Erro::NaoMelhora);
             }
         }
 
-        // E a conferência de sempre, agora sobre o subconjunto: a soma dos
-        // compromissos marcados tem de abrir em `T_j·G + R_j·H`. A solidez não
-        // muda, porque a prova CDS já garantiu `v ∈ {0,1}` em cada compromisso
-        // na hora do voto — o compromisso é vinculante, e a equação sobre o
-        // subconjunto força `T_j = Σvᵢ` e `R_j = Σrᵢ`.
+        // **E aqui a seção para.** Ela soma os compromissos marcados — uma
+        // soma em G1 por cédula, que custa uma fração de uma multiplicação — e
+        // guarda **o ponto**, não o total. Um ponto de Pedersen é perfeitamente
+        // ocultante: `Σ Cᵢ` não diz nada sobre `Σ vᵢ` para quem não tem o
+        // fator agregado, e nem um ledger permanente muda isso.
         //
-        // Somar `n` pontos e fazer **um** MSM de dois termos é o caminho
-        // barato: somas em G1 custam uma fração de uma multiplicação, e
-        // conferir cédula por cédula pediria uma multiplicação cada.
-        let g = gerador_g(&env);
-        let h: Bls12381G1Affine = env
-            .storage()
-            .instance()
-            .get(&Instancia::GeradorH)
-            .ok_or(Erro::PropostaNaoExiste)?;
+        // É o conserto da DEC-017. Antes, o total daquela seção ficava em claro
+        // no ledger, e numa seção unânime isso **é** o voto de cada membro
+        // dela. Agora o número de voto aparece numa só transação,
+        // `publicar_resultado`, sobre o eleitorado inteiro.
+        //
+        // O MSM saiu daqui, e com ele os argumentos `totais` e `aberturas`: a
+        // seção não tem mais o que conferir, porque não afirma mais nada.
         let bls = env.crypto().bls12_381();
-
-        let mut placar = Vec::new(&env);
+        let mut pontos = Vec::new(&env);
         for j in 0..n_conf {
             let mut soma = infinito(&env);
             for i in 0..quantas {
@@ -976,16 +967,7 @@ impl Tessera {
                     soma = bls.g1_add(&soma, &compromissos.get(i * n_conf + j).unwrap());
                 }
             }
-            let mut ps = Vec::new(&env);
-            let mut ss = Vec::new(&env);
-            ps.push_back(g.clone());
-            ps.push_back(h.clone());
-            ss.push_back(fr(&env, totais.get(j).unwrap()));
-            ss.push_back(aberturas.get(j).unwrap());
-            if bls.g1_msm(ps, ss) != soma {
-                return Err(Erro::AberturaNaoFecha);
-            }
-            placar.push_back(totais.get(j).unwrap());
+            pontos.push_back(soma);
         }
 
         if antes.is_none() {
@@ -996,18 +978,153 @@ impl Tessera {
         }
         env.storage()
             .persistent()
-            .set(&kr, &(quantas_abertas, placar.clone()));
+            .set(&kr, &(quantas_abertas, pontos));
         guardar_longo(&env, &kr);
 
+        // O evento perdeu o `placar` junto com o armazenamento. Carrega o que
+        // é público de verdade: quantas cédulas aquela seção tinha e quantas
+        // abriram.
         eventos::Apursec {
             proposta,
             secao,
             quantas_abertas,
             quantas,
-            placar,
         }
         .publish(&env);
         Ok(quantas_abertas)
+    }
+
+    /// **O placar da votação, numa transação só.** Qualquer pessoa, depois de
+    /// as seções terem sido apuradas.
+    ///
+    /// Quem publica nomeia as seções que está somando e apresenta
+    /// `(totais, aberturas)` sobre **o conjunto inteiro**. O contrato soma os
+    /// pontos que cada seção guardou e confere um MSM de dois termos por opção:
+    /// `Σ_s Σ_i C_i,j == T_j·G + R_j·H`. A solidez não mudou de lugar por
+    /// acidente — ela mora aqui agora, e é a mesma conta de sempre, feita uma
+    /// vez em vez de uma por seção.
+    ///
+    /// **O piso de `τ` é sobre a contagem agregada, e isso é o que o torna
+    /// aceitável.** O piso por seção que a DEC-011 rejeitou era travável: quem
+    /// sabotasse o próprio criptograma derrubava a contagem da sua seção abaixo
+    /// de `τ` e vetava o placar. O agregado se alimenta do eleitorado inteiro —
+    /// quem sabota retém uma cédula e nada mais.
+    ///
+    /// **Monotônico em (quantas seções, quantas cédulas)** (INV-26): um placar
+    /// só é substituído por um que cubra mais seções, ou as mesmas seções com
+    /// mais cédulas abertas. Sem a primeira componente, um placar honesto de
+    /// três seções seria sobreposto por um de uma seção com mais cédulas, que é
+    /// um placar de outra votação.
+    pub fn publicar_resultado(
+        env: Env,
+        proposta: BytesN<32>,
+        quem: Address,
+        secoes: Vec<u32>,
+        totais: Vec<u32>,
+        aberturas: Vec<Bls12381Fr>,
+    ) -> Result<Vec<u32>, Erro> {
+        quem.require_auth();
+        let p = abrir_proposta(&env, &proposta)?;
+        if !p.anel || p.rodada == 0 {
+            return Err(Erro::ModoErrado);
+        }
+        if env.ledger().sequence() < p.fecha_em {
+            return Err(Erro::VotacaoAindaAberta);
+        }
+        if env.ledger().timestamp() < instante_da_rodada(p.rodada) {
+            return Err(Erro::RelogioAindaNaoAbriu);
+        }
+
+        let (n_conf, _, _) = formato(&p);
+        let quantas_secoes = quantas_secoes(&env, &proposta, &p);
+        if secoes.is_empty()
+            || secoes.len() > quantas_secoes
+            || totais.len() != n_conf
+            || aberturas.len() != n_conf
+        {
+            return Err(Erro::ArgumentoMalFormado);
+        }
+
+        // As seções nomeadas, somadas. Repetir uma contaria as cédulas dela
+        // duas vezes, e a lista é ordenada estritamente — o que recusa a
+        // repetição e torna a contagem de seções confiável de uma vez.
+        let bls = env.crypto().bls12_381();
+        let mut soma = Vec::new(&env);
+        for _ in 0..n_conf {
+            soma.push_back(infinito(&env));
+        }
+        let mut abertas_no_total = 0u32;
+        let mut anterior: Option<u32> = None;
+        for s in secoes.iter() {
+            if s >= quantas_secoes || anterior.is_some_and(|a| s <= a) {
+                return Err(Erro::ArgumentoMalFormado);
+            }
+            anterior = Some(s);
+            let (abriram, pontos): (u32, Vec<Bls12381G1Affine>) = env
+                .storage()
+                .persistent()
+                .get(&Chave::ResultadoSecao(proposta.clone(), s))
+                .ok_or(Erro::SecaoNaoApurada)?;
+            abertas_no_total += abriram;
+            for j in 0..n_conf {
+                soma.set(
+                    j,
+                    bls.g1_add(&soma.get(j).unwrap(), &pontos.get(j).unwrap()),
+                );
+            }
+        }
+
+        if abertas_no_total < TAU {
+            return Err(Erro::AnonimatoInsuficiente);
+        }
+
+        // A contabilidade da monotonicidade mora numa chave própria, e não
+        // dentro de `Resultado`: o getter `resultado()` é interface congelada
+        // e a apuração com mesa grava a mesma chave: um `Vec<u32>` e nada mais.
+        let ka = Chave::PlacarAgregado(proposta.clone());
+        let antes: Option<(u32, u32)> = env.storage().persistent().get(&ka);
+        if let Some((ja_secoes, ja_abertas)) = &antes {
+            let melhora = secoes.len() > *ja_secoes
+                || (secoes.len() == *ja_secoes && abertas_no_total > *ja_abertas);
+            if !melhora || secoes.len() < *ja_secoes || abertas_no_total < *ja_abertas {
+                return Err(Erro::NaoMelhora);
+            }
+        }
+
+        let g = gerador_g(&env);
+        let h: Bls12381G1Affine = env
+            .storage()
+            .instance()
+            .get(&Instancia::GeradorH)
+            .ok_or(Erro::PropostaNaoExiste)?;
+        for j in 0..n_conf {
+            let mut ps = Vec::new(&env);
+            let mut ss = Vec::new(&env);
+            ps.push_back(g.clone());
+            ps.push_back(h.clone());
+            ss.push_back(fr(&env, totais.get(j).unwrap()));
+            ss.push_back(aberturas.get(j).unwrap());
+            if bls.g1_msm(ps, ss) != soma.get(j).unwrap() {
+                return Err(Erro::AberturaNaoFecha);
+            }
+        }
+
+        env.storage()
+            .persistent()
+            .set(&ka, &(secoes.len(), abertas_no_total));
+        guardar_longo(&env, &ka);
+        let kr = Chave::Resultado(proposta.clone());
+        env.storage().persistent().set(&kr, &totais);
+        guardar_longo(&env, &kr);
+
+        eventos::Apurar {
+            proposta,
+            totais: totais.clone(),
+            aberturas,
+            resultado: totais.clone(),
+        }
+        .publish(&env);
+        Ok(totais)
     }
 
     /// **Registra a assinatura da baliza da rodada de abertura.** Qualquer
@@ -1098,7 +1215,11 @@ impl Tessera {
     }
 
     /// O que a seção apurou: `(quantas cédulas abriram, totais confidenciais)`.
-    pub fn resultado_secao(env: Env, proposta: BytesN<32>, secao: u32) -> Option<(u32, Vec<u32>)> {
+    pub fn resultado_secao(
+        env: Env,
+        proposta: BytesN<32>,
+        secao: u32,
+    ) -> Option<(u32, Vec<Bls12381G1Affine>)> {
         env.storage()
             .persistent()
             .get(&Chave::ResultadoSecao(proposta, secao))

@@ -28,14 +28,16 @@ import {
   apurarSecao,
   cedulasDaSecao,
   lerCadeia,
+  lerResultado,
   lerResultadoSecao,
+  publicarResultado,
   type Abertura,
   type Diario,
   type PropostaRede,
 } from "./rede";
 import { CarteiraEfemera } from "./carteira";
 import { portao } from "./portao";
-import { somarSecoes, type ParcialDaSecao } from "./secoes";
+import { somarSecoes, TAU, type ParcialDaSecao } from "./secoes";
 import { carregar } from "./wasm";
 
 export type FasePlacar =
@@ -105,24 +107,17 @@ export async function apurarSozinho(
     // cada uma é independente: uma seção que não dê para ler não impede as
     // outras, e o que sair incompleto não é apresentado como placar.
     avancar({ tipo: "lendo" });
-    const parciais: ParcialDaSecao[] = [];
+    const parciais: (ParcialDaSecao & { aberturas: string[] })[] = [];
     let lidas = 0;
-    let publicadaAlguma = false;
-    let tx: string | undefined;
 
     for (let s = 0; s < secoes; s++) {
-      const jaNoLedger = await lerResultadoSecao(id, s);
       // Quantas a cadeia registrou. É o denominador verdadeiro: se a leitura
       // dos eventos trouxer menos, o problema é a janela do RPC, e dizer isso
       // é melhor que levar `CadeiaNaoFecha` sem explicação.
       const { quantas } = await lerCadeia(id, s);
+      if (quantas === 0) continue;
       const cedulas = await cedulasDaSecao(id, p.abre_em, s);
-
       if (cedulas.length !== quantas) {
-        if (jaNoLedger) {
-          parciais.push({ secao: s, ...jaNoLedger, cedulas: null });
-          continue;
-        }
         diario?.({
           tipo: "nota",
           txt:
@@ -131,7 +126,6 @@ export async function apurarSozinho(
         });
         continue;
       }
-      if (quantas === 0) continue;
 
       lidas += cedulas.length;
       avancar({ tipo: "decifrando", cedulas: lidas });
@@ -149,64 +143,117 @@ export async function apurarSozinho(
         });
       }
 
-      // Já está no ledger e ninguém abre mais que isso: nada a publicar.
-      if (jaNoLedger && jaNoLedger.abriram >= a.abriram) {
-        parciais.push({ secao: s, ...jaNoLedger, cedulas: a.cedulas });
-        publicadaAlguma = true;
-        continue;
-      }
-
-      // Publicar não é o que torna o placar verdadeiro — a conta acima é
-      // conferível por quem quiser, e o contrato recusaria um total que não
-      // fechasse. Publicar serve a quem abrir esta página depois e não quiser
-      // refazer a conta.
-      avancar({ tipo: "publicando" });
-      try {
-        // Uma carteira descartável: apurar não é um ato de identidade, e
-        // assinar com a carteira de identidade só acrescentaria um vínculo
-        // inútil ao ledger. O contrato aceita qualquer endereço aqui — é isso
-        // que faz a apuração não travável.
-        const c = await CarteiraEfemera.nascer();
-        tx = await apurarSecao(
-          c,
-          id,
-          s,
-          cedulas.flatMap((x) => x.compromissos),
-          a,
-          diario,
-        );
-        publicadaAlguma = true;
-      } catch (e) {
-        const porque = String((e as Error).message ?? e);
-        diario?.({
-          tipo: "nota",
-          txt: `o placar da seção ${s} não foi gravado no ledger: ${porque}. A conta acima não depende disso.`,
-        });
+      // A seção guarda uma contagem e um ponto — nada em claro (DEC-017). Só
+      // vale gravar se esta leitura abrir mais cédulas que a guardada.
+      const ja = await lerResultadoSecao(id, s);
+      if (!ja || ja.abriram < a.abriram) {
+        avancar({ tipo: "publicando" });
+        try {
+          const c = await CarteiraEfemera.nascer();
+          await apurarSecao(c, id, s, cedulas.flatMap((x) => x.compromissos), a, diario);
+        } catch (e) {
+          diario?.({
+            tipo: "nota",
+            txt: `a seção ${s} não foi gravada no ledger: ${String((e as Error).message ?? e)}. A conta acima não depende disso.`,
+          });
+        }
       }
       parciais.push({
         secao: s,
         totais: Array.from(a.totais),
         abriram: a.abriram,
         cedulas: a.cedulas,
+        aberturas: Array.from(a.aberturas),
       });
     }
 
+    // O placar que já estiver no ledger, para o caso de não dar para refazer a
+    // conta agora.
+    const noLedger = await lerResultado(id);
+
     if (parciais.length === 0) {
+      if (noLedger) {
+        return avancar({
+          tipo: "pronto",
+          totais: noLedger,
+          abriram: 0,
+          cedulas: null,
+          publicado: true,
+        });
+      }
       return avancar({ tipo: "vazia" });
     }
 
     const soma = somarSecoes(parciais, secoes);
     if (!soma.completo) {
+      if (noLedger) {
+        return avancar({
+          tipo: "pronto",
+          totais: noLedger,
+          abriram: 0,
+          cedulas: null,
+          publicado: true,
+        });
+      }
       return avancar({ tipo: "multissecao", secoes, publicadas: parciais.length });
     }
-    avancar({
-      tipo: "pronto",
+
+    const pronto = {
+      tipo: "pronto" as const,
       totais: soma.totais,
       abriram: soma.abriram,
       cedulas: soma.cedulas,
-      publicado: publicadaAlguma,
-      tx,
-    });
+    };
+
+    // **O piso agregado.** Abaixo de τ cédulas abertas no total, o contrato não
+    // publica placar em claro — e não publicar é a garantia funcionando, não um
+    // defeito. A conta acima continua sendo a conta certa.
+    if (soma.abriram < TAU) {
+      diario?.({
+        tipo: "nota",
+        txt:
+          `${soma.abriram} cédula${soma.abriram === 1 ? "" : "s"} aberta${soma.abriram === 1 ? "" : "s"} no total, e o piso de anonimato é ${TAU}: ` +
+          `o contrato não grava um placar em claro que denunciaria quem votou.`,
+      });
+      return avancar({ ...pronto, publicado: false });
+    }
+
+    // **O placar da votação, numa transação só.** É o único lugar em que um
+    // número de voto entra no ledger. Publicar não é o que torna o placar
+    // verdadeiro — a conta acima é conferível por quem quiser, e o contrato
+    // recusaria um agregado que não fechasse. Publicar serve a quem abrir esta
+    // página depois e não quiser refazer a conta.
+    if (noLedger && soma.totais.every((t, j) => t === noLedger[j])) {
+      return avancar({ ...pronto, publicado: true });
+    }
+    avancar({ tipo: "publicando" });
+    try {
+      // Uma carteira descartável: apurar não é um ato de identidade, e assinar
+      // com a carteira de identidade só acrescentaria um vínculo inútil ao
+      // ledger. O contrato aceita qualquer endereço aqui — é isso que faz a
+      // apuração não travável.
+      const c = await CarteiraEfemera.nascer();
+      const w = await carregar();
+      const aberturas = soma.totais.map((_, j) =>
+        w.somar_aberturas(parciais.map((x) => x.aberturas[j])),
+      );
+      const tx = await publicarResultado(
+        c,
+        id,
+        parciais.map((x) => x.secao),
+        soma.totais,
+        aberturas,
+        diario,
+      );
+      avancar({ ...pronto, publicado: true, tx });
+    } catch (e) {
+      const porque = String((e as Error).message ?? e);
+      diario?.({
+        tipo: "nota",
+        txt: `o placar não foi gravado no ledger: ${porque}. A conta acima não depende disso.`,
+      });
+      avancar({ ...pronto, publicado: false });
+    }
   } catch (e) {
     avancar({ tipo: "falha", porque: String((e as Error).message ?? e) });
   }

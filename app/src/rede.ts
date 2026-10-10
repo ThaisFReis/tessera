@@ -271,15 +271,22 @@ export const lerResultado = async (id: string): Promise<number[] | null> =>
  * sem dizer qual subconjunto é um placar que mente por omissão — e o contrato
  * guarda os dois justamente para que a tela não possa separá-los.
  */
+/**
+ * O que uma seção apurada guarda: **quantas cédulas abriram e um ponto por
+ * opção** — a soma dos compromissos abertos.
+ *
+ * Nenhum total em claro, desde T-026: o ponto é perfeitamente ocultante, e o
+ * número de voto só existe no placar agregado, que `lerResultado` devolve.
+ */
 export const lerResultadoSecao = async (
   id: string,
   secao: number,
-): Promise<{ abriram: number; totais: number[] } | null> => {
+): Promise<{ abriram: number; pontos: string[] } | null> => {
   const r = (await ler("resultado_secao", bytesN(id), u32(secao))) as
-    | [number, number[]]
+    | [Uint8Array, Uint8Array[]]
     | null
     | undefined;
-  return r ? { abriram: r[0], totais: Array.from(r[1]) } : null;
+  return r ? { abriram: Number(r[0]), pontos: (r[1] as Uint8Array[]).map(bytesParaHex) } : null;
 };
 
 /**
@@ -578,11 +585,39 @@ export const apurarSecao = (
       u32(secao),
       vetor(compromissos.map(ponto)),
       vetor(a.abertas.map((b) => xdr.ScVal.scvBool(b))),
-      vetor(a.totais.map(u32)),
-      vetor(a.aberturas.map(escalar)),
     ],
     d,
     `proposta ${id.slice(0, 8)}… · seção ${secao} · ${a.abriram} de ${a.cedulas} cédulas abriram`,
+  );
+
+/**
+ * **O placar da votação.** A única transação em que um número de voto aparece.
+ *
+ * `apurar_secao` guarda uma contagem e um ponto por seção, e nada em claro —
+ * é o conserto da DEC-017, em que o total de uma seção unânime era o voto dos
+ * seus membros. Aqui as seções nomeadas são somadas e um MSM confere o
+ * agregado, sobre o eleitorado inteiro.
+ */
+export const publicarResultado = (
+  c: Carteira,
+  id: string,
+  secoes: number[],
+  totais: number[],
+  aberturas: string[],
+  d?: Diario,
+) =>
+  enviar(
+    c,
+    "publicar_resultado",
+    [
+      bytesN(id),
+      endereco(c.endereco()),
+      vetor(secoes.map(u32)),
+      vetor(totais.map(u32)),
+      vetor(aberturas.map(escalar)),
+    ],
+    d,
+    `proposta ${id.slice(0, 8)}… · ${secoes.length} seção${secoes.length === 1 ? "" : "ões"} · placar ${totais.join(" · ")}`,
   );
 
 // ---------- escrita ----------

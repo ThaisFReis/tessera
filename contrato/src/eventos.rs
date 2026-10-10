@@ -114,6 +114,10 @@ pub struct Apurar {
 
 /// A apuração de uma seção, sem mesa. `quantas` é o que a cadeia registrou, e
 /// serve para quem lê os eventos saber quantas cédulas **deveria** ter achado.
+///
+/// **Sem placar**, desde T-026: o total daquela seção em claro revelava o voto
+/// dos membros de uma seção unânime (DEC-017). O que a seção publica é uma
+/// contagem; o número de voto sai de `publicar_resultado`.
 #[contractevent(topics = ["apursec"], data_format = "vec")]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Apursec {
@@ -123,7 +127,6 @@ pub struct Apursec {
     pub secao: u32,
     pub quantas_abertas: u32,
     pub quantas: u32,
-    pub placar: Vec<u32>,
 }
 
 /// A assinatura da baliza da rodada de abertura foi registrada e conferida.

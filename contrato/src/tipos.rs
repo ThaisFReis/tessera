@@ -130,6 +130,10 @@ pub enum Erro {
     /// A assinatura da rodada de abertura não foi registrada. Qualquer pessoa
     /// pode registrá-la, e sem ela não há seção para conferir.
     BalizaNaoRegistrada = 41,
+    /// `publicar_resultado` nomeou uma seção que ninguém apurou ainda. Não é
+    /// uma recusa definitiva: qualquer pessoa pode apurá-la, porque a chave da
+    /// rodada é pública.
+    SecaoNaoApurada = 42,
 }
 
 #[contracttype]
@@ -190,9 +194,20 @@ pub enum Chave {
     /// que a lista apresentada é exatamente o conjunto de cédulas daquela
     /// seção: omitir uma muda o encadeamento, inventar uma também.
     Cadeia(BytesN<32>, u32),
-    /// `(quantas cédulas abriram, totais confidenciais)` daquela seção. Só é
-    /// substituído por uma apuração que abra **mais** cédulas (INV-21).
+    /// `(quantas cédulas abriram, Σ compromissos abertos por opção)` daquela
+    /// seção. Só é substituído por uma apuração que abra **mais** cédulas
+    /// (INV-21).
+    ///
+    /// **Um ponto, não um total.** É o conserto da DEC-017: o total por seção
+    /// em claro revelava o voto dos membros de uma seção unânime, e um ponto de
+    /// Pedersen é perfeitamente ocultante. O número de voto aparece uma vez só,
+    /// em `publicar_resultado`, sobre o eleitorado inteiro.
     ResultadoSecao(BytesN<32>, u32),
+    /// `(quantas seções, quantas cédulas abertas)` do placar publicado. É a
+    /// contabilidade da regra monotônica do agregado (INV-26), separada de
+    /// `Resultado` porque aquela chave é lida por um getter congelado e também
+    /// é escrita pela apuração com mesa.
+    PlacarAgregado(BytesN<32>),
     /// Quantas seções já têm resultado. Quando bate com `secoes`, o placar
     /// existe.
     SecoesApuradas(BytesN<32>),

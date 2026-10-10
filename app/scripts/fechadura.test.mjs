@@ -75,3 +75,21 @@ assert.throws(
 );
 
 console.log("fechadura: a rodada confere, a cédula abre, e a sabotada custa só o próprio voto");
+
+/* ---------- T-026: somar as aberturas de várias seções ---------- */
+
+/* O agregado que `publicar_resultado` recebe soma escalares de Fr, e isso não
+   é coisa que o navegador faça em JavaScript — então o wasm soma. O teste aqui
+   é de que a ponte existe e devolve 32 bytes; a aritmética tem teste em Rust
+   (`a_soma_das_aberturas_abre_a_soma_dos_pontos`). */
+{
+  const um = "01".padStart(64, "0");
+  const dois = "02".padStart(64, "0");
+  const soma = w.somar_aberturas([um, dois]);
+  assert.equal(soma.length, 64, "a soma tem de sair em 32 bytes hexadecimais");
+  assert.equal(soma, "03".padStart(64, "0"), "1 + 2 em Fr é 3");
+  assert.equal(w.somar_aberturas([um]), um, "um só valor soma a ele mesmo");
+  assert.throws(() => w.somar_aberturas([]), "a lista vazia não é uma abertura de zero");
+}
+
+console.log("T-026: as aberturas de várias seções somam em Fr, no wasm");
