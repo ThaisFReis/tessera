@@ -61,6 +61,16 @@ const LANCES = 3;
 const STROOPS_POR_BYTE = 400n;
 
 /**
+ * Quantas vezes a taxa reembolsável que a simulação calculou.
+ *
+ * Quatro, medido: a simulação precifica o aluguel das entradas que **existem**
+ * naquele instante, e sob rajada quem aplica depois pode ter de criar uma
+ * entrada nova — a seção seguinte. Com ×1, a rajada de seis com limite 2 deixa
+ * 2 entrarem; com ×4, entram 6. Ver §11-D.
+ */
+const RESERVA_DE_ALUGUEL = 4n;
+
+/**
  * Espaço de escrita a declarar além do que a simulação pediu.
  *
  * `comparecer()` faz read-modify-write em `Chave::Anel`, uma entrada que cresce
@@ -729,8 +739,26 @@ async function uma(
       const novas = extras.filter((k) => !vistas.has(k.toXDR("base64")));
       dados.setReadWrite([...atuais, ...novas]);
     }
+    // **A taxa reembolsável, reservada com sobra** (§11-D, T-014).
+    //
+    // Medido em 2026-10-10: sob rajada, quem acaba escrevendo uma seção que a
+    // simulação não previu paga **aluguel de uma entrada nova**, e a reserva
+    // calculada para o estado de antes não cobre. O erro é
+    // `InsufficientRefundableFee`, e é de onde vinha o padrão "só a primeira
+    // seção encheu" — não de buraco no mecanismo de split. Seis comparecendo de
+    // uma vez com limite 2 passaram de 2 de 6 para **6 de 6**, três seções
+    // nascendo no mesmo ledger.
+    //
+    // A diferença volta: taxa reembolsável reservada e não usada é devolvida,
+    // e é por isso que reservar com folga sai quase de graça.
+    const reembolsavel = BigInt(dados.build().resourceFee().toString());
+    dados.setResourceFee(reembolsavel * RESERVA_DE_ALUGUEL);
     pronta = TransactionBuilder.cloneFrom(pronta, {
-      fee: (BigInt(pronta.fee) + BigInt(folga) * STROOPS_POR_BYTE).toString(),
+      fee: (
+        BigInt(pronta.fee) +
+        reembolsavel * RESERVA_DE_ALUGUEL +
+        BigInt(folga) * STROOPS_POR_BYTE
+      ).toString(),
       sorobanData: dados.build(),
     }).build();
   }

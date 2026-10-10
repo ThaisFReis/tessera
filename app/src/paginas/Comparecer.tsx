@@ -103,9 +103,13 @@ export default function Comparecer() {
       await comparecer(
         c, id, chave.publica, caminho.irmaos, caminho.indice, seccao, diario,
         Math.max(lista.length, 40),
-        // Três seções além da prevista: cobre uma rajada de 3× o limite
-        // entrando entre a simulação e a aplicação.
-        ehAberta(prop) ? 3 : 0,
+        // **Duas seções além da prevista, não três.** Medido em 2026-10-10
+        // (§11-D): cada entrada `Anel` declarada entra no orçamento de
+        // recursos da transação, e a quinta estoura o teto —
+        // `ResourceLimitExceeded`, com uma pessoa só. Com três declaradas
+        // além da prevista, a rajada de seis com limite 2 deixou 5 de 6; com
+        // duas, entraram 6 de 6.
+        ehAberta(prop) ? 2 : 0,
       );
       // Na aberta quem decide a seção é o contrato: pergunta a ele, não ao
       // palpite do cliente.
