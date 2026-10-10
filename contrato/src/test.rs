@@ -4382,10 +4382,7 @@ fn eventos_crus(env: &Env) -> Vetor<(Vetor<soroban_sdk::xdr::ScVal>, soroban_sdk
 }
 
 /// Um `ScVal` a partir de qualquer valor do SDK, para comparar byte a byte.
-fn scv<V: soroban_sdk::IntoVal<Env, soroban_sdk::Val>>(
-    env: &Env,
-    v: V,
-) -> soroban_sdk::xdr::ScVal {
+fn scv<V: soroban_sdk::IntoVal<Env, soroban_sdk::Val>>(env: &Env, v: V) -> soroban_sdk::xdr::ScVal {
     use soroban_sdk::TryFromVal;
     soroban_sdk::xdr::ScVal::try_from_val(env, &v.into_val(env))
         .expect("o valor nao converte para ScVal")

@@ -23,18 +23,13 @@
 //! revelaria todos os votos já dados, retroativamente e sem reparo. Trocamos um
 //! risco irreversível por um reversível.
 
-// `env.events().publish()` está depreciado em favor da macro `#[contractevent]`,
-// que muda o formato dos tópicos. **Esses eventos são interface congelada**
-// (§5): `app/src/rede.ts` lista as votações lendo `topic[0] == "abrir"` e
-// `topic[1]` como a proposta, e a janela útil do RPC é de 2.000 ledgers. Migrar
-// sem migrar o leitor junto apaga a lista de votações do dapp. Virou T-012.
-#![allow(deprecated)]
 // A aridade das entradas é a ABI, e a ABI é interface congelada (§5): `abrir`
 // tem 11 argumentos porque a proposta tem 11 campos. Reduzir exigiria um
 // struct, logo mudar o ABI, logo redeploy.
 #![allow(clippy::too_many_arguments)]
 
 mod cripto;
+mod eventos;
 mod tipos;
 
 pub use tipos::{Erro, Pergunta, Proposta, ProvaCds, ProvaSoma};
@@ -44,7 +39,7 @@ use soroban_sdk::xdr::ToXdr;
 use soroban_sdk::{
     contract, contractimpl,
     crypto::bls12_381::{Bls12381Fr, Bls12381G1Affine, Bls12381G2Affine},
-    symbol_short, Address, Bytes, BytesN, Env, Vec,
+    Address, Bytes, BytesN, Env, Vec,
 };
 use tipos::{Chave, Instancia, MAX_OPCOES, MAX_PERGUNTAS, TAU};
 
@@ -264,18 +259,17 @@ impl Tessera {
         env.storage().persistent().set(&kc, &(0u32, 0u32));
         guardar_longo(&env, &kc);
 
-        env.events().publish(
-            (symbol_short!("abrir"), proposta),
-            (
-                n_perguntas,
-                conf_opcoes,
-                abre_em,
-                fecha_em,
-                limiar,
-                anel,
-                secoes,
-            ),
-        );
+        eventos::Abrir {
+            proposta,
+            n_perguntas,
+            conf_opcoes,
+            abre_em,
+            fecha_em,
+            limiar,
+            anel,
+            secoes,
+        }
+        .publish(&env);
         Ok(())
     }
 
@@ -356,10 +350,13 @@ impl Tessera {
 
         // O evento é o que o nível 2 do verificador lê dos arquivos de
         // histórico para recalcular o acumulador sem depender do RPC (§8.3).
-        env.events().publish(
-            (symbol_short!("votar"), proposta, votante),
-            (compromissos, escolhas),
-        );
+        eventos::Votar {
+            proposta,
+            votante,
+            compromissos,
+            escolhas,
+        }
+        .publish(&env);
         Ok(())
     }
 
@@ -475,10 +472,13 @@ impl Tessera {
         guardar_longo(&env, &kn);
         guardar_longo(&env, &kc);
 
-        env.events().publish(
-            (symbol_short!("comparec"), proposta, votante),
-            (secao, tamanho),
-        );
+        eventos::Comparec {
+            proposta,
+            votante,
+            secao,
+            tamanho,
+        }
+        .publish(&env);
         Ok(tamanho)
     }
 
@@ -637,10 +637,14 @@ impl Tessera {
         // mesa: evento não toca entrada compartilhada, então não tem o problema
         // de rajada da §11-D, e a retenção do RPC público (7 dias, medida) é
         // maior que qualquer janela de votação.
-        env.events().publish(
-            (symbol_short!("anonimo"), proposta),
-            (imagem, compromissos, escolhas, cripto),
-        );
+        eventos::Anonimo {
+            proposta,
+            imagem,
+            compromissos,
+            escolhas,
+            cripto,
+        }
+        .publish(&env);
         Ok(())
     }
 
@@ -823,10 +827,14 @@ impl Tessera {
         env.storage().persistent().set(&conta, &quantos);
         guardar_longo(&env, &conta);
 
-        env.events().publish(
-            (symbol_short!("endosso"), proposta.clone(), membro),
-            (digest.clone(), quantos, p.limiar),
-        );
+        eventos::Endosso {
+            proposta: proposta.clone(),
+            membro,
+            digest: digest.clone(),
+            quantos,
+            limiar: p.limiar,
+        }
+        .publish(&env);
 
         if quantos < p.limiar {
             return Ok(None);
@@ -836,10 +844,13 @@ impl Tessera {
         env.storage().persistent().set(&k, &resultado);
         guardar_longo(&env, &k);
 
-        env.events().publish(
-            (symbol_short!("apurar"), proposta),
-            (totais, aberturas, resultado.clone()),
-        );
+        eventos::Apurar {
+            proposta,
+            totais,
+            aberturas,
+            resultado: resultado.clone(),
+        }
+        .publish(&env);
         Ok(Some(resultado))
     }
 
@@ -987,10 +998,14 @@ impl Tessera {
             .set(&kr, &(quantas_abertas, placar.clone()));
         guardar_longo(&env, &kr);
 
-        env.events().publish(
-            (symbol_short!("apursec"), proposta, secao),
-            (quantas_abertas, quantas, placar),
-        );
+        eventos::Apursec {
+            proposta,
+            secao,
+            quantas_abertas,
+            quantas,
+            placar,
+        }
+        .publish(&env);
         Ok(quantas_abertas)
     }
 
@@ -1055,8 +1070,11 @@ impl Tessera {
 
         env.storage().persistent().set(&k, &assinatura);
         guardar_longo(&env, &k);
-        env.events()
-            .publish((symbol_short!("abertura"), proposta), p.rodada_abertura);
+        eventos::Abertura {
+            proposta,
+            rodada_abertura: p.rodada_abertura,
+        }
+        .publish(&env);
         Ok(())
     }
 
