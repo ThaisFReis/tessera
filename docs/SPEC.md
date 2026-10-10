@@ -195,6 +195,8 @@ pergunta.
 | INV-07 | A imagem de chave não atravessa propostas | `core` `a_imagem_nao_atravessa_propostas` |
 | INV-08 | **Na votação fechada**, a seção é imprevisível até `abre_em`: nem o votante nem quem organiza escolhe a sua | `core` `a_secao_vem_da_baliza_e_nao_do_identificador`, `moer_o_identificador_nao_isola_ninguem`; `contrato` `trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez` — DEC-012 |
 | INV-25 | O piso de `τ` é conferido contra o **anel**, nunca contra o subconjunto que abriu — sabotar não trava | `contrato` `sabotar_o_proprio_criptograma_nao_derruba_o_piso` |
+| INV-26 | A apuração de uma seção **não publica número de voto nenhum**: ela guarda a contagem de cédulas abertas e `Σ Cᵢ` por opção. O placar em claro existe num lugar só, `publicar_resultado`, sobre o eleitorado inteiro, e é monotônico em (quantas seções, quantas cédulas) e com piso de `τ` sobre a contagem **agregada** | `contrato` `a_apuracao_de_secao_nao_guarda_total_em_claro`, `o_placar_agregado_nao_volta_atras`, `abaixo_de_tau_no_agregado_o_placar_nao_sai` |
+| INV-27 | O `Hp` contra o qual a imagem de chave é formada é **recalculável** fora do contrato: o `hash_to_g1` do host e o RFC 9380 do arkworks dão o mesmo ponto. Sem isto, verificar o voto duplo exigiria confiar no contrato para dizer qual é o gerador | `contrato` `o_hp_do_host_bate_com_o_do_core` |
 | INV-18 | Nenhum resultado, **nem parcial**, existe no contrato antes de `fecha_em` | `contrato` `antes_do_fechamento_nao_existe_placar` — relógio do ledger, sem suposição. E nenhum **na tela**, que decifra sozinha e não precisaria do contrato: `app/scripts/portao.test.mjs` |
 | INV-19 | Uma cédula que não abre perde o próprio voto e **não** impede a apuração das outras | `contrato` `a_cedula_que_nao_abre_perde_so_o_proprio_voto` |
 | INV-20 | A lista de compromissos apresentada na apuração é exatamente o conjunto de cédulas da seção. Duas travas em série: **omitir é inexprimível**, porque a aridade está presa à contagem que as cédulas escreveram, e **trocar ou reordenar** a cadeia pega | `contrato` `a_cadeia_recusa_omissao_e_invencao` |
@@ -224,7 +226,8 @@ pergunta.
 | Folha de Merkle `H(0x00 ‖ endereço ‖ peso_be)` — **o `secao_be` sai em T-023** (DEC-012) | `core/src/merkle.rs::folha` | muda a raiz; quebra toda prova de aptidão existente |
 | Separação de domínio `0x00` folha, `0x01` nó, `0x02` vazio, `0x03` seção | idem | sem ela, folha de 64 bytes vira nó interno |
 | Serialização G1, inclusive o infinito | `core/src/ponto.rs` | o host recusa qualquer outra coisa |
-| ABI do contrato (`abrir`, `comparecer`, `votar`, `votar_anonimo`, `apurar`) | `contrato/src/lib.rs` | redeploy invalida toda votação aberta e 12 arquivos que pinam o endereço |
+| ABI do contrato (`abrir`, `comparecer`, `votar`, `votar_anonimo`, `apurar`, `apurar_secao`, `publicar_resultado`) | `contrato/src/lib.rs` | redeploy invalida toda votação aberta e 14 arquivos que pinam o endereço |
+| Formato dos oito eventos (tópicos, e a **ordem** dos campos do dado) | `contrato/src/eventos.rs` | `app/src/rede.ts` e `cli/src/rpc.rs` desempacotam por posição; congelado por `o_formato_dos_eventos_*` desde T-012 |
 | Códigos de erro `Erro` | `contrato/src/tipos.rs` | espelhados em `app/src/rede.ts::ERROS` |
 | DSTs do anel (`TESSERA-V1-ANEL`, `-HP`, `-CONJUNTO`) | `core/src/anel.rs`, `contrato/src/cripto.rs` | divergir faz toda assinatura falhar sem dizer por quê |
 | Criptograma da fechadura: `U` (96 B, G2 comprimido) ‖ `V` (32 B) ‖ `W` (32 B) = **160 B por opção confidencial**, concatenados em ordem de pergunta — produzido por `cliente-wasm::montar` e lido por `cliente-wasm::abertura` | `core/src/relogio.rs` | é o que o evento carrega; mudar o layout torna ilegível toda cédula já depositada |
@@ -237,6 +240,23 @@ criptograma e `apurar` ganha o caminho por seção com subconjunto. O evento
 `anonimo` passa a carregar o criptograma. Isso **invalida toda votação aberta** e
 exige repontar os arquivos que pinam o endereço do contrato — como em T-009 e
 T-013, no mesmo redeploy.
+
+**Bump de ABI em T-012 / §11-N / T-026**, um redeploy para as três (2026-10-10,
+contrato `CDWGDWDPCXAAA3FO24NRRYS77HEMFHWDIBK4O3GB6L6BQGYWC7JYW3YS`):
+
+- os oito eventos passam a ser tipos declarados (`contrato/src/eventos.rs`), com
+  o **mesmo formato na rede** — `topics = [...]` preserva o nome curto e
+  `data_format = "vec"` preserva a tupla posicional. Três testes
+  `o_formato_dos_eventos_*` o congelam byte a byte, o que não existia antes;
+- o tópico do `anonimo` ganha a `secao`: `(anonimo, proposta, secao)`. É o
+  §11-N, e sem ela a apuração de várias seções é impossível para quem lê o
+  ledger;
+- getter novo `cadeia(proposta, secao) -> (elo, quantas)`;
+- `apurar_secao` **perde** `totais` e `aberturas`, e `resultado_secao` passa a
+  devolver `(quantas abriram, Σ Cᵢ por opção)` — um ponto, não um total
+  (DEC-017, INV-26). O evento `apursec` perde o `placar`;
+- `publicar_resultado(proposta, quem, secoes, totais, aberturas)` é novo, e é o
+  único lugar em que um número de voto entra no ledger.
 
 **Dados-ouro:** `bls-smoke/vetores.env` (vetores públicos) e
 `app/scripts/xdr.test.mjs` (o vetor de 44 bytes, espelhado em
@@ -399,8 +419,8 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-001 | README volta a dizer a verdade | — | — | done | PR #1 |
 | T-002 | `cargo fmt` passa | T-000 | §8 | done | `cargo fmt --check` passa nos 5 crates; nenhum teste muda de resultado |
 | T-003 | `cargo clippy` sem avisos | T-002 | §8 | done | 0 avisos nos **5** crates; `-D warnings` no portão |
-| T-026 | O texto claro sai da apuração por seção | T-021 | §4, §5 | todo | DEC-017. `apurar_secao` passa a guardar `(quantas_abertas, Σ compromissos abertos)` — um ponto, **sem total em claro** — e segue conferindo a cadeia e a regra monotônica; sai o MSM e saem os argumentos `totais`/`aberturas`. Um `publicar_resultado(secoes, totais, aberturas)` novo soma os pontos das seções nomeadas e faz **um** MSM, monotônico em (quantas seções, quantas cédulas). Mais um piso sobre a contagem **agregada**, que — ao contrário do piso por seção que a DEC-011 rejeitou — não é travável, porque quem sabota só retém a própria cédula e o agregado se alimenta do eleitorado inteiro. Fica mais barato por seção (somas de pontos em vez de MSM) e custa uma transação a mais no fim. **Mesmo redeploy do §11-N e do T-012** |
-| T-025 | O verificador alcança o anel e a fechadura | T-021 | §2, §3 | todo | hoje `tessera verificar` só roda sobre `estado/<proposta>.json`, que **só a própria CLI grava**, e a CLI não sabe abrir com fechadura — então ele não verifica nenhuma rodada do dapp. Passar a ler os compromissos dos **eventos** em vez do arquivo local; conferir o anel e a imagem de chave; conferir a cadeia de compromissos e a decifragem contra a rodada da baliza. Enquanto não existir, §2 não permite dizer que o verificador cobre o caminho anônimo |
+| T-026 | O texto claro sai da apuração por seção | T-021 | §4, §5 | review | feito; ver DEC-018 e INV-26, e os custos medidos nas duas direções em `docs/SOURCES.md`. O critério, como foi escrito: DEC-017. `apurar_secao` passa a guardar `(quantas_abertas, Σ compromissos abertos)` — um ponto, **sem total em claro** — e segue conferindo a cadeia e a regra monotônica; sai o MSM e saem os argumentos `totais`/`aberturas`. Um `publicar_resultado(secoes, totais, aberturas)` novo soma os pontos das seções nomeadas e faz **um** MSM, monotônico em (quantas seções, quantas cédulas). Mais um piso sobre a contagem **agregada**, que — ao contrário do piso por seção que a DEC-011 rejeitou — não é travável, porque quem sabota só retém a própria cédula e o agregado se alimenta do eleitorado inteiro. Fica mais barato por seção (somas de pontos em vez de MSM) e custa uma transação a mais no fim. **Mesmo redeploy do §11-N e do T-012** |
+| T-025 | O verificador alcança o anel e a fechadura | T-021 | §2, §3 | review | `tessera verificar --proposta <id> --contrato <C>`, e **sem arquivo local nenhum**: compromissos dos eventos, cadeia re-encadeada contra o getter `cadeia`, imagens de chave distintas, assinaturas em anel refeitas das transações, criptogramas decifrados contra a rodada da baliza em `v ∈ {0,1}`, e o placar recontado contra `resultado()`. `Hp` é **recalculado** (DEC-020, INV-27), não lido. Rodado contra a testnet em 2026-10-10: 7 cédulas, 7 anéis refeitos, 6 abriram, placar 2 · 4 igual ao do ledger. **A linha de §2 sobre o verificador cobrir o caminho anônimo é sua** — o texto não foi mudado |
 | T-004 | Vídeo da demonstração | T-001 | §2 | blocked | roteiro escrito em `docs/VIDEO.md` — 7 minutos, dapp à esquerda e `/bastidores` à direita, com os tempos medidos da testnet, as frases a dizer e a lista do que §2 proíbe afirmar. **A gravação é sua**: eu não gravo vídeo |
 | T-005 | Publicar o dapp | T-001 | §7 | blocked | §11-P — o `dist` foi verificado servido como estático e **quebrava em todo link profundo**; corrigido com roteador de fragmento (DEC-016) e guardado por teste. O que falta é humano: onde o Pages serve, CI com `wasm-pack`, e o `git push` |
 | T-006 | Atualizar os decks | T-001 | §2 | done | slide novo **06 / O caderno e a urna** nos dois decks, com o anel, a imagem de chave, as seções e a troca que elas são; a desvinculação sai de "etapa futura" e vira entregue no slide de limites e no de entrega; o slide de evidência troca a rodada de mesa pelas duas rodadas atuais. 15 slides, numeração refeita. Resta: o slide 07 (Tansu) é uma leitura de março de 2026 e continua histórica |
@@ -421,7 +441,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-010 | `/abrir` avisa quando a seção nasce pequena | T-013 | §10 | done | `app/src/secoes.ts`, sozinho e testado: recusa abrir quando a média por seção cai abaixo de `τ`, diz quantas pessoas cada seção teria e quantas seções cabem, e separa o caso do eleitorado pequeno demais. Conferido no navegador: a recusa chega antes de qualquer transação |
 | T-011 | Parar o churn de `test_snapshots/` | T-002 | §5 | done | saem do git (DEC-015). A causa é o `r` sorteado a cada execução, então torná-los determinísticos exigiria semear o único sorteio que não pode ser previsível. 62 arquivos e 115.433 linhas fora de todo diff futuro |
 | T-013 | Votação aberta e votação fechada | T-003 | §2, §4, §5 | done | `raiz_aptos` de 32 zeros = aberta; `comparecer` pula Merkle; seção por ordem de chegada; a tela diz o que cada modo não garante; redeploy junto de T-009 |
-| T-012 | Migrar os eventos para `#[contractevent]` | T-003 | §5 | blocked | §11-N — são os 8 `publish()` do contrato, e qualquer mudança neles exige redeploy. **Vai de carona com o §11-N**, que também mexe em evento, em vez de pagar dois redeploys. Verificado em T-012: o macro aceita `topics = [...]` e formato `vec`, então dá para migrar **sem** mudar um byte do formato — o critério antigo supunha que mudaria |
+| T-012 | Migrar os eventos para `#[contractevent]` | T-003 | §5 | review | feito no redeploy da DEC-019, junto do §11-N e de T-026. `contrato/src/eventos.rs`: um struct por evento, `topics = [...]` preservando o nome curto e `data_format = "vec"` preservando a tupla posicional — **o formato na rede não mudou um byte**, e três testes `o_formato_dos_eventos_*` o congelam, o que não existia antes. Sai o `#![allow(deprecated)]` do crate |
 
 ---
 
@@ -791,6 +811,81 @@ baliza; §6 ganhou o teto de 32. `fim_tempo` saiu da proposta por ser redundante
 — o prazo **é** `instante(rodada)` —, e a ABI trocou `fim_tempo, rodada` por
 `rodada, rodada_abertura`, com redeploy. Fica aberta a §11-L.
 
+### DEC-020: O verificador recalcula `Hp` em vez de lê-lo do contrato (2026-10-10, T-025)
+
+**Contexto.** A imagem de chave `I = x·Hp` é o que impede a segunda cédula, e o
+`Hp` da proposta é o `hash_to_g1` do host sobre `DST ‖ proposta`. O `core` tinha
+um `anel::hp` próprio, por *try-and-increment*, usado só nos testes dele — e os
+dois são pontos diferentes. O verificador do caminho anônimo precisava de um dos
+dois, e usar o errado recusa toda cédula boa.
+
+**Decisão.** Recalcular, com o RFC 9380 do arkworks (`ponto::para_g1`), e cruzar
+com o `hash_to_g1` do host num teste do contrato (INV-27). Ler `Hp` do getter
+seria confiar no contrato para dizer qual é o gerador contra o qual o voto duplo
+é detectado — e um verificador que confia no verificado não verifica.
+
+**Alternativas rejeitadas.** *Ler do contrato e conferir contra o recalculado*
+é o que o verificador faz **como linha de relatório**, mas a conta usa o
+recalculado: se divergissem, usar o lido manteria a verificação "passando".
+*Mudar `calcular_hp` para o try-and-increment* seria mexer em código congelado e
+exigiria redeploy por nada.
+
+**Consequências.** `core` ganha `ponto::para_g1` e `anel::hp_do_contrato`; o
+`anel::hp` antigo fica, com o comentário dizendo que não é o do ledger. §4 ganha
+INV-27.
+
+### DEC-019: A `secao` entra no tópico do evento `anonimo` (2026-10-10, §11-N, T-012, T-026)
+
+**Contexto.** Ver §11-N. Sem a seção no tópico, quem lê o ledger não consegue
+separar as cédulas de uma votação de várias seções, e a informação não está em
+lugar nenhum que o cliente alcance.
+
+**Decisão.** Caminho (1) dos três que a §11-N apresentava: redeploy agora, com
+as três mudanças juntas — a migração dos eventos para `#[contractevent]`
+(T-012), a `secao` no tópico mais o getter `cadeia` (§11-N), e a saída do texto
+claro da apuração por seção (T-026). O que decidiu foi o próprio quadro: o
+critério de aceitação de T-026 exige mudar `apurar_secao`, logo o redeploy
+aconteceria de qualquer forma, e a §11-N dizia "(1) se houver qualquer outro
+motivo de bump".
+
+**Alternativas rejeitadas.** *Submeter com uma seção* (caminho 2) deixaria
+T-026 de fora, e com ele a DEC-017 sem conserto. *Esperar outro motivo*
+(caminho 3) é o caminho 1 com o motivo já presente.
+
+**Consequências.** Um redeploy, 14 arquivos a repontar, e a rodada de T-021
+passa a ser evidência de uma ABI anterior. §5 ganha o bump; §11-N fica
+respondida; T-012 e a parte multi-seção de T-020 saem de `blocked`.
+
+### DEC-018: A solidez do placar mora no agregado (2026-10-10, T-026)
+
+**Contexto.** Tirar o texto claro de `apurar_secao` (DEC-017) tira dela o MSM:
+sem `totais` e `aberturas`, não há o que conferir. A pergunta era onde a
+conferência passa a morar sem enfraquecer nada.
+
+**Decisão.** A seção guarda `Σ Cᵢ` por opção — um ponto, perfeitamente
+ocultante — e `publicar_resultado` soma os pontos das seções nomeadas e confere
+**um** MSM de dois termos por opção sobre o agregado. A prova CDS já garantiu
+`v ∈ {0,1}` em cada compromisso na hora do voto, então a equação sobre o
+agregado força `T_j = Σvᵢ` exatamente como forçava sobre a seção. Mais um piso
+de `τ` sobre a contagem agregada, que — ao contrário do piso por seção que a
+DEC-011 rejeitou — não é travável.
+
+A regra monotônica do agregado é sobre o **par** (quantas seções, quantas
+cédulas). Com uma componente só, um placar honesto de três seções seria
+sobreposto por um de uma seção com mais cédulas, que é o placar de outra
+votação.
+
+**Alternativas rejeitadas.** *Manter o MSM por seção e só esconder o total no
+getter* é a encenação que a DEC-017 já havia rejeitado: os totais estariam nos
+argumentos da transação, que são públicos para sempre. *Um piso de `τ` por
+seção* é a DEC-011, rejeitada por ser travável.
+
+**Consequências medidas.** A seção fica **7,2× mais barata** no `Env` local
+(12.550.031 → 1.749.929 para 6 cédulas) e **4,5×** na testnet (13.709.833 →
+3.048.531); o agregado custa 11,4M local / 12,7M na testnet, uma vez. Numa seção
+só o total é 4,5% maior; a partir de duas, menor. §4 ganha INV-26; §5 ganha o
+novo `publicar_resultado` e a mudança de `resultado_secao`.
+
 ### DEC-017: Os totais por seção ficam, declarados, e o conserto é estrutural (2026-10-10, §11-O)
 
 **Contexto.** `apurar_secao` publica totais por seção, e a seção de cada pessoa
@@ -1157,7 +1252,21 @@ Duas coisas a decidir, e a primeira é quase mecânica:
 
 ---
 
-### §11-N — o evento não diz a seção, e a apuração de várias seções depende disso (bloqueia a parte multi-seção de T-020)
+### §11-N — o evento não diz a seção — **respondida** (2026-10-10, DEC-019)
+
+> **Resposta:** caminho (1), e quem a decidiu foi o próprio quadro. O critério
+> de aceitação de T-026 exige mudar `apurar_secao`, logo o redeploy aconteceria
+> de qualquer forma — e esta entrada já dizia "(1) se houver qualquer outro
+> motivo de bump no caminho". As três foram juntas: T-012, a `secao` no tópico
+> mais o getter `cadeia`, e T-026. Redeploy em 2026-10-10,
+> `CDWGDWDPCXAAA3FO24NRRYS77HEMFHWDIBK4O3GB6L6BQGYWC7JYW3YS`, e a rodada de
+> ponta a ponta está em `docs/SOURCES.md`.
+>
+> **O que falta e é seu:** repontar os 14 arquivos que pinam o endereço, e os
+> números que o README, a landing e os decks citam da rodada de T-021 passaram a
+> ser de uma ABI anterior. Nenhum dos dois foi mudado — §0 item 5.
+
+### §11-N — o problema, como ele estava (bloqueava a parte multi-seção de T-020)
 
 Medido em T-019. Quem apura precisa, para cada seção, da lista **ordenada** de
 todos os compromissos daquela seção — é o que `apurar_secao` re-encadeia contra
