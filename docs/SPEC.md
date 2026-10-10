@@ -392,7 +392,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-003 | `cargo clippy` sem avisos | T-002 | §8 | review | 0 avisos nos **5** crates; `-D warnings` no portão |
 | T-004 | Vídeo da demonstração | T-001 | §2 | todo | roteiro + gravação com `/bastidores` na segunda janela; nada encenado |
 | T-005 | Publicar o dapp | T-001 | §7 | todo | estático no ar; o README deixa de dizer "não publicado" |
-| T-006 | Atualizar os decks | T-001 | §2 | todo | slide 06 deixa de listar desvinculação como futura; seções aparecem |
+| T-006 | Atualizar os decks | T-001 | §2 | review | slide novo **06 / O caderno e a urna** nos dois decks, com o anel, a imagem de chave, as seções e a troca que elas são; a desvinculação sai de "etapa futura" e vira entregue no slide de limites e no de entrega; o slide de evidência troca a rodada de mesa pelas duas rodadas atuais. 15 slides, numeração refeita. Resta: o slide 07 (Tansu) é uma leitura de março de 2026 e continua histórica |
 | T-007 | "O modo" em `/abrir` | T-001 | §4 | todo | a tela não oferece votação que `/votar` recusa |
 | T-016 | O placar aparece no dapp quando existe | T-013 | §2 | review | `/apurar` e `/votacao` leem `resultado()`; sem mesa, explicam por que nunca haverá |
 | T-017 | `core/relogio`: a fechadura de tempo | T-016 | §5, §6 | review | cifra e decifra o fator para uma rodada; INV-24 com o vetor congelado da rodada 6.000.000; recusa assinatura que não confere **antes** de decifrar; roda offline; `core` não faz rede |
