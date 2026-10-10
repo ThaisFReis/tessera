@@ -86,7 +86,7 @@ Teto de CPU por transação, achado por bissecção na testnet: **400.000.000**.
 | **apuração Pedersen** | **5.408.931** | **8.622 stroops** |
 | **caminho de Merkle (profundidade 8)** | **127.863** | **5.235 stroops** |
 | **`votar()` completo, m=2** | **36.812.994** | |
-| **`apurar()`, m=2** | **11.150.582** | |
+| **`apurar()`, m=2** | **11.197.414** | |
 | **`apurar_secao()`** (sem mesa) | **11.035.050 + 252.722 por cédula** | |
 | apuração ElGamal (desenho anterior) | 6.712.183 | 11.852 stroops |
 | verificação Groth16 (4 entradas públicas) | 47.371.348 | |
@@ -99,6 +99,9 @@ Três conclusões que mudaram o desenho:
    força bruta custa ~124k por unidade de peso, o que dá um teto de ~3.218 de
    peso por transação. Conferir uma abertura afirmada custa **5.408.931,
    constante no comparecimento** — medido idêntico para 250 e para 1.000.000.
+   E `apurar()` inteiro custa 11.197.414 com cinco votantes e 11.371.398 com
+   quarenta: 1,5% para oito vezes mais gente, que é o que "não cresce com o
+   comparecimento" quer dizer na prática.
 3. **O desenho com sigilo permanente é também o mais barato.** Pedersen é 19%
    mais barato em CPU e 27% em taxa que o ElGamal que ele substituiu. Não houve
    trade-off a pagar.
