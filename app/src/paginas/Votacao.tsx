@@ -8,6 +8,7 @@ import {
   ledgerAtual,
   REDE,
   lerResultado,
+  lerResultadoSecao,
   type PropostaRede,
 } from "../rede";
 import { Carregando, Estado, Icone } from "../ui";
@@ -49,7 +50,11 @@ export default function Votacao() {
           if (vivo) setAnel(por.map((a) => a.length));
         }
         const [conf] = await lerComparecimento(id);
-        const r = await lerResultado(id);
+        // Com fechadura de tempo o placar mora por seção, e não há total
+        // agregado no contrato: `resultado()` é o caminho da mesa.
+        const r = prop?.rodada
+          ? (await lerResultadoSecao(id, 0))?.totais ?? null
+          : await lerResultado(id);
         if (vivo) {
           setCedulas(conf);
           setPlacar(r);
@@ -121,6 +126,13 @@ export default function Votacao() {
       {f === "encerrada" && !placar && (
         <section>
           <h2>A URNA FECHOU</h2>
+          {p.rodada !== 0n && (
+            <p>
+              O placar não precisa de ninguém: a chave que abre as cédulas é a assinatura da
+              rodada <span className="valor-mono">{String(p.rodada)}</span> da baliza, e ela nasce
+              sozinha. A apuração acontece ao abrir a página.
+            </p>
+          )}
           <Link className="secondary-button" to={`/apurar/${id}`}>Ver a apuração <Icone nome="arrow" /></Link>
         </section>
       )}
@@ -143,8 +155,18 @@ export default function Votacao() {
               ? "nenhuma — ninguém pode abrir um voto, e por isso ninguém pode apurar"
               : `${p.limiar} de ${p.mesa.length} para apurar`}
           </Fato>
+          <Fato rotulo="fechadura de tempo">
+            {p.rodada === 0n
+              ? "nenhuma — o placar depende da mesa, ou não existe"
+              : `rodada ${p.rodada} da baliza drand — antes dela a chave que abre as cédulas não ` +
+                "existe, e depois dela qualquer pessoa apura"}
+          </Fato>
           <Fato rotulo="quem pode abrir a sua cédula">
-            {p.anel
+            {p.rodada !== 0n
+              ? "depois da rodada, qualquer pessoa — e é assim que o placar existe sem mesa. " +
+                "O que protege você não é o sigilo do conteúdo da cédula: é o anel, que não diz " +
+                "de quem ela é. Antes da rodada, ninguém."
+              : p.anel
               ? "ninguém — a cédula em anel não reparte o fator com a mesa, então não existe parcela a reunir"
               : p.mesa.length === 1
                 ? `uma pessoa: ${p.mesa[0]}`

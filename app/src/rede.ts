@@ -258,6 +258,25 @@ function chavesDeAnel(id: string, primeira: number, ultima: number): xdr.LedgerK
 export const lerResultado = async (id: string): Promise<number[] | null> =>
   ((await ler("resultado", bytesN(id))) as number[] | undefined) ?? null;
 
+/**
+ * O placar de uma seção, como o contrato o guardou: quantas cédulas abriram e
+ * os totais sobre elas.
+ *
+ * Os dois números andam juntos de propósito. Um placar sobre um subconjunto
+ * sem dizer qual subconjunto é um placar que mente por omissão — e o contrato
+ * guarda os dois justamente para que a tela não possa separá-los.
+ */
+export const lerResultadoSecao = async (
+  id: string,
+  secao: number,
+): Promise<{ abriram: number; totais: number[] } | null> => {
+  const r = (await ler("resultado_secao", bytesN(id), u32(secao))) as
+    | [number, number[]]
+    | null
+    | undefined;
+  return r ? { abriram: r[0], totais: Array.from(r[1]) } : null;
+};
+
 /** Quantas seções existem agora. Na aberta cresce com o comparecimento. */
 export const lerSecoes = async (id: string): Promise<number> =>
   ((await ler("secoes", bytesN(id))) as number | undefined) ?? 1;
