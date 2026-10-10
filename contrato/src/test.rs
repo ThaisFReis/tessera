@@ -13,7 +13,7 @@ extern crate std;
 
 use super::*;
 use soroban_sdk::{
-    testutils::{Address as _, Ledger},
+    testutils::{Address as _, Events as _, Ledger},
     xdr::ToXdr,
     Bytes, BytesN, Env, Vec,
 };
@@ -4354,4 +4354,297 @@ fn a_assinatura_de_outra_rodada_nao_abre_a_secao() {
         .map(|a| a.abriram),
         Ok(2)
     );
+}
+
+// ===================== T-012: o formato dos eventos =====================
+//
+// Antes desta seção o formato do evento era interface congelada (§5) **sem um
+// único teste**. O dapp lê `topic[0]` como o nome e `topic[1]` como a proposta,
+// e `rede.ts` desempacota o dado posicionalmente — então a migração para
+// `#[contractevent]`, que muda a forma dos tópicos por omissão, podia apagar a
+// lista de votações sem quebrar nenhum `cargo test`.
+//
+// Estes testes gravam os bytes de hoje. A migração é correta se eles passarem
+// sem mudar uma linha.
+
+/// Os eventos da última invocação, em ScVal cru: tópicos e dado.
+fn eventos_crus(env: &Env) -> Vetor<(Vetor<soroban_sdk::xdr::ScVal>, soroban_sdk::xdr::ScVal)> {
+    use soroban_sdk::xdr::ContractEventBody;
+    env.events()
+        .all()
+        .events()
+        .iter()
+        .map(|e| {
+            let ContractEventBody::V0(c) = &e.body;
+            (c.topics.to_vec(), c.data.clone())
+        })
+        .collect()
+}
+
+/// Um `ScVal` a partir de qualquer valor do SDK, para comparar byte a byte.
+fn scv<V: soroban_sdk::IntoVal<Env, soroban_sdk::Val>>(
+    env: &Env,
+    v: V,
+) -> soroban_sdk::xdr::ScVal {
+    use soroban_sdk::TryFromVal;
+    soroban_sdk::xdr::ScVal::try_from_val(env, &v.into_val(env))
+        .expect("o valor nao converte para ScVal")
+}
+
+fn sim(s: &str) -> soroban_sdk::Symbol {
+    soroban_sdk::Symbol::new(&Env::default(), s)
+}
+
+/// O último evento da invocação que acabou de rodar.
+fn ultimo(env: &Env) -> (Vetor<soroban_sdk::xdr::ScVal>, soroban_sdk::xdr::ScVal) {
+    eventos_crus(env)
+        .pop()
+        .expect("a invocacao nao publicou evento nenhum")
+}
+
+/// **`votar`, `endosso` e `apurar`: tópicos e dado, byte a byte.**
+#[test]
+fn o_formato_dos_eventos_do_caminho_identificado_esta_congelado() {
+    let c = montar(16);
+    let e = &c.env;
+
+    // --- votar ---
+    let mut soma = [ArkFr::from(0u64); OPCOES as usize];
+    let escolhas = [0u32, 0, 1, 0, 1, 0];
+    for (i, x) in escolhas.iter().enumerate() {
+        let rs = c.votar(i, *x);
+        for j in 0..OPCOES as usize {
+            soma[j] += rs[j];
+        }
+    }
+    let (t, d) = ultimo(e);
+    assert_eq!(
+        t,
+        std::vec![
+            scv(e, sim("votar")),
+            scv(e, c.proposta.clone()),
+            scv(e, c.aptos[5].clone())
+        ],
+        "o dapp le topic[0] como o nome e topic[1] como a proposta"
+    );
+    match &d {
+        soroban_sdk::xdr::ScVal::Vec(Some(v)) => {
+            assert_eq!(v.len(), 2, "votar carrega compromissos e escolhas");
+            assert!(matches!(v[0], soroban_sdk::xdr::ScVal::Vec(_)));
+            assert!(matches!(v[1], soroban_sdk::xdr::ScVal::Vec(_)));
+        }
+        outro => std::panic!("votar tinha de publicar um Vec, veio {:?}", outro),
+    }
+
+    // --- endosso, abaixo do limiar ---
+    let mut totais = Vec::new(e);
+    let mut aberturas = Vec::new(e);
+    for j in 0..OPCOES as usize {
+        totais.push_back(if j == 0 { 4u32 } else { 2u32 });
+        aberturas.push_back(escalar(e, &soma[j]));
+    }
+    e.ledger().set_sequence_number(FECHA_EM + 1);
+
+    assert_eq!(c.endossar_um(0, &totais, &aberturas).unwrap(), None);
+    let (t, d) = ultimo(e);
+    assert_eq!(
+        t,
+        std::vec![
+            scv(e, sim("endosso")),
+            scv(e, c.proposta.clone()),
+            scv(e, c.mesa[0].clone())
+        ]
+    );
+    match &d {
+        soroban_sdk::xdr::ScVal::Vec(Some(v)) => {
+            assert_eq!(v.len(), 3, "endosso carrega digest, quantos e limiar")
+        }
+        outro => std::panic!("endosso tinha de publicar um Vec, veio {:?}", outro),
+    }
+
+    // --- apurar, quando o limiar fecha ---
+    c.endossar_um(1, &totais, &aberturas).unwrap();
+    c.endossar_um(2, &totais, &aberturas).unwrap().unwrap();
+    let evs = eventos_crus(e);
+    let (t, d) = evs.last().unwrap().clone();
+    assert_eq!(
+        t,
+        std::vec![scv(e, sim("apurar")), scv(e, c.proposta.clone())],
+        "o apurar da mesa nao carrega endereco no topico"
+    );
+    match &d {
+        soroban_sdk::xdr::ScVal::Vec(Some(v)) => {
+            assert_eq!(v.len(), 3, "apurar carrega totais, aberturas e o resultado")
+        }
+        outro => std::panic!("apurar tinha de publicar um Vec, veio {:?}", outro),
+    }
+}
+
+/// **`abrir`, `comparec`, `anonimo`, `apursec` e `abertura`.**
+///
+/// São os cinco que o dapp e o verificador leem. O `anonimo` é o mais
+/// sensível: `rede.ts` desempacota o dado **por posição**
+/// (`[imagem, compromissos, escolhas, cripto]`), então a ordem dos campos é
+/// interface congelada tanto quanto o nome.
+#[test]
+fn o_formato_dos_eventos_do_caminho_anonimo_esta_congelado() {
+    let u = urna_do_navegador(&[0, 1]);
+    let e = &u.env;
+
+    // --- anonimo: o último evento é a última cédula ---
+    let (t, d) = ultimo(e);
+    assert_eq!(
+        t,
+        std::vec![scv(e, sim("anonimo")), scv(e, u.proposta.clone())],
+        "o anonimo nao carrega endereco nenhum, e e esse o ponto dele"
+    );
+    match &d {
+        soroban_sdk::xdr::ScVal::Vec(Some(v)) => {
+            assert_eq!(v.len(), 4, "imagem, compromissos, escolhas, cripto");
+            assert!(
+                matches!(v[0], soroban_sdk::xdr::ScVal::Bytes(_)),
+                "a imagem de chave e o primeiro campo"
+            );
+            assert!(matches!(v[1], soroban_sdk::xdr::ScVal::Vec(_)));
+            assert!(matches!(v[2], soroban_sdk::xdr::ScVal::Vec(_)));
+            assert!(
+                matches!(v[3], soroban_sdk::xdr::ScVal::Bytes(_)),
+                "o criptograma e o ultimo campo"
+            );
+        }
+        outro => std::panic!("anonimo tinha de publicar um Vec, veio {:?}", outro),
+    }
+
+    // --- apursec ---
+    u.fim();
+    let a = tessera_cliente::abertura(
+        &u.compromissos(),
+        &u.criptos(),
+        2,
+        &u.h_hex,
+        RODADA_FIM,
+        ASSINATURA_FIM,
+    )
+    .expect("a abertura da secao falhou");
+    assert_eq!(u.apurar(&a), Ok(2));
+    let (t, d) = ultimo(e);
+    assert_eq!(
+        t,
+        std::vec![
+            scv(e, sim("apursec")),
+            scv(e, u.proposta.clone()),
+            scv(e, 0u32)
+        ],
+        "o apursec diz a secao no topico — e o unico que diz"
+    );
+    match &d {
+        soroban_sdk::xdr::ScVal::Vec(Some(v)) => {
+            assert_eq!(v.len(), 3, "quantas_abertas, quantas, placar")
+        }
+        outro => std::panic!("apursec tinha de publicar um Vec, veio {:?}", outro),
+    }
+}
+
+/// **`abrir`, `abertura` e `comparec`.** O primeiro é o que monta a lista de
+/// votações no dapp; os outros dois são o caderno.
+#[test]
+fn o_formato_dos_eventos_do_caderno_esta_congelado() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(4_989_900);
+    env.ledger().set_timestamp(t0());
+    let id = env.register(Tessera, ());
+    let cliente = TesseraClient::new(&env, &id);
+    let e = &env;
+
+    let apto = Address::generate(e);
+    let folhas: Vetor<merkle::Apto> = std::vec![merkle::Apto {
+        endereco: bytes_de(&apto.clone().to_xdr(e)),
+        peso: 1,
+    }];
+    let arvore = merkle::Arvore::montar(&folhas).unwrap();
+    let proposta: BytesN<32> = BytesN::from_array(e, &[9u8; 32]);
+    let mut perg = Vec::new(e);
+    perg.push_back(Pergunta {
+        opcoes: 2,
+        confidencial: true,
+    });
+
+    // --- abrir ---
+    cliente.abrir(
+        &Address::generate(e),
+        &proposta,
+        &perg,
+        &BytesN::from_array(e, &arvore.raiz()),
+        &Vec::new(e),
+        &0u32,
+        &4_989_990u32,
+        &4_990_190u32,
+        &true,
+        &1u32,
+        &0u32,
+        &0u64,
+        &RODADA_ABERTURA,
+    );
+    let (t, d) = ultimo(e);
+    assert_eq!(
+        t,
+        std::vec![scv(e, sim("abrir")), scv(e, proposta.clone())],
+        "e por este topico que o dapp lista as votacoes"
+    );
+    match &d {
+        soroban_sdk::xdr::ScVal::Vec(Some(v)) => assert_eq!(
+            v.len(),
+            7,
+            "n_perguntas, conf_opcoes, abre_em, fecha_em, limiar, anel, secoes"
+        ),
+        outro => std::panic!("abrir tinha de publicar um Vec, veio {:?}", outro),
+    }
+
+    // --- abertura: dado de valor único, não Vec ---
+    env.ledger().set_timestamp(instante(RODADA_ABERTURA));
+    cliente.registrar_abertura(&proposta, &assinatura_host(e));
+    let (t, d) = ultimo(e);
+    assert_eq!(
+        t,
+        std::vec![scv(e, sim("abertura")), scv(e, proposta.clone())]
+    );
+    assert_eq!(
+        d,
+        scv(e, RODADA_ABERTURA),
+        "o abertura carrega a rodada crua, sem Vec em volta"
+    );
+
+    // --- comparec ---
+    let caminho = {
+        let c = arvore.caminho(0).unwrap();
+        let mut v = Vec::new(e);
+        for irmao in &c.irmaos {
+            v.push_back(BytesN::from_array(e, irmao));
+        }
+        v
+    };
+    cliente.comparecer(
+        &proposta,
+        &apto,
+        &g1(e, &pedersen::gerador()),
+        &caminho,
+        &0u32,
+        &0u32,
+    );
+    let (t, d) = ultimo(e);
+    assert_eq!(
+        t,
+        std::vec![
+            scv(e, sim("comparec")),
+            scv(e, proposta.clone()),
+            scv(e, apto.clone())
+        ]
+    );
+    match &d {
+        soroban_sdk::xdr::ScVal::Vec(Some(v)) => {
+            assert_eq!(v.len(), 2, "comparec carrega secao e tamanho")
+        }
+        outro => std::panic!("comparec tinha de publicar um Vec, veio {:?}", outro),
+    }
 }
