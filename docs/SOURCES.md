@@ -16,6 +16,7 @@ no teste que as produz, que é o que as mantém verdadeiras. Ver
 | 2026-10-07 | Hash da cadeia quicknet da drand | `52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971` | — | https://api.drand.sh/v2/chains |
 | 2026-10-07 | Esquema, gênese e período da quicknet | `bls-unchained-g1-rfc9380`, 1692803367, 3 s | — | https://api.drand.sh/v2/chains/52db9ba7…/info |
 | 2026-10-07 | Chave pública da quicknet | 96 bytes, G2 comprimido (byte alto `0x83`) | — | idem, comprimento medido |
+| 2026-10-10 | Assinatura da rodada 6.000.100 da `quicknet` | `b6018631cdb80412e0690267164e381fc744e6a62ba3397c9becae5370100e87dcabde17a7325d5e7fb8d0d135cb664d` | v2 | https://api.drand.sh/v2/chains/52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971/rounds/6000100 — congelada em `contrato/src/test.rs::ASSINATURA_FIM` e em `app/scripts/fechadura.test.mjs`, para que o portão não dependa de rede |
 | 2026-10-07 | Mensagem assinada pela drand em modo *unchained* | `sha256(rodada em 8 bytes big-endian)` — a rodada crua **não** confere | quicknet | medido: pareamento contra a rodada 6.000.000, DST `BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_` |
 | 2026-10-07 | Rodada de um instante `t` | `(t − 1692803367)/3 + 1`, vencendo exatamente em `t` | quicknet | medido: `t=1791421407` → 32872681, relé publicando a 32872680 |
 | 2026-10-07 | `soroban-sdk` expõe pareamento com saída de valor | não — só `pairing_check`, que devolve `bool` | 28.0.0 | fonte instalada, `src/crypto/bls12_381.rs` |

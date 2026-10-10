@@ -220,7 +220,7 @@ pergunta.
 | ABI do contrato (`abrir`, `comparecer`, `votar`, `votar_anonimo`, `apurar`) | `contrato/src/lib.rs` | redeploy invalida toda votação aberta e 12 arquivos que pinam o endereço |
 | Códigos de erro `Erro` | `contrato/src/tipos.rs` | espelhados em `app/src/rede.ts::ERROS` |
 | DSTs do anel (`TESSERA-V1-ANEL`, `-HP`, `-CONJUNTO`) | `core/src/anel.rs`, `contrato/src/cripto.rs` | divergir faz toda assinatura falhar sem dizer por quê |
-| Criptograma da fechadura: `U` (96 B, G2 comprimido) ‖ `V` (32 B) ‖ `W` (32 B) = **160 B por opção confidencial**, concatenados em ordem de pergunta | `core/src/relogio.rs` | é o que o evento carrega; mudar o layout torna ilegível toda cédula já depositada |
+| Criptograma da fechadura: `U` (96 B, G2 comprimido) ‖ `V` (32 B) ‖ `W` (32 B) = **160 B por opção confidencial**, concatenados em ordem de pergunta — produzido por `cliente-wasm::montar` e lido por `cliente-wasm::abertura` | `core/src/relogio.rs` | é o que o evento carrega; mudar o layout torna ilegível toda cédula já depositada |
 | DSTs da fechadura (`TESSERA-V1-RELOGIO-SIGMA`, `-MASCARA`, `-PAD`) | idem | divergir faz a decifragem devolver lixo em silêncio |
 | Constantes da baliza: cadeia, gênese, período, chave pública, e o DST `BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_` | `core/src/relogio.rs` | a rodada e a verificação dependem delas; ver §6 |
 | Cadeia de compromissos `Cadeia ← H(anterior ‖ compromissos)` | `contrato/src/lib.rs` | é o que prova que a lista da apuração é o conjunto real de cédulas |
@@ -397,7 +397,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-016 | O placar aparece no dapp quando existe | T-013 | §2 | review | `/apurar` e `/votacao` leem `resultado()`; sem mesa, explicam por que nunca haverá |
 | T-017 | `core/relogio`: a fechadura de tempo | T-016 | §5, §6 | review | cifra e decifra o fator para uma rodada; INV-24 com o vetor congelado da rodada 6.000.000; recusa assinatura que não confere **antes** de decifrar; roda offline; `core` não faz rede |
 | T-018 | Contrato: subconjunto, cadeia e regra monotônica | T-017 | §4, §5, §7 | review | criptograma no evento `anonimo`; `Cadeia(proposta, secao)` de 32 bytes que não cresce; `apurar` por seção com lista ordenada + bitmap, conferindo a cadeia e o MSM de dois termos; INV-18 a INV-22 com teste cada; rodada presa a `fecha_em` (INV-22); bump de ABI e redeploy com os arquivos repontados; custo medido e citado junto do número; `τ` conferido contra o anel da seção e **não** contra o subconjunto aberto (INV-25, DEC-011) |
-| T-019 | Decifrar no navegador e buscar a rodada | T-017, T-018 | §3, §5 | todo | `cliente-wasm` exporta decifrar; `app/src/rede.ts` busca a assinatura e a **valida** antes de usar; nenhuma página importa o SDK nem o relé direto |
+| T-019 | Decifrar no navegador e buscar a rodada | T-017, T-018 | §3, §5 | review | `cliente-wasm` exporta `conferir_baliza` e `abertura_da_secao`, e a cédula sai **cifrada** de `montar`; `app/src/rede.ts` busca a assinatura no relé e a confere no pareamento antes de usar; nenhuma página importa o SDK nem o relé direto; o ciclo inteiro — navegador cifra, rodada vence, contrato aceita o placar — tem teste em Rust e em JS; a cédula sabotada custa só o próprio voto. Apuração automática de **uma** seção: a de várias espera §11-N |
 | T-020 | O placar aparece sozinho quando a janela fecha | T-019 | §2, §4 | todo | antes de `fecha_em` a tela não mostra nada, nem parcial; depois, apura e publica sem ninguém clicar; diz quantas de quantas cédulas abriram; o diário conta o que aconteceu |
 | T-021 | Rodada ponta a ponta na testnet | T-020 | §8 | todo | `app/scripts/rodada-relogio.mjs`: cédulas, fim da janela, apuração automática, e **uma cédula sabotada que não trava o placar**; hash das transações no PR |
 | T-024 | Os scripts de carga voltam a medir CPU | — | §0, §8 | todo | `sim.cost?.cpuInsns` não existe no SDK 14.6.1 e devolve `undefined`; `rodada-30.mjs` o converte em **0** com `?? 0`, que é número inventado e §0 proíbe. Trocar pelo que `rede.ts` já usa — `transactionData.resources().instructions()` — e fazer o script **falhar** em vez de imprimir zero quando a medição não vier |
@@ -780,6 +780,33 @@ baliza; §6 ganhou o teto de 32. `fim_tempo` saiu da proposta por ser redundante
 — o prazo **é** `instante(rodada)` —, e a ABI trocou `fim_tempo, rodada` por
 `rodada, rodada_abertura`, com redeploy. Fica aberta a §11-L.
 
+### DEC-014: Os caminhos que o teste nativo chama erram em `String`, não em `JsValue` (2026-10-10, T-019)
+
+**Contexto.** `cliente-wasm` existe para que o navegador e o teste de aceitação
+do contrato rodem **o mesmo** código. Mas `JsValue` não existe fora do wasm32:
+construir um entra em pânico, e `wasm-bindgen` marca essas funções como não
+desenroláveis, então o pânico **aborta o processo** em vez de falhar o teste.
+Medido em T-019: `SIGABRT`, sem nome de teste e sem asserção.
+
+Até aqui isso não aparecia porque os testes nativos só exercitavam o caminho
+feliz. A fechadura mudou: o que T-019 tem a provar é justamente que a assinatura
+errada é **recusada**.
+
+**Decisão.** As funções puras que o teste nativo chama erram em `String` —
+`abertura`, `bytes_de_hex`, `ponto_em`. Os invólucros `#[wasm_bindgen]`
+convertem na borda, e só eles tocam o tipo.
+
+**Alternativas.** (a) Exercitar as recusas em `wasm-bindgen-test`: pede um
+runner de navegador no portão, que é dependência nova. (b) `JsError`: mesmo
+pânico. (c) Um tipo de erro próprio no crate: é para onde isto vai se crescer,
+mas hoje `String` carrega exatamente o que as duas bordas usam.
+
+**Consequências.** `anonima` e `montar` continuam errando em `JsValue`, porque o
+teste nativo só usa o caminho feliz delas — e isso está escrito em comentário no
+`de_hex`, para que quem for testar a próxima recusa saiba o que a espera.
+
+---
+
 ### §11-L — vazão contra conjunto de anonimato, e a landing fala de um só
 
 `secoes_para(30)` devolve **uma** seção, porque o alvo é 20 por seção e 30 cabe
@@ -1041,3 +1068,48 @@ Duas coisas a decidir, e a primeira é quase mecânica:
    quanto tempo do disparo à última confirmação — ou sai. Eu escreveria a
    condição: ela é o resultado honesto e é *mais* interessante que o número
    nu, porque diz o que uma votação real precisa ter no cliente.
+
+---
+
+### §11-N — o evento não diz a seção, e a apuração de várias seções depende disso (bloqueia a parte multi-seção de T-020)
+
+Medido em T-019. Quem apura precisa, para cada seção, da lista **ordenada** de
+todos os compromissos daquela seção — é o que `apurar_secao` re-encadeia contra
+`Cadeia(proposta, secao)`. A lista vem dos eventos `anonimo`, e o tópico do
+evento é `(anonimo, proposta)`: **não tem a seção**.
+
+Com uma seção, não há problema: todas as cédulas são dela. Com várias, quem
+apura não tem como separá-las. Não é questão de esforço — a informação não está
+no ledger em lugar nenhum que o cliente alcance:
+
+- o criptograma não diz nada antes de ser decifrado, e decifrar não revela a
+  seção;
+- a assinatura em anel não revela qual anel assinou, que é o ponto dela;
+- a cadeia é sequencial, então "descobrir" a atribuição seria testar as
+  partições possíveis: 3³⁰ para a rodada de 30 votantes em 3 seções.
+
+Tentar por tentativa e erro não é uma otimização ruim, é inviável.
+
+**O que eu faria:** `secao` entra no tópico do evento, que passa a ser
+`(anonimo, proposta, secao)` — um `u32` a mais, custo irrisório, e **não revela
+nada novo**: a seção já é pública (`secao_de` é um getter), o anel de cada seção
+já é público, e votar já exige declarar a seção na própria chamada. Junto com
+isso, um getter `cadeia(proposta, secao) -> (bytes32, u32)`, para que o cliente
+saiba quantas cédulas ele *deveria* ter encontrado e possa dizer "faltam 2 no
+que eu li" em vez de levar `ArgumentoMalFormado` sem explicação.
+
+**Por que paro aqui:** o formato do evento e a ABI são §5 — congelados, e
+mudá-los é redeploy, que invalida toda votação aberta e repontar 13 arquivos.
+Fizemos um redeploy anteontem em T-023. A decisão é sua, e são três caminhos:
+
+1. **Redeploy agora**, com as duas mudanças juntas, e T-020 nasce completo.
+2. **A submissão vai com uma seção**, que é o que `secoes_para(30)` já
+   recomenda (§11-L) e o que o placar automático suporta hoje. Multi-seção
+   continua votando e continua apurável por quem tiver a lista — só não pelo
+   dapp sozinho.
+3. Esperar até ter outro motivo de redeploy e ir junto.
+
+Eu iria de (1) se houver qualquer outro motivo de bump no caminho de T-020 a
+T-022, e de (2) se não houver — porque um redeploy custa uma rodada inteira de
+reverificação, e a §11-L já diz que a configuração recomendada para 30 pessoas é
+uma seção só.

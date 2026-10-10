@@ -13,6 +13,7 @@ type Etapa = "escolha" | "revisao" | "enviando" | "concluido";
 const propostaDemo: PropostaRede = {
   perguntas: [{ opcoes: 3, confidencial: true }], raiz_aptos: new Uint8Array(),
   mesa: [], limiar: 0, abre_em: 0, fecha_em: Number.MAX_SAFE_INTEGER, anel: true, secoes: 1,
+  rodada: 0n, rodada_abertura: 0n,
 };
 const opcoesDemo = [
   { titulo: "Aprovar", descricao: "Sou a favor da proposta." },
@@ -105,14 +106,19 @@ function Urna({ id, demo }: { id: string; demo: boolean }) {
         const [hp, h] = await Promise.all([lerHp(id), lerGeradorH()]);
         const i = anel.indexOf(guardada.publica);
         if (i < 0) throw new Error("Sua chave não está no grupo de participantes desta votação.");
+        // A fechadura: `p.rodada` é a rodada da baliza em que a cédula
+        // destranca, e `0` é a proposta sem fechadura. O `r` é cifrado aqui
+        // dentro, na mesma chamada em que nasce — sai da aba já ilegível, para
+        // uma chave que ainda não existe no mundo.
         const c = w.cedula_anonima(id, hp, h, anel, i, guardada.secreta,
           [{ opcoes: p.perguntas[0].opcoes, confidencial: true }], new Uint32Array([escolha]),
-        ) as { imagem: string; c0: string; z: string[]; cedula: { compromissos: string[]; provas: never[]; provas_soma: never[]; escolhas: number[] } };
+          p.rodada,
+        ) as { imagem: string; c0: string; z: string[]; cedula: { compromissos: string[]; provas: never[]; provas_soma: never[]; escolhas: number[]; cripto: string } };
         diario({ tipo: "nota", txt: "Cédula e prova de participação preparadas neste navegador." });
         setProgresso(1);
         const efemera = await CarteiraEfemera.nascer();
         setProgresso(2);
-        const hash = await votarAnonimo(efemera, id, guardada.secao, anel, c.imagem, c.c0, c.z, c.cedula.compromissos, c.cedula.provas, c.cedula.provas_soma, c.cedula.escolhas, "", diario);
+        const hash = await votarAnonimo(efemera, id, guardada.secao, anel, c.imagem, c.c0, c.z, c.cedula.compromissos, c.cedula.provas, c.cedula.provas_soma, c.cedula.escolhas, c.cedula.cripto, diario);
         if (!montada.current) return;
         // A cédula entrou: a chave de anel deixa de ser útil e passa a ser só
         // o vínculo entre você e ela. Morre aqui.

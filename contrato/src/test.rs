@@ -2120,6 +2120,8 @@ fn a_cedula_do_navegador_e_aceita_pelo_contrato() {
         &segredo_hex,
         &perguntas_js,
         &escolhas_feitas,
+        // Esta proposta tem mesa, e mesa não usa fechadura de tempo.
+        0,
     )
     .expect("o cliente nao montou a cedula anonima");
     let c = &a.cedula;
@@ -4001,4 +4003,355 @@ fn a_seccao_vem_da_baliza_e_o_contrato_confere() {
     // E o dimensionamento: 40 aptos em 2 seções é média 20, a faixa que
     // `core::merkle` mede como segura.
     assert_eq!(merkle::secoes_para(N), SECOES);
+}
+
+// ---------- T-019: a fechadura fechando o ciclo ----------
+
+/// A assinatura da rodada em que a janela desta urna fecha.
+///
+/// Medida, não inventada: foi buscada na baliza em 2026-10-10 e está em
+/// `docs/SOURCES.md`. A rodada 6.000.100 já venceu há anos de calendário da
+/// cadeia, e é por isso que dá para tê-la num teste — numa votação de verdade
+/// ela ainda não existiria no momento do voto, que é o ponto da fechadura.
+const ASSINATURA_FIM: &str = "b6018631cdb80412e0690267164e381fc744e6a62ba3397c9becae5370100e87dcabde17a7325d5e7fb8d0d135cb664d";
+
+/// Uma urna em anel com fechadura, com as cédulas montadas **pelo cliente do
+/// navegador** — `tessera_cliente::anonima`, a mesma função que a aba roda.
+///
+/// A diferença para [`urna_com_fechadura`] é o criptograma: ali ele é um
+/// recheio de bytes, porque o contrato só confere a forma; aqui ele é cifrado
+/// de verdade, e é a decifragem que reconstrói o placar. Sem este caminho, o
+/// `r` continuava saindo em tipos Rust de dentro do teste, e nada provava que a
+/// cédula depositada **pode** ser aberta depois.
+struct UrnaDoNavegador {
+    env: Env,
+    cliente: TesseraClient<'static>,
+    proposta: BytesN<32>,
+    h_hex: std::string::String,
+    /// Por cédula, na ordem da cadeia: os compromissos em hexadecimal e o
+    /// criptograma concatenado. É exatamente o que o evento carrega.
+    cedulas: Vetor<(Vetor<std::string::String>, std::string::String)>,
+}
+
+fn urna_do_navegador(escolhas: &[u32]) -> UrnaDoNavegador {
+    use tessera_cliente::{anonima, PerguntaJs};
+    use tessera_core::anel;
+
+    let n = escolhas.len();
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(4_989_900);
+    env.ledger().set_timestamp(t0());
+    let id = env.register(Tessera, ());
+    let cliente = TesseraClient::new(&env, &id);
+
+    let aptos: Vetor<Address> = (0..n).map(|_| Address::generate(&env)).collect();
+    let folhas: Vetor<merkle::Apto> = aptos
+        .iter()
+        .map(|a| merkle::Apto {
+            endereco: bytes_de(&a.clone().to_xdr(&env)),
+            peso: 1,
+        })
+        .collect();
+    let arvore = merkle::Arvore::montar(&folhas).unwrap();
+
+    let mut perg = Vec::new(&env);
+    perg.push_back(Pergunta {
+        opcoes: 2,
+        confidencial: true,
+    });
+    let proposta: BytesN<32> = BytesN::from_array(&env, &[0x19u8; 32]);
+    cliente.abrir(
+        &Address::generate(&env),
+        &proposta,
+        &perg,
+        &BytesN::from_array(&env, &arvore.raiz()),
+        &Vec::new(&env),
+        &0u32,
+        &ABRE,
+        &FECHA,
+        &true,
+        &1u32,
+        &0u32,
+        &RODADA_FIM,
+        &0u64,
+    );
+
+    let g = pedersen::gerador();
+    let h_hex = ponto::para_hex(&ponto::desserializar(&cliente.gerador_h().to_array()).unwrap());
+    let hp = ponto::desserializar(&cripto::calcular_hp(&env, &proposta).to_array()).unwrap();
+
+    let xs: Vetor<ArkFr> = (0..n).map(|_| pedersen::acaso_fr().unwrap()).collect();
+    let anel_ark: Vetor<ArkG1> = xs.iter().map(|x| anel::chave_publica(&g, x)).collect();
+    for (i, pk) in anel_ark.iter().enumerate() {
+        let c = arvore.caminho(i).unwrap();
+        let mut irmaos = Vec::new(&env);
+        for s in &c.irmaos {
+            irmaos.push_back(BytesN::from_array(&env, s));
+        }
+        cliente.comparecer(
+            &proposta,
+            &aptos[i],
+            &g1(&env, pk),
+            &irmaos,
+            &c.indice,
+            &0u32,
+        );
+    }
+    env.ledger().set_sequence_number(ABRE + 10);
+
+    let anel_hex: Vetor<std::string::String> = anel_ark.iter().map(ponto::para_hex).collect();
+    let mut anel_sdk: Vec<Bls12381G1Affine> = Vec::new(&env);
+    for p in &anel_ark {
+        anel_sdk.push_back(g1(&env, p));
+    }
+    let perguntas_js = [PerguntaJs {
+        opcoes: 2,
+        confidencial: true,
+    }];
+
+    let mut cedulas = Vetor::new();
+    for (i, escolha) in escolhas.iter().copied().enumerate() {
+        let segredo: std::string::String = pedersen::fr_para_bytes_be(&xs[i])
+            .iter()
+            .map(|b| std::format!("{:02x}", b))
+            .collect();
+        let a = anonima(
+            &ponto_hex(&proposta.to_array()),
+            &ponto::para_hex(&hp),
+            &h_hex,
+            &anel_hex,
+            i,
+            &segredo,
+            &perguntas_js,
+            &[escolha],
+            RODADA_FIM,
+        )
+        .expect("o cliente nao montou a cedula");
+        let c = &a.cedula;
+        assert_eq!(
+            c.cripto.len(),
+            2 * tessera_core::relogio::TAMANHO * 2,
+            "um criptograma de 160 bytes por opcao confidencial, em hexadecimal"
+        );
+
+        let mut compr_sdk: Vec<Bls12381G1Affine> = Vec::new(&env);
+        for x in &c.compromissos {
+            compr_sdk.push_back(g1(&env, &ponto::de_hex(x).unwrap()));
+        }
+        let mut provas_sdk: Vec<ProvaCds> = Vec::new(&env);
+        for p in &c.provas {
+            provas_sdk.push_back(ProvaCds {
+                a0: g1(&env, &ponto::de_hex(&p.a0).unwrap()),
+                a1: g1(&env, &ponto::de_hex(&p.a1).unwrap()),
+                e0: escalar(&env, &pedersen::fr_de_bytes_be(&hex_bytes(&p.e0))),
+                z0: escalar(&env, &pedersen::fr_de_bytes_be(&hex_bytes(&p.z0))),
+                e1: escalar(&env, &pedersen::fr_de_bytes_be(&hex_bytes(&p.e1))),
+                z1: escalar(&env, &pedersen::fr_de_bytes_be(&hex_bytes(&p.z1))),
+            });
+        }
+        let mut soma_sdk: Vec<ProvaSoma> = Vec::new(&env);
+        for p in &c.provas_soma {
+            soma_sdk.push_back(ProvaSoma {
+                a: g1(&env, &ponto::de_hex(&p.a).unwrap()),
+                z: escalar(&env, &pedersen::fr_de_bytes_be(&hex_bytes(&p.z))),
+            });
+        }
+        let mut z_sdk: Vec<Bls12381Fr> = Vec::new(&env);
+        for zi in &a.z {
+            z_sdk.push_back(escalar(&env, &pedersen::fr_de_bytes_be(&hex_bytes(zi))));
+        }
+        let mut cripto_sdk = Bytes::new(&env);
+        for b in hex_bytes(&c.cripto) {
+            cripto_sdk.push_back(b);
+        }
+        cliente.votar_anonimo(
+            &proposta,
+            &0u32,
+            &anel_sdk,
+            &g1(&env, &ponto::de_hex(&a.imagem).unwrap()),
+            &escalar(&env, &pedersen::fr_de_bytes_be(&hex_bytes(&a.c0))),
+            &z_sdk,
+            &compr_sdk,
+            &provas_sdk,
+            &soma_sdk,
+            &Vec::new(&env),
+            &cripto_sdk,
+        );
+        cedulas.push((c.compromissos.clone(), c.cripto.clone()));
+    }
+
+    UrnaDoNavegador {
+        env,
+        cliente,
+        proposta,
+        h_hex,
+        cedulas,
+    }
+}
+
+impl UrnaDoNavegador {
+    fn fim(&self) {
+        self.env.ledger().set_sequence_number(FECHA);
+        self.env.ledger().set_timestamp(instante(RODADA_FIM));
+    }
+
+    /// Os compromissos de todas as cédulas, achatados na ordem da cadeia — o
+    /// que quem apura junta lendo os eventos.
+    fn compromissos(&self) -> Vetor<std::string::String> {
+        self.cedulas
+            .iter()
+            .flat_map(|(cs, _)| cs.iter().cloned())
+            .collect()
+    }
+
+    fn criptos(&self) -> Vetor<std::string::String> {
+        self.cedulas.iter().map(|(_, c)| c.clone()).collect()
+    }
+
+    /// Entrega ao contrato o que a decifragem reconstruiu.
+    fn apurar(&self, a: &tessera_cliente::AberturaJs) -> Result<u32, Erro> {
+        let mut abertas = Vec::new(&self.env);
+        for b in &a.abertas {
+            abertas.push_back(*b);
+        }
+        let mut compr = Vec::new(&self.env);
+        for c in self.compromissos() {
+            compr.push_back(g1(&self.env, &ponto::de_hex(&c).unwrap()));
+        }
+        let mut totais = Vec::new(&self.env);
+        for t in &a.totais {
+            totais.push_back(*t);
+        }
+        let mut aberturas = Vec::new(&self.env);
+        for x in &a.aberturas {
+            aberturas.push_back(escalar(&self.env, &pedersen::fr_de_bytes_be(&hex_bytes(x))));
+        }
+        self.cliente
+            .try_apurar_secao(
+                &self.proposta,
+                &Address::generate(&self.env),
+                &0u32,
+                &compr,
+                &abertas,
+                &totais,
+                &aberturas,
+            )
+            .map_err(|e| e.unwrap())
+            .map(|r| r.unwrap())
+    }
+}
+
+/// **O ciclo fechado: o navegador cifra, a rodada vence, e qualquer pessoa
+/// apura.**
+///
+/// Este é o teste que faltava. Até aqui o contrato conferia a forma do
+/// criptograma e os testes reconstruíam o placar a partir dos `r` que ainda
+/// estavam em memória — o que prova a apuração, mas não prova que o
+/// criptograma depositado **abre**. Aqui o `r` só existe dentro de
+/// `anonima()`, sai cifrado, e volta pela assinatura da baliza.
+#[test]
+fn o_navegador_cifra_a_cedula_e_qualquer_pessoa_apura() {
+    let u = urna_do_navegador(&[0, 1, 1, 1]);
+    u.fim();
+
+    let a = tessera_cliente::abertura(
+        &u.compromissos(),
+        &u.criptos(),
+        2,
+        &u.h_hex,
+        RODADA_FIM,
+        ASSINATURA_FIM,
+    )
+    .expect("a abertura da secao falhou");
+
+    assert_eq!(a.abriram, 4, "todas as quatro cedulas tinham de abrir");
+    assert_eq!(a.cedulas, 4);
+    assert_eq!(
+        a.totais,
+        std::vec![1, 3],
+        "a decifragem leu um voto na primeira opcao e tres na segunda"
+    );
+
+    assert_eq!(u.apurar(&a), Ok(4), "o contrato recusou o placar decifrado");
+    assert_eq!(
+        u.cliente.resultado_secao(&u.proposta, &0u32),
+        Some((4, Vec::from_array(&u.env, [1, 3])))
+    );
+
+    std::println!("\n== T-019: O CICLO DA FECHADURA ==");
+    std::println!("cedulas ............. {}", a.cedulas);
+    std::println!("abriram ............. {}", a.abriram);
+    std::println!("placar .............. {:?}", a.totais);
+}
+
+/// Um byte mexido no criptograma custa **um** voto, não o placar.
+///
+/// É a INV-25 do lado do cliente: a sabotagem que o contrato não pode detectar
+/// — porque ele não decifra — tem de morrer aqui, marcando a cédula como
+/// fechada em vez de abortar a apuração inteira.
+#[test]
+fn a_cedula_sabotada_na_cifra_perde_so_o_proprio_voto() {
+    let u = urna_do_navegador(&[0, 1, 1, 1]);
+    u.fim();
+
+    let mut criptos = u.criptos();
+    // Mexe num byte do `W` da segunda cédula, que votou na opção 1.
+    let alvo = &mut criptos[1];
+    let i = alvo.len() - 2;
+    let trocado = if alvo.as_bytes()[i] == b'a' { "b" } else { "a" };
+    alvo.replace_range(i..i + 1, trocado);
+
+    let a = tessera_cliente::abertura(
+        &u.compromissos(),
+        &criptos,
+        2,
+        &u.h_hex,
+        RODADA_FIM,
+        ASSINATURA_FIM,
+    )
+    .expect("a abertura tinha de seguir sem a cedula sabotada");
+
+    assert_eq!(a.abertas, std::vec![true, false, true, true]);
+    assert_eq!(a.abriram, 3, "so a cedula sabotada ficou de fora");
+    assert_eq!(a.totais, std::vec![1, 2]);
+    assert_eq!(
+        u.apurar(&a),
+        Ok(3),
+        "o contrato tinha de aceitar o placar sobre as tres que abriram"
+    );
+}
+
+/// A assinatura de outra rodada não abre nada — e é recusada **antes** de
+/// decifrar, no pareamento. INV-24.
+#[test]
+fn a_assinatura_de_outra_rodada_nao_abre_a_secao() {
+    let u = urna_do_navegador(&[0, 1]);
+    u.fim();
+
+    assert!(
+        tessera_cliente::abertura(
+            &u.compromissos(),
+            &u.criptos(),
+            2,
+            &u.h_hex,
+            RODADA_FIM,
+            ASSINATURA_ABERTURA,
+        )
+        .is_err(),
+        "a assinatura da rodada de abertura nao pode valer pela rodada do fim"
+    );
+    // E a assinatura certa abre — senão o teste passaria por estar quebrado.
+    assert_eq!(
+        tessera_cliente::abertura(
+            &u.compromissos(),
+            &u.criptos(),
+            2,
+            &u.h_hex,
+            RODADA_FIM,
+            ASSINATURA_FIM,
+        )
+        .map(|a| a.abriram),
+        Ok(2)
+    );
 }

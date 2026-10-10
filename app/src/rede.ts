@@ -12,6 +12,7 @@ import {
 } from "@stellar/stellar-sdk";
 import type { Carteira } from "./carteira";
 import type { Anotar } from "./diario";
+import { carregar } from "./wasm";
 
 export const REDE = {
   rpc: "https://soroban-testnet.stellar.org",
@@ -20,6 +21,20 @@ export const REDE = {
   passphrase: Networks.TESTNET,
   contrato: "CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH",
   explorer: "https://stellar.expert/explorer/testnet",
+};
+
+/**
+ * A baliza: a cadeia `quicknet` da drand e o relé de onde a assinatura vem.
+ *
+ * **O relé é um servidor como qualquer outro, e esta camada não confia nele.**
+ * Tudo o que ele devolve passa por `conferir_baliza` — um pareamento contra a
+ * chave pública congelada da cadeia, em `core/src/relogio.rs` — antes de
+ * encostar num cálculo. Se o relé mentir, a conferência recusa; se o relé
+ * sumir, qualquer outro serve, porque a assinatura é a mesma para todo mundo.
+ */
+export const BALIZA = {
+  cadeia: "52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971",
+  rele: "https://api.drand.sh/v2/chains",
 };
 
 /**
@@ -189,6 +204,10 @@ export type PropostaRede = {
   fecha_em: number;
   anel: boolean;
   secoes: number;
+  /** A rodada da baliza que destranca as cédulas. `0` = sem fechadura. */
+  rodada: bigint;
+  /** A rodada de onde sai a divisão em seções (DEC-012). */
+  rodada_abertura: bigint;
 };
 
 export const lerProposta = (id: string) =>
@@ -372,6 +391,154 @@ export async function assembleias(desde?: number): Promise<Assembleia[]> {
     })
     .reverse();
 }
+
+// ---------- a fechadura de tempo ----------
+
+/**
+ * Busca a assinatura da rodada no relé **e a confere** antes de devolver.
+ *
+ * A conferência é um pareamento contra a chave pública da cadeia, e acontece
+ * aqui, nesta função, não no uso — é o que INV-24 exige. Nenhum chamador recebe
+ * bytes que não passaram por ela, e nenhuma página fala com o relé direto.
+ *
+ * Devolve os 48 bytes comprimidos que a baliza publica. Para
+ * `registrar_abertura` o contrato quer os 96 não comprimidos, e quem converte é
+ * `assinatura_da_baliza` no wasm — o host não sabe descomprimir.
+ */
+export async function buscarBaliza(rodada: number | bigint): Promise<string> {
+  const r = await fetch(`${BALIZA.rele}/${BALIZA.cadeia}/rounds/${rodada}`);
+  if (!r.ok) {
+    throw new Error(
+      `a baliza ainda não publicou a rodada ${rodada} (ou o relé está fora): HTTP ${r.status}`,
+    );
+  }
+  const j = (await r.json()) as { round: number; signature: string };
+  if (BigInt(j.round) !== BigInt(rodada)) {
+    throw new Error(`o relé respondeu a rodada ${j.round} em vez de ${rodada}`);
+  }
+  const w = await carregar();
+  // Lança se o pareamento não fechar. É o único portão, e é por aqui que passa
+  // tudo o que vem de fora.
+  w.conferir_baliza(BigInt(rodada), j.signature);
+  return j.signature;
+}
+
+/** Os 96 bytes não comprimidos que o host lê, a partir dos 48 da baliza. */
+export async function balizaParaHost(assinatura: string): Promise<string> {
+  return (await carregar()).assinatura_da_baliza(assinatura);
+}
+
+/** Uma cédula como o ledger a guarda: os compromissos e o criptograma. */
+export type CedulaNoLedger = {
+  imagem: string;
+  compromissos: string[];
+  /** 160 bytes por opção confidencial, em hexadecimal. */
+  cripto: string;
+  ledger: number;
+};
+
+/**
+ * As cédulas depositadas, na ordem em que chegaram.
+ *
+ * **Sem indexador.** O evento `anonimo` carrega os compromissos e o
+ * criptograma, e o RPC público os guarda por 7 dias — mais que qualquer janela
+ * de votação. A ordem dos eventos é a ordem da cadeia de compromissos, que é o
+ * que `apurar_secao` re-encadeia: ler na ordem errada é recusado com
+ * `CadeiaNaoFecha`, não aceito em silêncio.
+ *
+ * Hoje isto só serve a uma votação de **uma** seção: o tópico do evento tem a
+ * proposta e não a seção, então não há como separar as cédulas por seção sem
+ * um bump de ABI. Ver §11-N.
+ */
+export async function cedulasDaSecao(id: string, desdeLedger: number): Promise<CedulaNoLedger[]> {
+  const todas: CedulaNoLedger[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    const r = await servidor.getEvents(
+      cursor
+        ? { cursor, filters: [{ type: "contract", contractIds: [REDE.contrato] }] }
+        : {
+            startLedger: Math.max(1, desdeLedger),
+            filters: [{ type: "contract", contractIds: [REDE.contrato] }],
+          },
+    );
+    for (const e of r.events) {
+      if (scValToNative(e.topic[0]) !== "anonimo") continue;
+      if (bytesParaHex(scValToNative(e.topic[1]) as Uint8Array) !== id) continue;
+      const v = scValToNative(e.value) as [Uint8Array, Uint8Array[], number[], Uint8Array];
+      todas.push({
+        imagem: bytesParaHex(v[0]),
+        compromissos: v[1].map(bytesParaHex),
+        cripto: bytesParaHex(v[3]),
+        ledger: e.ledger,
+      });
+    }
+    if (!r.cursor || r.events.length === 0) return todas;
+    cursor = r.cursor;
+  }
+}
+
+/** O que a decifragem reconstruiu, pronto para o contrato. */
+export type Abertura = {
+  abertas: boolean[];
+  totais: number[];
+  aberturas: string[];
+  abriram: number;
+  cedulas: number;
+};
+
+/**
+ * Decifra a seção inteira no navegador e devolve o placar a apresentar.
+ *
+ * Nada disso precisa de carteira: a chave da rodada é pública, os
+ * criptogramas estão no ledger, e a conta é a mesma para quem quer que a faça.
+ * É isso que torna a apuração **não travável** — não depende de ninguém em
+ * particular voltar.
+ */
+export async function abrirSecao(
+  cedulas: CedulaNoLedger[],
+  nConf: number,
+  rodada: number | bigint,
+): Promise<Abertura> {
+  const assinatura = await buscarBaliza(rodada);
+  const [w, h] = await Promise.all([carregar(), lerGeradorH()]);
+  return w.abertura_da_secao(
+    cedulas.flatMap((c) => c.compromissos),
+    cedulas.map((c) => c.cripto),
+    nConf,
+    h,
+    BigInt(rodada),
+    assinatura,
+  ) as Abertura;
+}
+
+/**
+ * Entrega o placar da seção. Qualquer pessoa, depois do fim da janela e do
+ * vencimento da rodada — e só substitui o guardado se abrir **mais** cédulas.
+ */
+export const apurarSecao = (
+  c: Carteira,
+  id: string,
+  secao: number,
+  compromissos: string[],
+  a: Abertura,
+  d?: Diario,
+) =>
+  enviar(
+    c,
+    "apurar_secao",
+    [
+      bytesN(id),
+      endereco(c.endereco()),
+      u32(secao),
+      vetor(compromissos.map(ponto)),
+      vetor(a.abertas.map((b) => xdr.ScVal.scvBool(b))),
+      vetor(a.totais.map(u32)),
+      vetor(a.aberturas.map(escalar)),
+    ],
+    d,
+    `proposta ${id.slice(0, 8)}… · seção ${secao} · ${a.abriram} de ${a.cedulas} cédulas abriram`,
+  );
 
 // ---------- escrita ----------
 

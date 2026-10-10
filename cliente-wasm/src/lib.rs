@@ -38,19 +38,32 @@ fn hex(b: &[u8]) -> String {
 }
 
 fn de_hex(s: &str) -> Result<Vec<u8>, JsValue> {
+    bytes_de_hex(s).map_err(|e| JsValue::from_str(&e))
+}
+
+/// O mesmo, com erro em `String`.
+///
+/// Existe porque **`JsValue` não pode ser construído fora do wasm32** — ele
+/// entra em pânico, e um pânico dentro de um teste do contrato aborta o
+/// processo em vez de falhar (medido em T-019, `SIGABRT`). O caminho da
+/// decifragem erra em `String` porque é o único cujos **erros** o teste nativo
+/// exercita — recusar a assinatura errada é o que ele tem a provar.
+fn bytes_de_hex(s: &str) -> Result<Vec<u8>, String> {
     if !s.len().is_multiple_of(2) {
-        return Err(JsValue::from_str("hex de comprimento ímpar"));
+        return Err("hex de comprimento ímpar".into());
     }
     (0..s.len())
         .step_by(2)
-        .map(|i| {
-            u8::from_str_radix(&s[i..i + 2], 16).map_err(|_| JsValue::from_str("hex inválido"))
-        })
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|_| String::from("hex inválido")))
         .collect()
 }
 
 fn ponto_de(s: &str) -> Result<G1Affine, JsValue> {
-    ponto::de_hex(s).map_err(|e| JsValue::from_str(&format!("ponto inválido: {:?}", e)))
+    ponto_em(s).map_err(|e| JsValue::from_str(&e))
+}
+
+fn ponto_em(s: &str) -> Result<G1Affine, String> {
+    ponto::de_hex(s).map_err(|e| std::format!("ponto inválido: {:?}", e))
 }
 
 fn fr_hex(f: &Fr) -> String {
@@ -99,6 +112,14 @@ pub struct Cedula {
     /// Sem mesa o campo vem vazio, e é essa ausência que torna a abertura de um
     /// voto impossível em vez de improvável.
     pub parcelas: Vec<Vec<String>>,
+    /// Os criptogramas da fechadura de tempo, concatenados em hexadecimal: 160
+    /// bytes por opção confidencial, na mesma ordem dos compromissos. Vazio
+    /// quando a proposta não tem fechadura (`rodada = 0`).
+    ///
+    /// É o **único** lugar do sistema em que o `r` sai da função que o criou —
+    /// e sai cifrado para uma chave que ainda não existe. Ninguém, nem quem
+    /// vota, pode abri-lo antes da rodada vencer.
+    pub cripto: String,
 }
 
 #[derive(Serialize)]
@@ -243,6 +264,145 @@ pub fn nova_chave_de_anel() -> Result<JsValue, JsValue> {
     serde_wasm_bindgen::to_value(&js).map_err(Into::into)
 }
 
+// ---------- a fechadura, do outro lado ----------
+
+/// O que quem apura apresenta ao contrato, já reconstruído a partir dos
+/// criptogramas.
+#[derive(Serialize)]
+pub struct AberturaJs {
+    /// Uma por cédula, na ordem da cadeia: se o criptograma dela abriu.
+    pub abertas: Vec<bool>,
+    /// `totais[opção]` — a soma dos votos das cédulas que abriram.
+    pub totais: Vec<u32>,
+    /// `aberturas[opção]` — a soma dos fatores das mesmas cédulas.
+    pub aberturas: Vec<String>,
+    /// Quantas cédulas abriram, de quantas havia. É o que a tela diz em voz
+    /// alta, porque um placar sobre um subconjunto tem de dizer qual.
+    pub abriram: u32,
+    pub cedulas: u32,
+}
+
+/// Confere a assinatura da baliza contra a chave pública congelada da cadeia.
+///
+/// Existe separada de [`abertura_da_secao`] porque **a tela confere antes de
+/// usar** (INV-24): o relé de onde a assinatura vem é um servidor como qualquer
+/// outro, e nada do que ele diz entra no cálculo sem passar por um pareamento.
+/// Devolve o erro em vez de um booleano para que não haja como ignorar.
+#[wasm_bindgen]
+pub fn conferir_baliza(rodada: u64, assinatura_hex: String) -> Result<(), JsValue> {
+    relogio::conferir(rodada, &de_hex(&assinatura_hex)?)
+        .map(|_| ())
+        .map_err(|e| JsValue::from_str(&format!("baliza: {:?}", e)))
+}
+
+/// Abre a seção inteira: decifra cada criptograma, descobre o voto de cada
+/// compromisso, e soma.
+///
+/// `compromissos` vem achatado em `cédulas × opções confidenciais`, na ordem da
+/// cadeia; `criptos[i]` são os 160 bytes por opção daquela cédula, em
+/// hexadecimal. A chave sai de [`relogio::conferir`] — não existe caminho de
+/// tipos que decifre sem ela.
+///
+/// **Uma cédula que não abre perde só o próprio voto.** Criptograma mexido,
+/// cifrado para outra rodada, ou que não corresponde ao compromisso: a cédula
+/// entra como `abertas[i] = false` e a apuração segue. É isso que impede que
+/// sabotar o próprio criptograma trave o placar de todos — e é por isso que
+/// esta função não devolve erro no primeiro tropeço.
+#[wasm_bindgen]
+pub fn abertura_da_secao(
+    compromissos_hex: Vec<String>,
+    criptos_hex: Vec<String>,
+    n_conf: usize,
+    h_hex: String,
+    rodada: u64,
+    assinatura_hex: String,
+) -> Result<JsValue, JsValue> {
+    let js = abertura(
+        &compromissos_hex,
+        &criptos_hex,
+        n_conf,
+        &h_hex,
+        rodada,
+        &assinatura_hex,
+    )
+    .map_err(|e| JsValue::from_str(&e))?;
+    serde_wasm_bindgen::to_value(&js).map_err(Into::into)
+}
+
+/// A mesma coisa em tipos Rust puros — é esta que o teste de aceitação do
+/// contrato chama, pelo mesmo motivo de [`anonima`]: uma segunda implementação
+/// divergiria, e aqui divergir significa um placar que o contrato recusa.
+pub fn abertura(
+    compromissos_hex: &[String],
+    criptos_hex: &[String],
+    n_conf: usize,
+    h_hex: &str,
+    rodada: u64,
+    assinatura_hex: &str,
+) -> Result<AberturaJs, String> {
+    let chave = relogio::conferir(rodada, &bytes_de_hex(assinatura_hex)?)
+        .map_err(|e| std::format!("baliza: {:?}", e))?;
+    let g = pedersen::gerador();
+    let h = ponto_em(h_hex)?;
+    let quantas = criptos_hex.len();
+    if n_conf == 0 || compromissos_hex.len() != quantas * n_conf {
+        return Err(
+            "um compromisso por opção confidencial em cada cédula, na ordem da cadeia".into(),
+        );
+    }
+
+    let mut js = AberturaJs {
+        abertas: Vec::with_capacity(quantas),
+        totais: vec![0u32; n_conf],
+        aberturas: Vec::new(),
+        abriram: 0,
+        cedulas: quantas as u32,
+    };
+    let mut somas = vec![Fr::from(0u64); n_conf];
+
+    for (i, cripto) in criptos_hex.iter().enumerate() {
+        let bruto = bytes_de_hex(cripto)?;
+        // Decifra a cédula inteira **antes** de somar qualquer coisa: uma
+        // cédula que abre pela metade não entra pela metade.
+        let mut abertos: Vec<(usize, Fr)> = Vec::with_capacity(n_conf);
+        for j in 0..n_conf {
+            let fatia = match bruto.get(j * relogio::TAMANHO..(j + 1) * relogio::TAMANHO) {
+                Some(f) => f,
+                None => break,
+            };
+            let r = match relogio::decifrar(fatia, &chave) {
+                Ok(r) => r,
+                Err(_) => break,
+            };
+            // O `r` sozinho não diz o voto: diz qual dos dois compromissos
+            // possíveis é o que está no ledger. A disjuntiva já garantiu, na
+            // hora do voto, que não há terceira opção.
+            let c = ponto_em(&compromissos_hex[i * n_conf + j])?;
+            let v = if pedersen::comprometer(&g, &h, &pedersen::escalar(0), &r) == c {
+                0
+            } else if pedersen::comprometer(&g, &h, &pedersen::escalar(1), &r) == c {
+                1
+            } else {
+                break;
+            };
+            abertos.push((v, r));
+        }
+
+        let abriu = abertos.len() == n_conf;
+        js.abertas.push(abriu);
+        if abriu {
+            js.abriram += 1;
+            for (j, (v, r)) in abertos.iter().enumerate() {
+                js.totais[j] += *v as u32;
+                somas[j] += r;
+            }
+        }
+    }
+
+    js.aberturas = somas.iter().map(fr_hex).collect();
+    Ok(js)
+}
+
 // ---------- a cédula ----------
 
 /// A cédula identificada: o contexto das provas é o XDR do endereço.
@@ -266,6 +426,9 @@ pub fn cedula(
         &escolhas,
         membros_mesa,
         limiar,
+        // A cédula identificada é o caminho da mesa, e ali quem abre são as
+        // parcelas de Shamir. Fechadura de tempo e mesa não se somam.
+        0,
     )?;
     serde_wasm_bindgen::to_value(&c).map_err(Into::into)
 }
@@ -288,6 +451,7 @@ pub fn cedula_anonima(
     secreta_hex: String,
     perguntas_js: JsValue,
     escolhas: Vec<u32>,
+    rodada: u64,
 ) -> Result<JsValue, JsValue> {
     let perguntas: Vec<PerguntaJs> = serde_wasm_bindgen::from_value(perguntas_js)?;
     let js = anonima(
@@ -299,6 +463,7 @@ pub fn cedula_anonima(
         &secreta_hex,
         &perguntas,
         &escolhas,
+        rodada,
     )?;
     serde_wasm_bindgen::to_value(&js).map_err(Into::into)
 }
@@ -321,6 +486,7 @@ pub fn anonima(
     secreta_hex: &str,
     perguntas: &[PerguntaJs],
     escolhas: &[u32],
+    rodada: u64,
 ) -> Result<CedulaAnonima, JsValue> {
     let proposta = de_hex(proposta_hex)?;
     let g = pedersen::gerador();
@@ -335,7 +501,7 @@ pub fn anonima(
     let ident = ponto::serializar(&imagem).to_vec();
 
     // Sem mesa: a cédula anônima do dapp aberto não reparte `r` com ninguém.
-    let c = montar(&proposta, &ident, h_hex, perguntas, escolhas, 0, 0)?;
+    let c = montar(&proposta, &ident, h_hex, perguntas, escolhas, 0, 0, rodada)?;
 
     // `c.escolhas` — as respostas públicas expandidas —, NÃO o `escolhas` de
     // entrada, que é uma por pergunta. É o que o contrato lê em
@@ -389,6 +555,7 @@ pub fn contexto(proposta: &[u8], ident: &[u8], pergunta: u32, opcao: u32) -> Vec
 /// função, e não uma reescrita dela. O que o navegador roda e o que o teste
 /// exercita são o mesmo código — a única coisa que fica de fora é a travessia
 /// `JsValue`, que é trabalho do `wasm-bindgen`, não meu.
+#[allow(clippy::too_many_arguments)]
 pub fn montar(
     proposta: &[u8],
     ident: &[u8],
@@ -397,6 +564,8 @@ pub fn montar(
     escolhas: &[u32],
     membros_mesa: usize,
     limiar: u32,
+    // A rodada da baliza para a qual cifrar o `r`. `0` não cifra nada.
+    rodada: u64,
 ) -> Result<Cedula, JsValue> {
     if perguntas.len() != escolhas.len() {
         return Err(JsValue::from_str(
@@ -412,6 +581,7 @@ pub fn montar(
         provas_soma: Vec::new(),
         escolhas: Vec::new(),
         parcelas: vec![Vec::new(); membros_mesa],
+        cripto: String::new(),
     };
 
     for (q, pg) in perguntas.iter().enumerate() {
@@ -439,6 +609,17 @@ pub fn montar(
                 pedersen::comprometer(&g, &h, &pedersen::escalar(v), &rs[j as usize])
             })
             .collect();
+
+        // A fechadura. Cifrar aqui, dentro do laço que tem o `r`, é o que
+        // permite apurar sem mesa: o fator viaja no evento, ilegível, e a
+        // chave que o abre nasce sozinha no instante da rodada.
+        if rodada != 0 {
+            for r in &rs {
+                let cg = relogio::cifrar(r, rodada)
+                    .map_err(|e| JsValue::from_str(&format!("fechadura: {:?}", e)))?;
+                c.cripto.push_str(&hex(&cg));
+            }
+        }
 
         for j in 0..pg.opcoes {
             let v = u64::from(j == escolha);
