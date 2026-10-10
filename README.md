@@ -198,7 +198,7 @@ placar inteiro. Ou totais por seção, ou um placar travável.
 
 A consequência tem de ser dita: **numa seção unânime, qualquer pessoa sabe em
 que cada um dos seus membros votou**, porque a seção de cada pessoa é pública.
-Com uma seção só — que é o que o dimensionamento recomenda abaixo de 40 pessoas
+Com uma seção só — que é o que o dimensionamento recomenda até 32 pessoas
 — a brecha é a do resultado unânime global, que todo sistema de votação tem.
 
 O que se paga, em qualquer caso, é o conjunto de anonimato, que passa a ser a
@@ -554,7 +554,7 @@ sigilo além do que entrega é pior que um honesto.
 - **Totais por seção, numa votação com fechadura.** Eles são públicos por
   construção, e a seção de cada pessoa também é. Numa seção unânime, isso revela
   o voto de todos os seus membros. Com uma seção — o que o dimensionamento
-  recomenda abaixo de 40 pessoas — a brecha é a do resultado unânime global.
+  recomenda até 32 pessoas — a brecha é a do resultado unânime global.
 - **Mesa que não destrói suas cópias.** O limiar `k`-de-`n` está implementado
   em `core/src/shamir.rs` e protege abaixo de `k` conluios: a mesa soma as
   shares localmente e nenhum `r` individual se junta em lugar algum. Acima de

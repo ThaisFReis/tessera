@@ -302,7 +302,8 @@ export default function Abrir() {
             Com mesa, o resultado é único — o acumulador não sabe de que seção veio cada cédula.
             Com fechadura de tempo os totais são <strong>por seção</strong>, e a consequência tem
             de ser dita: numa seção unânime, qualquer pessoa sabe em que cada um dos seus membros
-            votou. Abaixo de 40 pessoas, uma seção só é a configuração recomendada.
+            votou. Até 32 pessoas, uma seção só é a configuração recomendada — acima disso o
+            anel estoura o teto de CPU, e aí as seções deixam de ser escolha.
           </p>
         </section>
       )}

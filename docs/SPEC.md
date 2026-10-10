@@ -399,6 +399,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-001 | README volta a dizer a verdade | — | — | review | PR #1 |
 | T-002 | `cargo fmt` passa | T-000 | §8 | review | `cargo fmt --check` passa nos 5 crates; nenhum teste muda de resultado |
 | T-003 | `cargo clippy` sem avisos | T-002 | §8 | review | 0 avisos nos **5** crates; `-D warnings` no portão |
+| T-026 | O texto claro sai da apuração por seção | T-021 | §4, §5 | todo | DEC-017. `apurar_secao` passa a guardar `(quantas_abertas, Σ compromissos abertos)` — um ponto, **sem total em claro** — e segue conferindo a cadeia e a regra monotônica; sai o MSM e saem os argumentos `totais`/`aberturas`. Um `publicar_resultado(secoes, totais, aberturas)` novo soma os pontos das seções nomeadas e faz **um** MSM, monotônico em (quantas seções, quantas cédulas). Mais um piso sobre a contagem **agregada**, que — ao contrário do piso por seção que a DEC-011 rejeitou — não é travável, porque quem sabota só retém a própria cédula e o agregado se alimenta do eleitorado inteiro. Fica mais barato por seção (somas de pontos em vez de MSM) e custa uma transação a mais no fim. **Mesmo redeploy do §11-N e do T-012** |
 | T-025 | O verificador alcança o anel e a fechadura | T-021 | §2, §3 | todo | hoje `tessera verificar` só roda sobre `estado/<proposta>.json`, que **só a própria CLI grava**, e a CLI não sabe abrir com fechadura — então ele não verifica nenhuma rodada do dapp. Passar a ler os compromissos dos **eventos** em vez do arquivo local; conferir o anel e a imagem de chave; conferir a cadeia de compromissos e a decifragem contra a rodada da baliza. Enquanto não existir, §2 não permite dizer que o verificador cobre o caminho anônimo |
 | T-004 | Vídeo da demonstração | T-001 | §2 | blocked | roteiro escrito em `docs/VIDEO.md` — 7 minutos, dapp à esquerda e `/bastidores` à direita, com os tempos medidos da testnet, as frases a dizer e a lista do que §2 proíbe afirmar. **A gravação é sua**: eu não gravo vídeo |
 | T-005 | Publicar o dapp | T-001 | §7 | blocked | §11-P — o `dist` foi verificado servido como estático e **quebrava em todo link profundo**; corrigido com roteador de fragmento (DEC-016) e guardado por teste. O que falta é humano: onde o Pages serve, CI com `wasm-pack`, e o `git push` |
@@ -790,6 +791,34 @@ baliza; §6 ganhou o teto de 32. `fim_tempo` saiu da proposta por ser redundante
 — o prazo **é** `instante(rodada)` —, e a ABI trocou `fim_tempo, rodada` por
 `rodada, rodada_abertura`, com redeploy. Fica aberta a §11-L.
 
+### DEC-017: Os totais por seção ficam, declarados, e o conserto é estrutural (2026-10-10, §11-O)
+
+**Contexto.** `apurar_secao` publica totais por seção, e a seção de cada pessoa
+é pública — então uma seção unânime revela o voto de todos os seus membros. O
+README afirmava que o desenho evita essa brecha; era verdade só no caminho da
+mesa. Ver §11-O.
+
+**Decisão, em duas partes.**
+
+*Agora, sem mexer no contrato:* declarar a brecha onde ela é relevante — README,
+tela de abrir e deck — e manter **uma seção** como configuração recomendada, que
+é o que `secoes_para` já faz **até 32 pessoas**. Acima disso o anel estoura o
+teto de CPU e as seções deixam de ser escolha.
+
+*Depois, no mesmo redeploy do §11-N e do T-012:* tirar o texto claro da chamada
+por seção. Ver T-026.
+
+**Alternativa rejeitada, e o motivo é mais forte do que o §11-O supunha.**
+Agregar na leitura — `resultado` somando as seções e devolvendo `None` enquanto
+faltar alguma — **não esconde nada**. Os totais de cada seção estão nos
+*argumentos* de `apurar_secao`, e argumento de transação é público para sempre.
+O vazamento acontece quando a apuração é enviada, não quando alguém lê o getter.
+Esconder a leitura seria encenação, e §2 proíbe chamar isso de proteção.
+
+**Consequências.** §2 ganha o limite escrito; §9 ganha T-026; a redação de
+"uma seção até 32" substitui "abaixo de 40 pessoas", que era minha e estava
+errada — `secoes_para(33)` já devolve 2.
+
 ### DEC-016: O dapp usa roteador de fragmento (2026-10-10, T-005)
 
 **Contexto.** Verificando o `dist` servido como arquivo estático — e não o
@@ -1179,7 +1208,13 @@ uma seção só.
 
 ---
 
-### §11-O — a apuração por seção publica totais por seção, e o README diz que o desenho evita isso (bloqueia a parte de §2 de T-022)
+### §11-O — a apuração por seção publica totais por seção — **respondida** (2026-10-10, DEC-017)
+
+> **Resposta:** aceitar e declarar agora, com uma seção como recomendação até 32
+> pessoas; o conserto estrutural é a T-026, no mesmo redeploy do §11-N. A opção
+> de agregar na leitura foi **descartada**: os totais por seção estão nos
+> argumentos da transação, então esconder o getter não esconde nada. O registro
+> original segue.
 
 Achado em T-022, lendo o README contra o código de T-018.
 
@@ -1218,7 +1253,7 @@ exatamente a falha de liveness que a INV-21 existe para fechar. A troca é real:
    direto ou os eventos — então é conforto, não garantia, e §2 proibiria chamar
    de proteção.
 3. **Uma seção só quando o eleitorado é pequeno.** Já é o que `secoes_para`
-   recomenda abaixo de 40 pessoas (§11-L), e com uma seção a brecha é a do
+   recomenda até 32 pessoas (§11-L), e com uma seção a brecha é a do
    resultado unânime global, que todo sistema de votação tem. Não resolve
    eleitorados grandes.
 4. **Piso de `τ` sobre o subconjunto aberto.** Rejeitado pela DEC-011: dá a
