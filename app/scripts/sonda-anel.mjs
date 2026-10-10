@@ -181,8 +181,8 @@ async function main() {
     xdr.ScVal.scvBool(true),
     u32(1),      // secoes
     u32(0),      // limite_secao
-    u64(0),      // fim_tempo
-    u64(0),      // rodada
+    u64(0),      // rodada da fechadura: 0 = sem fechadura
+    u64(0),      // rodada de abertura: 0, porque é uma seção só
   ]);
   diz(`proposta ${id.slice(0, 12)}…`);
   diz(`comparecimento até o ledger ${abreEm} · votação até ${fechaEm}`);
@@ -228,6 +228,7 @@ async function main() {
     const c = wasm.cedula_anonima(
       id, hp, h, anel, i, chaves[i].secreta,
       [{ opcoes: OPCOES.length, confidencial: true }], [escolha],
+      0n, // sem fechadura
     );
     const par = await nascer();
     efemeras.push(par.publicKey());

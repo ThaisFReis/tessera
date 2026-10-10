@@ -390,6 +390,7 @@ async function main() {
     const c = wasm.cedula_anonima(
       id, hp, h, meu, i, chaves[idx].secreta,
       [{ opcoes: OPCOES, confidencial: true }], [k % OPCOES],
+      0n, // sem fechadura: esta rodada mede vazão, não o relógio
     );
     const argsVoto = [
       bN(id), u32(divisao[idx]), vec(meu.map(bN)), bN(c.imagem), fr(c.c0), vec(c.z.map(fr)),
