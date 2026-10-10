@@ -47,8 +47,8 @@
 //! O anel publica o conjunto. Anonimato de anel é anonimato *dentro de um grupo
 //! conhecido*: o verificador precisa de todas as chaves para conferir todos os
 //! ramos. Então a lista de membros deixa de ser 32 bytes de raiz e passa a ser
-//! pública — como o eleitorado no Brasil, que é público, e como o caderno, que
-//! também é. O que fica secreto é só o vínculo.
+//! pública — como o eleitorado e a lista de presença num voto secreto, que são
+//! públicos. O que fica secreto é só o vínculo.
 
 use crate::pedersen;
 use crate::ponto;

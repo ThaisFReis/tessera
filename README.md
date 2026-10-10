@@ -22,10 +22,28 @@ significa "legível quando a chave vazar". Então o ledger **nunca recebe um tex
 cifrado do voto**. Ele recebe um compromisso de Pedersen, `C = v·G + r·H`. O
 voto em si transita fora da cadeia e é destruído.
 
-A segunda ideia veio da urna brasileira, que resolve há décadas e sem
-criptografia nenhuma o problema de o remetente da cédula ser a identidade de
-quem vota: **o caderno diz quem compareceu, a urna diz o que foi votado, e nada
-liga os dois.** Tessera faz isso em dois atos — `comparecer()` identificado, e
+Com **fechadura de tempo** há uma exceção, e ela é deliberada: o evento passa a
+carregar o fator `r` cifrado para uma rodada futura de uma baliza pública. A
+objeção acima continua de pé e não se aplica, porque ali **não existe segredo
+durável**: a chave é publicada de propósito num instante conhecido. O slide que
+atacamos diz "cifrado para sempre, na esperança de que a chave nunca escape";
+isto é **cifrado até as 20:59**. São coisas diferentes, e a segunda é a resposta
+à primeira.
+
+**O princípio que organiza tudo é um só: não é possível ligar uma cédula a quem
+a depositou.** Não é uma propriedade entre outras — é de onde o desenho inteiro
+decorre. O anel existe para que a cédula não carregue remetente; a imagem de
+chave, para impedir a segunda cédula sem revelar de quem é a primeira; a chave
+de uso único, para que nem o pagamento da taxa ligue as duas pontas.
+
+E é por isso que abrir uma cédula diz o que *aquela cédula* votou e nada mais.
+Quem abre não ganha o vínculo, porque o vínculo não está guardado em lugar
+nenhum para ser ganho.
+
+A segunda ideia é o princípio do voto secreto, que resolve sem criptografia
+nenhuma o problema de o remetente da cédula ser a identidade de quem vota:
+**o caderno diz quem compareceu, a urna diz o que foi votado, e nada liga os
+dois.** Tessera faz isso em dois atos — `comparecer()` identificado, e
 `votar_anonimo()` de uma chave efêmera, com uma imagem de chave que impede a
 segunda cédula da mesma pessoa sem revelar quem ela é.
 
@@ -42,7 +60,8 @@ segunda cédula da mesma pessoa sem revelar quem ela é.
 | Cliente CLI | ✅ rodada completa na testnet |
 | Verificador público | ✅ no `tessera verificar` |
 | dapp (React, cripto no navegador) | ✅ roda local, **não publicado** |
-| Apuração pelo dapp | ⬜ só pela CLI — as parcelas vivem no navegador de cada membro |
+| Fechadura de tempo (apuração **sem mesa**) | ✅ rodada ponta a ponta na testnet |
+| Apuração pelo dapp | ✅ com fechadura, sozinha, numa seção · ⬜ com mesa, só pela CLI |
 | Console de demonstração | ✅ visor sobre a saída da CLI |
 
 Todo número abaixo veio de uma invocação real na testnet ou de um teste que roda
@@ -66,8 +85,9 @@ Teto de CPU por transação, achado por bissecção na testnet: **400.000.000**.
 | **prova disjuntiva CDS** | **10.980.243** | **14.144 stroops** |
 | **apuração Pedersen** | **5.408.931** | **8.622 stroops** |
 | **caminho de Merkle (profundidade 8)** | **127.863** | **5.235 stroops** |
-| **`votar()` completo, m=2** | **36.781.170** | |
-| **`apurar()`, m=2** | **11.150.582** | |
+| **`votar()` completo, m=2** | **36.812.994** | |
+| **`apurar()`, m=2** | **11.197.414** | |
+| **`apurar_secao()`** (sem mesa) | **11.035.050 + 252.722 por cédula** | |
 | apuração ElGamal (desenho anterior) | 6.712.183 | 11.852 stroops |
 | verificação Groth16 (4 entradas públicas) | 47.371.348 | |
 
@@ -79,14 +99,18 @@ Três conclusões que mudaram o desenho:
    força bruta custa ~124k por unidade de peso, o que dá um teto de ~3.218 de
    peso por transação. Conferir uma abertura afirmada custa **5.408.931,
    constante no comparecimento** — medido idêntico para 250 e para 1.000.000.
+   E `apurar()` inteiro custa 11.197.414 com cinco votantes e 11.371.398 com
+   quarenta: 1,5% para oito vezes mais gente, que é o que "não cresce com o
+   comparecimento" quer dizer na prática.
 3. **O desenho com sigilo permanente é também o mais barato.** Pedersen é 19%
    mais barato em CPU e 27% em taxa que o ElGamal que ele substituiu. Não houve
    trade-off a pagar.
 
 E o orçamento fechou no contrato de verdade, não na soma das sondas: **um voto
-confidencial custa 36.781.170 instruções, 9,2% de uma transação, com folga de
-10,9×.** A soma das primitivas dava 33.480.865; os 9,8% a mais são autorização,
-estado e evento.
+confidencial custa 36.812.994 instruções, 9,2% de uma transação, com folga de
+10,9×.** A soma das primitivas dava 33.480.865; os quase 10% a mais são
+autorização, estado e evento. (Eram 36.781.170 antes da fechadura; a diferença
+de 0,09% é a checagem de forma do criptograma, e nada além.)
 
 Uma cédula **pública** custa 350.372 — **105× menos**. É o preço do sigilo,
 medido.
@@ -151,31 +175,154 @@ por cédula para de depender do tamanho da votação. Trinta pessoas em três se
 de dez, na testnet:
 
 ```
-caderno   30/30 aceitas · 30 transações · 25 no mesmo ledger
-urna      30/30 aceitas · 3 por ledger · zero recusas
-cédula    148.889.608 instruções · 37,2% do teto
+caderno   30/30 aceitas · 30 transações · todas no mesmo ledger
+urna      30/30 aceitas · 3 por ledger · 10 ledgers · 240 s
+cédula    148.911.943 instruções · 37,2% do teto
 ```
 
-**O resultado continua único.** O acumulador é por proposta e não sabe de que
-seção veio cada cédula — o Brasil publica boletim por seção e é daí que vem o
-vazamento da seção unânime; aqui não precisa.
+**Com retentativas no cliente, e isso é parte do resultado.** A mesma rodada sem
+elas aceitou 16 de 30: dez cédulas preteridas até expirar e quatro recusadas por
+taxa. Não é limite do contrato — é o leilão de inclusão da rede, e quem escreve
+um cliente de votação precisa saber que reenviar é obrigatório, não otimização.
+Com `RETENTATIVAS=12` nenhuma pessoa precisou de mais de uma tentativa no
+caderno.
 
-O que se paga é o conjunto de anonimato, que passa a ser a seção.
+**Com mesa, o resultado é único.** O acumulador é por proposta e não sabe de
+que seção veio cada cédula.
+
+**Com fechadura de tempo, os totais são por seção** — e isso é uma troca, não um
+detalhe. A cadeia de compromissos, o anel e a regra que impede travar o placar
+são todos por seção; um total agregado só poderia ser publicado depois que
+todas as seções fossem apuradas, e aí uma seção que ninguém apurasse travaria o
+placar inteiro. Ou totais por seção, ou um placar travável.
+
+A consequência tem de ser dita: **numa seção unânime, qualquer pessoa sabe em
+que cada um dos seus membros votou**, porque a seção de cada pessoa é pública.
+Com uma seção só — que é o que o dimensionamento recomenda até 32 pessoas
+— a brecha é a do resultado unânime global, que todo sistema de votação tem.
+
+O que se paga, em qualquer caso, é o conjunto de anonimato, que passa a ser a
+seção: seções compram vazão pagando com o tamanho do grupo em que você se
+esconde.
 
 ### Quem divide as seções
 
-Ninguém escolhe. Se o organizador escolhesse, poria um dissidente numa seção
-sozinho — anel de um, voto ligado à pessoa, sem precisar de conluio. A ordem vem
-de `H(0x03 ‖ proposta ‖ endereço)` e as seções saem em rodízio sobre ela, o que
-as deixa do mesmo tamanho a menos de um e deixa qualquer pessoa com a lista
-recalcular e conferir.
+Ninguém escolhe, e **nem quem abre a votação pode escolher**. Se o organizador
+escolhesse, poria um dissidente numa seção sozinho — anel de um, voto ligado à
+pessoa, sem precisar de conluio.
 
-E a seção entra **na folha de Merkle** — `H(0x00 ‖ endereço ‖ peso ‖ seção)` —
-senão seria argumento da chamada e quem vota escolheria a sua.
+A seção é `H(0x03 ‖ assinatura da baliza ‖ endereço) mod seções`, e a assinatura
+é de uma rodada que **ainda não venceu quando a votação é aberta**. Não há o que
+moer: na hora de abrir, o número que decide as seções não existe no mundo.
+Quando ele existe, qualquer pessoa o registra no contrato — que o confere num
+pareamento antes de aceitar — e daí qualquer pessoa com a lista recalcula a
+divisão inteira.
 
-O limite que sobra está declarado: quem abre ainda pode moer o identificador da
-proposta atrás de um sorteio que lhe agrade. Com blocos de tamanho igual isso
-não produz uma seção de um, que é o ataque que importa.
+A primeira versão derivava de `H(0x03 ‖ proposta ‖ endereço)` e punha a seção
+**dentro da folha de Merkle**. Era conferível, e ainda assim quebrada: quem
+abria a votação podia moer o identificador da proposta até cair num sorteio que
+isolasse alguém. Trocar a proposta pela assinatura fechou isso, e a folha voltou
+a ser `H(0x00 ‖ endereço ‖ peso)`.
+
+O preço é o desequilíbrio — um hash e uma divisão não fazem rodízio, então as
+seções saem de tamanhos diferentes. Quem paga é o **dimensionamento**: alvo de
+20 por seção, teto de 32 pela CPU do anel. Medido por simulação, a chance de uma
+seção cair abaixo de `τ` é de 0,002% na pior faixa pequena e 0,071% em mil
+aptos — e quando cai, o contrato **recusa apurar em vez de vazar**.
+
+---
+
+## A fechadura de tempo
+
+Uma votação em anel não reparte com ninguém o fator que esconde o voto. Isso
+deixava a assembleia **sem mesa** num lugar desconfortável: sigilo absoluto e
+resultado impossível. Para ter placar era preciso escolher gente de confiança —
+e gente de confiança é exatamente o que um voto secreto não deveria exigir.
+
+A fechadura troca o retentor humano por um **relógio**. A cédula sai da aba com
+o fator `r` cifrado para uma rodada futura da [drand](https://drand.love) —
+cadeia `quicknet`, uma baliza pública que assina uma rodada a cada 3 segundos.
+A chave que abre a cédula **é** essa assinatura. Antes do instante da rodada ela
+não foi publicada; depois dele, está publicada para todo mundo.
+
+O esquema é o do `tlock`: cifra baseada em identidade de Boneh–Franklin com a
+rodada no lugar da identidade, derandomizada à Fujisaki–Okamoto — o que faz a
+decifragem **conferir o próprio criptograma** em vez de devolver lixo em
+silêncio quando um byte muda.
+
+**O contrato não decifra, e não precisa.** O host do Soroban só expõe
+`pairing_check`, sem pareamento com saída de valor, e decifrar precisa do valor.
+Ele confere a forma do criptograma e o carrega no evento. Quem decifra é
+qualquer pessoa, depois da rodada, no navegador — e quem recusa um total que
+minta continua sendo o compromisso de Pedersen, como sempre foi.
+
+### Os dois portões
+
+Apurar exige os dois, e os dois são relógio, não suposição:
+
+| portão | o que mede | erro |
+|---|---|---|
+| a janela fechou | sequência de ledger | `#7 VotacaoAindaAberta` |
+| a rodada venceu | instante unix | `#35 RelogioAindaNaoAbriu` |
+
+Nenhum dos dois basta, e a ordem importa: enquanto a urna aceita cédula, que a
+rodada já tenha vencido é irrelevante. **Antes dos dois, nenhum placar sai —
+nem parcial.**
+
+### Ninguém consegue travar o placar
+
+Quem apura apresenta a lista ordenada de todas as cédulas da seção e diz quais o
+criptograma abriu. O contrato re-encadeia a lista contra uma cadeia de hash de
+32 bytes que as cédulas escreveram ao entrar, soma os compromissos marcados, e
+confere o mesmo MSM de dois termos de sempre.
+
+E guarda **só se abrir mais cédulas** que a apuração já guardada. É isso que
+impede travar: quem omitir uma cédula honesta é sobreposto por qualquer pessoa
+que a inclua — e qualquer pessoa consegue, porque a chave da rodada é pública.
+Basta um observador honesto; não é preciso que os votantes voltem.
+
+Uma cédula sabotada — um byte trocado no criptograma, que o contrato não pode
+detectar — **custa só o próprio voto**. Não há piso de `τ` sobre quantas
+abriram, e a ausência é deliberada: exigi-lo daria a qualquer um o poder de
+travar a apuração estragando o próprio criptograma.
+
+### Medido na testnet
+
+Rodada ponta a ponta em 2026-10-10, proposta `d06750b2…`, **sem mesa em nenhum
+momento**, 5 cédulas e uma sabotada de propósito:
+
+```
+cédula       320 B de criptograma · 100.684.411 instruções (anel de 5)
+urna aberta  apurar recusado · #7  VotacaoAindaAberta
+urna fechada apurar recusado · #35 RelogioAindaNaoAbriu
+rodada venceu, 4 de 5 abriram · placar 2 · 2
+parcial de 2 entrou primeiro e foi sobreposta por quem incluiu as 4
+voltar atrás recusado · #37 NaoMelhora
+apurar_secao 13.709.833 instruções
+```
+
+Conferir a assinatura da baliza dentro do contrato custa **24.053.490
+instruções**, 6% do teto. `apurar_secao` custou 11,5% mais on-chain que a
+fórmula medida no `Env` local — a diferença é autorização, evento e estado, que
+o teste local não cobra.
+
+### O que isto custa em confiança, dito inteiro
+
+**A baliza é uma suposição, e é a única do projeto que depende de gente.** Um
+conluio de um limiar dos operadores da drand produziria a assinatura antes da
+hora e abriria o **conteúdo** das cédulas em curso. São pessoas que ninguém
+desta votação escolheu e que não têm interesse nela — mas são pessoas. Por isso
+o projeto **não** diz que abrir cedo é impossível, e **não** chama a baliza de
+"sem confiança".
+
+O que não depende dela é o placar: nenhum resultado sai antes de a janela
+fechar, e isso é o relógio do ledger.
+
+**E não há plano B.** Se a baliza parar de publicar, a chave não nasce e o
+placar não existe — as cédulas ficam no ledger, ilegíveis, até que a rodada seja
+publicada algum dia. O vínculo continua não existindo em lugar nenhum, então
+nada vaza; mas o resultado não sai. Prometer resultado com a baliza parada seria
+mentira, então não prometemos.
 
 ---
 
@@ -309,7 +456,7 @@ Contratos na testnet:
 
 | | |
 |---|---|
-| **Tessera (cédula mista)** | `CBYKJOBOIKSLXFLYQHYNFEJER643TY6KFVHLVTNUQNNDO5JRJPYDI2B6` |
+| **Tessera (cédula mista)** | `CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH` |
 | Tessera v1, cédula de uma pergunta | `CBLUSE2LCPPELS7GIQ5MRYKSW7KTILMWY7VBRFRSWAVG3L7TSRQYHP7H` |
 | sondas 1–13 (cripto, CDS e Merkle) | `CCL4CPAJ4ZVP25FP2PO7T3AMYGIVQZLYJZYZS53UAM5IFA5NFYGLUISR` |
 | sonda 9 (TTL) | `CCCZ4HPW3ESHO6BMNFGXX6DJRSWPWA7FBQH2MS6QGHC3U67DIZ434KFC` |
@@ -330,8 +477,10 @@ decimal errado.
 | [`docs/PLANO.md`](docs/PLANO.md) | cronograma até a submissão, com portões e cortes pré-decididos |
 | [`docs/UX.md`](docs/UX.md) | a especificação de UX, e por que o valor deste produto é uma ausência |
 | [`docs/UX-CLI.md`](docs/UX-CLI.md) | a saída exata da CLI, medida em colunas |
+| [`docs/VIDEO.md`](docs/VIDEO.md) | o roteiro do vídeo do dapp, com os tempos medidos e o que §2 proíbe dizer |
 | [`docs/design-votacao.md`](docs/design-votacao.md) | o desenho do dapp, os bastidores e o guarda do diário |
 | [`docs/SPEC.md`](docs/SPEC.md) | a especificação de trabalho: invariantes, portões, quadro de tarefas, decisões |
+| [`docs/RELOGIO.md`](docs/RELOGIO.md) | a fechadura de tempo: a baliza, as três medições que a destravaram, e o que ela custa em confiança |
 | [`docs/SOURCES.md`](docs/SOURCES.md) | todo fato externo conferido, com data |
 | [`CLAUDE.md`](CLAUDE.md) | como se trabalha neste repositório |
 
@@ -365,20 +514,47 @@ sigilo além do que entrega é pior que um honesto.
   não existe voto obrigatório. O que o ledger não mostra é qual cédula é dela.
 - **A lista de aptos fica pública no modo anel.** Um anel só é verificável por
   quem tem as chaves de todos os ramos: anonimato de anel é anonimato *dentro de
-  um conjunto conhecido*. É coerente com a urna — no Brasil o eleitorado e o
-  caderno são ambos públicos — mas é uma troca, e ela não existia no desenho
-  identificado.
+  um conjunto conhecido*. É coerente com o voto secreto, onde o eleitorado e a
+  lista de presença são públicos e só o vínculo é secreto — mas é uma troca, e
+  ela não existia no desenho identificado.
 - **Um anel de um não esconde ninguém.** O sigilo é propriedade do grupo, não da
   matemática sozinha. Com seções o contrato recusa anel abaixo de `TAU`; sem
   seções ele avisa e deixa passar, porque ali ninguém escolheu o grupo.
-- **Uma votação em anel não apura.** Ela não reparte com a mesa o fator que
-  esconde o voto, então ninguém reconstrói a abertura — e ninguém publica total.
-  Não é promessa, é o contrato: qualquer total afirmado cai em
-  `AberturaNaoFecha`. O sigilo é absoluto e o resultado é impossível.
-- **Resistência à coação.** Quem vota conhece o próprio fator de aleatoriedade e
-  *consegue* provar o voto a um terceiro. O protocolo remove o registro público
-  permanente; não remove a capacidade de alguém se auto-incriminar. É a lacuna
-  mais séria da v1.
+- **Uma votação em anel sem mesa e sem fechadura não apura.** Ela não reparte
+  com ninguém o fator que esconde o voto, então ninguém reconstrói a abertura —
+  e ninguém publica total. Não é promessa, é o contrato: qualquer total afirmado
+  cai em `AberturaNaoFecha`. O sigilo é absoluto e o resultado é impossível.
+  **Com fechadura de tempo isso deixa de valer**, e de propósito: o retentor
+  passa a ser o relógio, e qualquer pessoa apura depois da rodada.
+- **Resistência à coação, enquanto você vota.** Quem estiver olhando a sua tela
+  vê a sua escolha, e nenhum protocolo conserta isso. O que o Tessera garante é
+  o **depois**: o fator `r` que esconde o voto nasce na sua aba e morre com ela,
+  nenhum cliente o grava, e nenhum comando lê um arquivo desses.
+
+  A v1 gravava um recibo com os `r_j` e pedia que a pessoa o apagasse. Era pior
+  que inútil: quem coage simplesmente manda não apagar, e nenhum comando lia o
+  arquivo — ele não servia para conferir voto nem para apurar. Hoje `votar` não
+  grava, e `queimar` existe só para limpar sobras de rodadas antigas,
+  sobrescrevendo antes de remover. Dois testes travam isso, e um deles lê o
+  próprio fonte de `comandos.rs`, porque ausência não se prova de outro jeito.
+
+  **O que continua em aberto:** um cliente adulterado pode guardar o `r` sem
+  você saber. Rodar o seu é a defesa, e é por isso que o dapp é estático e o
+  `core` é o mesmo crate em todos os caminhos.
+- **O conteúdo de uma cédula aberta.** O que o protocolo protege é o *vínculo*,
+  não o conteúdo: quem reúne a abertura descobre o que aquela cédula votou, e
+  nunca de quem ela é. Sem mesa e sem fechadura, ninguém reúne nada. **Com
+  fechadura, depois da rodada, qualquer pessoa reúne** — e o que continua
+  protegido é o vínculo, que não está guardado em lugar nenhum para ser ganho.
+- **A baliza, e a falta de plano B.** A fechadura depende de a drand publicar a
+  assinatura da rodada. Um conluio de um limiar dos seus operadores abre o
+  conteúdo das cédulas antes da hora; se ela parar, o placar não existe e não há
+  alternativa prevista. É a única suposição do projeto que depende de gente, e
+  por isso está escrita aqui e não implícita.
+- **Totais por seção, numa votação com fechadura.** Eles são públicos por
+  construção, e a seção de cada pessoa também é. Numa seção unânime, isso revela
+  o voto de todos os seus membros. Com uma seção — o que o dimensionamento
+  recomenda até 32 pessoas — a brecha é a do resultado unânime global.
 - **Mesa que não destrói suas cópias.** O limiar `k`-de-`n` está implementado
   em `core/src/shamir.rs` e protege abaixo de `k` conluios: a mesa soma as
   shares localmente e nenhum `r` individual se junta em lugar algum. Acima de

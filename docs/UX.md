@@ -249,6 +249,53 @@ Inverta o total para 20 e mostre:
 
 **Esse é o passo 6 do roteiro e é o que separa um sistema que *afirma* ser verificável de um que é.** Nove de dez demos de hackathon mostram só o caminho feliz. Mostrar a recusa é o que faz um jurado técnico acreditar no resto.
 
+### 6.3 A apuração sem mesa, pela fechadura de tempo
+
+Tudo acima descreve o caminho da **mesa**: três linhas, três agentes, e um ato
+humano no começo. A assembleia sem mesa não tinha essa tela — ela não tinha
+placar nenhum. Com a fechadura de tempo passa a ter, e a tela muda de natureza:
+**não há nada para clicar.**
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  APURAÇÃO · 5 CÉDULAS                                        │
+│                                                              │
+│   O PLACAR                                                   │
+│     OPÇÃO 1   2        OPÇÃO 2   2                           │
+│                                                              │
+│   4 de 5 cédulas abriram — 1 criptograma não abriu, e        │
+│   custou só o próprio voto.                                  │
+│                                                              │
+│   Ninguém afirmou estes números: eles saíram da decifragem   │
+│   das cédulas, neste navegador, com a assinatura da rodada   │
+│   32935517 da baliza — conferida num pareamento antes de     │
+│   qualquer conta.                                            │
+└──────────────────────────────────────────────────────────────┘
+```
+
+A ordem de 6.1 se inverte, e por um motivo: **não existe uma primeira linha que
+afirme.** Ninguém afirma. A tela decifra o que está no ledger com uma chave que
+é pública, e o contrato confere a soma antes de gravar. A arquitetura de
+confiança deixa de ser "três agentes em sequência" e passa a ser "nenhum".
+
+As três telas que vêm antes do placar são tão importantes quanto ele, porque é
+nelas que a garantia fica visível:
+
+| estado | o que a tela diz |
+|---|---|
+| a janela ainda está aberta | *não há placar, e não há nem parcial* — a chave que abre as cédulas não foi publicada, e produzi-la mais cedo exigiria conluio de um limiar dos operadores da baliza |
+| a urna fechou, o relógio não | a rodada vence em `N` segundos; até lá o contrato recusa, inclusive para esta aba |
+| a apuração não foi até o fim | o placar não se perdeu: os criptogramas estão no ledger e a chave é pública, e **qualquer pessoa** refaz a conta |
+
+A primeira é a mais importante das três. Ela tem de deixar claro que a tela não
+está escondendo um número que ela tem — e o jeito de deixar claro é dizer onde a
+chave está, que é em nenhum lugar ainda.
+
+E o 6.2 tem equivalente aqui, melhor que o original porque não precisa de
+encenação: uma cédula entra com um byte trocado no criptograma, o contrato a
+aceita — ele confere a forma, não o conteúdo —, e no fim ela aparece como a
+cédula que não abriu. **Sabotar custa um voto, e só o do saboteur.**
+
 ---
 
 ## 7. O que construir em 3,5 dias
@@ -338,7 +385,7 @@ O PLANO.md tem os 6 passos. Aqui está como filmá-los para que *sintam* algo. A
 | 0:00–0:20 | A pergunta da assembleia. Uma frase: "Dona Marta quer rejeitar as contas. O presidente aprovou o empréstimo do filho dela." | o problema é de gente, não de cripto |
 | 0:20–0:50 | A cédula. Trocar APROVAR ↔ REJEITAR **três vezes** e deixar o hex mudar inteiro. Sem narração nesse trecho. | *entendi o sigilo sem ninguém me explicar* |
 | 0:50–1:10 | Marcar "registrar publicamente", o contador cair, o aviso de mínimo aparecer | este sistema pensou no que eu não pensei |
-| 1:10–1:35 | Conferência. O aviso de coação. Apagar a chave. "Agora nem você consegue provar em que votou." | é honesto sobre o próprio limite |
+| 1:10–1:35 | Conferência. O aviso de coação. "O `r` morreu com a aba — nem você consegue provar em que votou." | é honesto sobre o próprio limite |
 | 1:35–2:10 | Cinco votos entrando. A grade de blocos indistinguíveis. | a imagem do pitch |
 | 2:10–2:40 | Apuração: mesa afirma, contrato confere, verificador refaz. REJEITADO 31 a 19. | a cadeia de confiança sem confiar na mesa |
 | 2:40–3:10 | **Mesa mentindo. Recusa na hora.** | isto é real |
@@ -357,7 +404,7 @@ Duas regras de montagem:
 - **Não escreva "100% anônimo".** É falso (N1) e um jurado pega em dez segundos.
 - **Não ponha barra de progresso em operação de 5 segundos.** A finalidade da Stellar é um recurso; esconda-a atrás de um spinner e você joga o recurso fora.
 - **Não anime o compromisso "sendo criptografado".** Cadeado fechando, partícula voando: é a estética que faz parecer brinquedo. O hex mudando já é a melhor animação possível, porque é verdadeira.
-- **Não esconda o aviso de coação atrás de "saiba mais".** É a lacuna mais séria do protocolo. Enterrá-la na interface é mentir por omissão de layout.
+- **Não esconda o aviso de coação atrás de "saiba mais".** O protocolo protege o *depois* — o `r` morre com a aba e nenhum cliente o grava —, e não protege o *durante*: quem olha a sua tela vê a sua escolha. Enterrar isso na interface é mentir por omissão de layout.
 - **Não faça modal de confirmação.** Ver §4.3.
 
 ---

@@ -30,6 +30,8 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 
+import { comTeto, instrucoes } from "./medir.mjs";
+
 const require = createRequire(import.meta.url);
 const wasm = require("../../cliente-wasm/pacote-node/tessera_cliente.js");
 
@@ -38,7 +40,7 @@ const HORIZON = "https://horizon-testnet.stellar.org";
 const FRIENDBOT = "https://friendbot.stellar.org";
 const PASSPHRASE = Networks.TESTNET;
 const CONTRATO = process.env.TESSERA_CONTRATO ??
-  "CBYKJOBOIKSLXFLYQHYNFEJER643TY6KFVHLVTNUQNNDO5JRJPYDI2B6";
+  "CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH";
 
 const ELEITORADO = 10;
 const COMPARECEM = 7;
@@ -58,6 +60,9 @@ const bN = (h) => xdr.ScVal.scvBytes(hexBytes(h));
 // rodar. Foi o que custou duas rodadas de testnet para achar.
 const fr = (h) => nativeToScVal(BigInt("0x" + h), { type: "u256" });
 const u32 = (n) => xdr.ScVal.scvU32(n);
+const u64 = (n) => xdr.ScVal.scvU64(new xdr.Uint64(BigInt(n)));
+// Sem fechadura de tempo nestas cargas: o criptograma vai vazio.
+const semCripto = () => xdr.ScVal.scvBytes(new Uint8Array(0));
 const vec = (v) => xdr.ScVal.scvVec(v);
 const addr = (g) => new Address(g).toScVal();
 // 44 bytes: SCV_ADDRESS ‖ ACCOUNT ‖ ED25519 ‖ chave. `toScAddress()` dá 40 e
@@ -101,6 +106,9 @@ async function enviar(par, metodo, args) {
     .build();
   const sim = await servidor.simulateTransaction(bruta);
   if (rpc.Api.isSimulationError(sim)) throw new Error(`${metodo}: ${sim.error}`);
+  // Mede **antes** de enviar: se o SDK mudar de forma, o script para aqui em
+  // vez de gastar uma rodada inteira e imprimir um custo que não foi medido.
+  const cpu = instrucoes(sim, metodo);
   const pronta = rpc.assembleTransaction(bruta, sim).build();
   pronta.sign(par);
   const envio = await servidor.sendTransaction(pronta);
@@ -110,7 +118,7 @@ async function enviar(par, metodo, args) {
   for (let i = 0; i < 60; i++) {
     const r = await servidor.getTransaction(envio.hash);
     if (r.status === rpc.Api.GetTransactionStatus.SUCCESS) {
-      return { hash: envio.hash, cpu: sim.cost?.cpuInsns, taxa: pronta.fee };
+      return { hash: envio.hash, cpu, taxa: pronta.fee };
     }
     if (r.status === rpc.Api.GetTransactionStatus.FAILED) {
       throw new Error(`${metodo} falhou on-chain: ${envio.hash}`);
@@ -154,7 +162,7 @@ async function main() {
   const enderecos = membros.map((m) => xdrDe(m.publicKey()));
   const pesos = membros.map(() => 1);
   const id = bytesHex(Keypair.random().rawPublicKey().subarray(0, 32));
-  const raiz = wasm.raiz_de_aptos(id, enderecos, pesos, 1);
+  const raiz = wasm.raiz_de_aptos(enderecos, pesos);
   diz(`raiz de aptos = ${raiz.slice(0, 16)}…${raiz.slice(-8)}`);
 
   titulo("abrir, com o caderno separado da urna");
@@ -176,7 +184,10 @@ async function main() {
     u32(abreEm),
     u32(fechaEm),
     xdr.ScVal.scvBool(true),
-    u32(1),
+    u32(1),      // secoes
+    u32(0),      // limite_secao
+    u64(0),      // rodada da fechadura: 0 = sem fechadura
+    u64(0),      // rodada de abertura: 0, porque é uma seção só
   ]);
   diz(`proposta ${id.slice(0, 12)}…`);
   diz(`comparecimento até o ledger ${abreEm} · votação até ${fechaEm}`);
@@ -192,13 +203,13 @@ async function main() {
   for (let i = 0; i < COMPARECEM; i++) {
     const k = wasm.nova_chave_de_anel();
     chaves.push(k);
-    const c = wasm.caminho_de(id, enderecos, pesos, 1, i);
+    const c = wasm.caminho_de(enderecos, pesos, i);
     const r = await enviar(membros[i], "comparecer", [
       bN(id), addr(membros[i].publicKey()), bN(k.publica),
-      vec(c.irmaos.map(bN)), u32(c.indice), u32(c.secao),
+      vec(c.irmaos.map(bN)), u32(c.indice), u32(0), // seção 0: um anel só
     ]);
     diz(`${membros[i].publicKey().slice(0, 8)}…  compareceu · anel com ${i + 1}`);
-    if (i === 0) diz(`   cpu ${r.cpu} · taxa ${r.taxa} stroops`);
+    if (i === 0) diz(`   ${comTeto(r.cpu)} · taxa ${r.taxa} stroops`);
   }
 
   const faltaram = membros.slice(COMPARECEM).map((m) => m.publicKey().slice(0, 8));
@@ -222,6 +233,7 @@ async function main() {
     const c = wasm.cedula_anonima(
       id, hp, h, anel, i, chaves[i].secreta,
       [{ opcoes: OPCOES.length, confidencial: true }], [escolha],
+      0n, // sem fechadura de tempo nesta rodada: ver rodada-relogio.mjs
     );
     const par = await nascer();
     efemeras.push(par.publicKey());
@@ -231,9 +243,10 @@ async function main() {
       vec(c.cedula.provas.map(provaCds)),
       vec(c.cedula.provas_soma.map(provaSoma)),
       vec(c.cedula.escolhas.map(u32)),
+      semCripto(),
     ]);
     diz(`cédula ${i + 1} de ${COMPARECEM} · de ${par.publicKey().slice(0, 8)}… · imagem ${c.imagem.slice(0, 12)}…`);
-    if (i === 0) diz(`   cpu ${r.cpu} · taxa ${r.taxa} stroops · anel de ${anel.length}`);
+    if (i === 0) diz(`   ${comTeto(r.cpu)} · taxa ${r.taxa} stroops · anel de ${anel.length}`);
   }
 
   titulo("o que o ledger sabe, e o que não sabe");
@@ -250,6 +263,7 @@ async function main() {
   const repetida = wasm.cedula_anonima(
     id, hp, h, anel, 2, chaves[2].secreta,
     [{ opcoes: OPCOES.length, confidencial: true }], [1],
+    0n,
   );
   const par = await nascer();
   try {
@@ -259,6 +273,7 @@ async function main() {
       vec(repetida.cedula.provas.map(provaCds)),
       vec(repetida.cedula.provas_soma.map(provaSoma)),
       vec(repetida.cedula.escolhas.map(u32)),
+      semCripto(),
     ]);
     throw new Error("a segunda cédula da mesma pessoa passou");
   } catch (e) {

@@ -12,14 +12,29 @@ import {
 } from "@stellar/stellar-sdk";
 import type { Carteira } from "./carteira";
 import type { Anotar } from "./diario";
+import { carregar } from "./wasm";
 
 export const REDE = {
   rpc: "https://soroban-testnet.stellar.org",
   horizon: "https://horizon-testnet.stellar.org",
   friendbot: "https://friendbot.stellar.org",
   passphrase: Networks.TESTNET,
-  contrato: "CBYKJOBOIKSLXFLYQHYNFEJER643TY6KFVHLVTNUQNNDO5JRJPYDI2B6",
+  contrato: "CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH",
   explorer: "https://stellar.expert/explorer/testnet",
+};
+
+/**
+ * A baliza: a cadeia `quicknet` da drand e o relé de onde a assinatura vem.
+ *
+ * **O relé é um servidor como qualquer outro, e esta camada não confia nele.**
+ * Tudo o que ele devolve passa por `conferir_baliza` — um pareamento contra a
+ * chave pública congelada da cadeia, em `core/src/relogio.rs` — antes de
+ * encostar num cálculo. Se o relé mentir, a conferência recusa; se o relé
+ * sumir, qualquer outro serve, porque a assinatura é a mesma para todo mundo.
+ */
+export const BALIZA = {
+  cadeia: "52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971",
+  rele: "https://api.drand.sh/v2/chains",
 };
 
 /**
@@ -85,6 +100,9 @@ const ERROS: Record<number, string> = {
   22: "SomaDiferenteDoPeso", 23: "TotalDiferenteDoComparecimento", 24: "MembroJaEndossou",
   25: "PerguntasForaDaFaixa", 26: "VotacaoAindaNaoComecou", 27: "ComparecimentoEncerrado",
   28: "JaCompareceu", 29: "AnelInvalido", 30: "ImagemJaUsada", 31: "ModoErrado",
+  32: "SecaoInvalida", 33: "VotacaoAberta", 34: "RodadaNaoFecha",
+  35: "RelogioAindaNaoAbriu", 36: "CadeiaNaoFecha", 37: "NaoMelhora",
+  38: "CriptogramaMalFormado",
 };
 
 /** Arredondar para inteiro faz uma chamada barata ler "0% do teto", que soa
@@ -137,6 +155,9 @@ const ponto = (h: string) => bytesN(h);
  */
 const escalar = (h: string) => nativeToScVal(BigInt("0x" + h), { type: "u256" });
 const u32 = (n: number) => xdr.ScVal.scvU32(n);
+const u64 = (n: number) => xdr.ScVal.scvU64(new xdr.Uint64(BigInt(n)));
+const bytes = (h: string) =>
+  xdr.ScVal.scvBytes(h === "" ? new Uint8Array(0) : hexParaBytes(h));
 const vetor = (v: xdr.ScVal[]) => xdr.ScVal.scvVec(v);
 const endereco = (g: string) => new Address(g).toScVal();
 
@@ -183,32 +204,111 @@ export type PropostaRede = {
   fecha_em: number;
   anel: boolean;
   secoes: number;
+  /** A rodada da baliza que destranca as cédulas. `0` = sem fechadura. */
+  rodada: bigint;
+  /** A rodada de onde sai a divisão em seções (DEC-012). */
+  rodada_abertura: bigint;
 };
 
 export const lerProposta = (id: string) =>
   ler("proposta", bytesN(id)) as Promise<PropostaRede | null>;
+
+/** Os tetos do contrato, espelhados de `contrato/src/tipos.rs`. O teto de
+ *  opções é do orçamento de CPU: cada opção sigilosa custa uma disjuntiva. */
+export const MAX_PERGUNTAS = 8;
+export const MAX_OPCOES = 16;
 
 /** A raiz de 32 zeros é o sentinela de votação aberta. */
 export const RAIZ_ABERTA = "0".repeat(64);
 export const ehAberta = (p: PropostaRede) => bytesParaHex(p.raiz_aptos) === RAIZ_ABERTA;
 
 /**
- * A seção numa votação **aberta**: `H(proposta ‖ endereço) mod secoes`.
+ * As chaves de ledger dos anéis `[primeira, ultima]`, para somar ao footprint.
  *
- * O cliente precisa calcular o mesmo que o contrato **antes de enviar**, porque
- * a seção nomeia a entrada `Anel(proposta, secao)` que a transação vai escrever
- * — e o footprint é declarado na simulação. Derivar isso de ordem de chegada
- * custou uma rodada: uma por ledger, e recusas com `txFailed`.
+ * **É isto que faz o split automático funcionar sob rajada.** A seção só existe
+ * na aplicação — ela vem de `caderno / limite` —, mas o footprint é declarado
+ * na simulação. Quem comparece sozinho acerta a previsão; vinte comparecendo
+ * juntos, não. Declarando uma janela, a transação pode escrever em qualquer
+ * seção da faixa sem ter declarado uma e escrito outra.
+ *
+ * Sem isso, o medido foi uma por ledger e recusas com `txFailed`.
  */
-export async function secaoAberta(id: string, g: string, secoes: number): Promise<number> {
-  const bytes = new Uint8Array([...hexParaBytes(id), ...hexParaBytes(enderecoXdr(g))]);
-  const h = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
-  return new DataView(h.buffer).getUint32(0, false) % secoes;
+function chavesDeAnel(id: string, primeira: number, ultima: number): xdr.LedgerKey[] {
+  const chaves: xdr.LedgerKey[] = [];
+  for (let s = primeira; s <= ultima; s++) {
+    chaves.push(
+      xdr.LedgerKey.contractData(
+        new xdr.LedgerKeyContractData({
+          contract: new Address(REDE.contrato).toScAddress(),
+          key: xdr.ScVal.scvVec([
+            xdr.ScVal.scvSymbol("Anel"),
+            bytesN(id),
+            u32(s),
+          ]),
+          durability: xdr.ContractDataDurability.persistent(),
+        }),
+      ),
+    );
+  }
+  return chaves;
 }
+
+/**
+ * O placar, quando existe.
+ *
+ * Só existe depois que alguém reuniu a abertura e o contrato conferiu contra o
+ * acumulado. Numa votação sem mesa isso nunca acontece, e é isso que `/apurar`
+ * explica.
+ */
+export const lerResultado = async (id: string): Promise<number[] | null> =>
+  ((await ler("resultado", bytesN(id))) as number[] | undefined) ?? null;
+
+/**
+ * O placar de uma seção, como o contrato o guardou: quantas cédulas abriram e
+ * os totais sobre elas.
+ *
+ * Os dois números andam juntos de propósito. Um placar sobre um subconjunto
+ * sem dizer qual subconjunto é um placar que mente por omissão — e o contrato
+ * guarda os dois justamente para que a tela não possa separá-los.
+ */
+export const lerResultadoSecao = async (
+  id: string,
+  secao: number,
+): Promise<{ abriram: number; totais: number[] } | null> => {
+  const r = (await ler("resultado_secao", bytesN(id), u32(secao))) as
+    | [number, number[]]
+    | null
+    | undefined;
+  return r ? { abriram: r[0], totais: Array.from(r[1]) } : null;
+};
+
+/** Quantas seções existem agora. Na aberta cresce com o comparecimento. */
+export const lerSecoes = async (id: string): Promise<number> =>
+  ((await ler("secoes", bytesN(id))) as number | undefined) ?? 1;
 
 /** Em que seção a pessoa caiu, segundo a cadeia. */
 export const lerSecao = async (id: string, g: string): Promise<number | null> =>
   ((await ler("secao_de", bytesN(id), endereco(g))) as number | null) ?? null;
+
+/// A assinatura da baliza da rodada de abertura, já conferida pelo contrato,
+/// nos 96 bytes não comprimidos. É dela que a seção é derivada (DEC-012) — e
+/// são **estes** bytes, não os 48 comprimidos que a baliza publica.
+export const lerAbertura = async (id: string): Promise<string | null> => {
+  const b = (await ler("abertura", bytesN(id))) as Uint8Array | null;
+  return b ? bytesParaHex(b) : null;
+};
+
+/// Registra a assinatura. Qualquer pessoa, uma vez, depois que a rodada venceu
+/// — e o contrato confere com um pareamento antes de guardar, senão quem a
+/// apresentasse escolheria as seções.
+export const registrarAbertura = (c: Carteira, id: string, assinaturaHost: string, d?: Diario) =>
+  enviar(
+    c,
+    "registrar_abertura",
+    [bytesN(id), bytesN(assinaturaHost)],
+    d,
+    `proposta ${id.slice(0, 8)}… · assinatura da baliza, 96 bytes`,
+  );
 
 export const lerAnel = async (id: string, secao: number): Promise<string[]> =>
   ((await ler("anel", bytesN(id), u32(secao))) as Uint8Array[]).map(bytesParaHex);
@@ -316,6 +416,154 @@ export async function assembleias(desde?: number): Promise<Assembleia[]> {
     .reverse();
 }
 
+// ---------- a fechadura de tempo ----------
+
+/**
+ * Busca a assinatura da rodada no relé **e a confere** antes de devolver.
+ *
+ * A conferência é um pareamento contra a chave pública da cadeia, e acontece
+ * aqui, nesta função, não no uso — é o que INV-24 exige. Nenhum chamador recebe
+ * bytes que não passaram por ela, e nenhuma página fala com o relé direto.
+ *
+ * Devolve os 48 bytes comprimidos que a baliza publica. Para
+ * `registrar_abertura` o contrato quer os 96 não comprimidos, e quem converte é
+ * `assinatura_da_baliza` no wasm — o host não sabe descomprimir.
+ */
+export async function buscarBaliza(rodada: number | bigint): Promise<string> {
+  const r = await fetch(`${BALIZA.rele}/${BALIZA.cadeia}/rounds/${rodada}`);
+  if (!r.ok) {
+    throw new Error(
+      `a baliza ainda não publicou a rodada ${rodada} (ou o relé está fora): HTTP ${r.status}`,
+    );
+  }
+  const j = (await r.json()) as { round: number; signature: string };
+  if (BigInt(j.round) !== BigInt(rodada)) {
+    throw new Error(`o relé respondeu a rodada ${j.round} em vez de ${rodada}`);
+  }
+  const w = await carregar();
+  // Lança se o pareamento não fechar. É o único portão, e é por aqui que passa
+  // tudo o que vem de fora.
+  w.conferir_baliza(BigInt(rodada), j.signature);
+  return j.signature;
+}
+
+/** Os 96 bytes não comprimidos que o host lê, a partir dos 48 da baliza. */
+export async function balizaParaHost(assinatura: string): Promise<string> {
+  return (await carregar()).assinatura_da_baliza(assinatura);
+}
+
+/** Uma cédula como o ledger a guarda: os compromissos e o criptograma. */
+export type CedulaNoLedger = {
+  imagem: string;
+  compromissos: string[];
+  /** 160 bytes por opção confidencial, em hexadecimal. */
+  cripto: string;
+  ledger: number;
+};
+
+/**
+ * As cédulas depositadas, na ordem em que chegaram.
+ *
+ * **Sem indexador.** O evento `anonimo` carrega os compromissos e o
+ * criptograma, e o RPC público os guarda por 7 dias — mais que qualquer janela
+ * de votação. A ordem dos eventos é a ordem da cadeia de compromissos, que é o
+ * que `apurar_secao` re-encadeia: ler na ordem errada é recusado com
+ * `CadeiaNaoFecha`, não aceito em silêncio.
+ *
+ * Hoje isto só serve a uma votação de **uma** seção: o tópico do evento tem a
+ * proposta e não a seção, então não há como separar as cédulas por seção sem
+ * um bump de ABI. Ver §11-N.
+ */
+export async function cedulasDaSecao(id: string, desdeLedger: number): Promise<CedulaNoLedger[]> {
+  const todas: CedulaNoLedger[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    const r = await servidor.getEvents(
+      cursor
+        ? { cursor, filters: [{ type: "contract", contractIds: [REDE.contrato] }] }
+        : {
+            startLedger: Math.max(1, desdeLedger),
+            filters: [{ type: "contract", contractIds: [REDE.contrato] }],
+          },
+    );
+    for (const e of r.events) {
+      if (scValToNative(e.topic[0]) !== "anonimo") continue;
+      if (bytesParaHex(scValToNative(e.topic[1]) as Uint8Array) !== id) continue;
+      const v = scValToNative(e.value) as [Uint8Array, Uint8Array[], number[], Uint8Array];
+      todas.push({
+        imagem: bytesParaHex(v[0]),
+        compromissos: v[1].map(bytesParaHex),
+        cripto: bytesParaHex(v[3]),
+        ledger: e.ledger,
+      });
+    }
+    if (!r.cursor || r.events.length === 0) return todas;
+    cursor = r.cursor;
+  }
+}
+
+/** O que a decifragem reconstruiu, pronto para o contrato. */
+export type Abertura = {
+  abertas: boolean[];
+  totais: number[];
+  aberturas: string[];
+  abriram: number;
+  cedulas: number;
+};
+
+/**
+ * Decifra a seção inteira no navegador e devolve o placar a apresentar.
+ *
+ * Nada disso precisa de carteira: a chave da rodada é pública, os
+ * criptogramas estão no ledger, e a conta é a mesma para quem quer que a faça.
+ * É isso que torna a apuração **não travável** — não depende de ninguém em
+ * particular voltar.
+ */
+export async function abrirSecao(
+  cedulas: CedulaNoLedger[],
+  nConf: number,
+  rodada: number | bigint,
+): Promise<Abertura> {
+  const assinatura = await buscarBaliza(rodada);
+  const [w, h] = await Promise.all([carregar(), lerGeradorH()]);
+  return w.abertura_da_secao(
+    cedulas.flatMap((c) => c.compromissos),
+    cedulas.map((c) => c.cripto),
+    nConf,
+    h,
+    BigInt(rodada),
+    assinatura,
+  ) as Abertura;
+}
+
+/**
+ * Entrega o placar da seção. Qualquer pessoa, depois do fim da janela e do
+ * vencimento da rodada — e só substitui o guardado se abrir **mais** cédulas.
+ */
+export const apurarSecao = (
+  c: Carteira,
+  id: string,
+  secao: number,
+  compromissos: string[],
+  a: Abertura,
+  d?: Diario,
+) =>
+  enviar(
+    c,
+    "apurar_secao",
+    [
+      bytesN(id),
+      endereco(c.endereco()),
+      u32(secao),
+      vetor(compromissos.map(ponto)),
+      vetor(a.abertas.map((b) => xdr.ScVal.scvBool(b))),
+      vetor(a.totais.map(u32)),
+      vetor(a.aberturas.map(escalar)),
+    ],
+    d,
+    `proposta ${id.slice(0, 8)}… · seção ${secao} · ${a.abriram} de ${a.cedulas} cédulas abriram`,
+  );
+
 // ---------- escrita ----------
 
 /**
@@ -332,13 +580,14 @@ async function enviar(
   diario?: Diario,
   resumo?: string,
   folga = 0,
+  extras: xdr.LedgerKey[] = [],
 ): Promise<string> {
   diario?.({ tipo: "cmd", txt: `${metodo}()` });
   if (resumo) diario?.({ tipo: "val", txt: resumo });
 
   for (let lance = 0; ; lance++) {
     try {
-      return await uma(carteira, metodo, args, TAXA_INCLUSAO * 4 ** lance, diario, folga);
+      return await uma(carteira, metodo, args, TAXA_INCLUSAO * 4 ** lance, diario, folga, extras);
     } catch (e) {
       // Taxa curta não é erro do voto: a transação não entrou em ledger nenhum.
       // Re-simular junto com o lance maior também renova o footprint.
@@ -366,6 +615,7 @@ async function uma(
   lance: number,
   diario?: Diario,
   folga = 0,
+  extras: xdr.LedgerKey[] = [],
 ): Promise<string> {
   const conta = await servidor.getAccount(carteira.endereco());
   const bruta = new TransactionBuilder(conta, {
@@ -401,13 +651,28 @@ async function uma(
 
   let pronta = rpc.assembleTransaction(bruta, sim).build();
 
-  if (folga > 0) {
+  if (folga > 0 || extras.length > 0) {
     const dados = new SorobanDataBuilder(
       pronta.toEnvelope().v1().tx().ext().sorobanData().toXDR("base64"),
     );
     const r = dados.build().resources();
     // `diskReadBytes`, não `readBytes`: o protocolo 23 renomeou.
-    dados.setResources(r.instructions(), r.diskReadBytes(), r.writeBytes() + folga);
+    // Toda entrada declarada é **carregada**, não só a usada: declarar as
+    // seções vizinhas aumenta a leitura junto da escrita. Só subir
+    // `writeBytes` deixou 10 de 20 em `txFailed`.
+    dados.setResources(
+      r.instructions(),
+      r.diskReadBytes() + folga,
+      r.writeBytes() + folga,
+    );
+    if (extras.length) {
+      // As que a simulação já previu continuam; estas são as seções vizinhas,
+      // que a transação pode acabar escrevendo se gente entrar no meio.
+      const atuais = dados.getReadWrite();
+      const vistas = new Set(atuais.map((k) => k.toXDR("base64")));
+      const novas = extras.filter((k) => !vistas.has(k.toXDR("base64")));
+      dados.setReadWrite([...atuais, ...novas]);
+    }
     pronta = TransactionBuilder.cloneFrom(pronta, {
       fee: (BigInt(pronta.fee) + BigInt(folga) * STROOPS_POR_BYTE).toString(),
       sorobanData: dados.build(),
@@ -463,6 +728,17 @@ export const abrir = (
   fecha_em: number,
   anel: boolean,
   secoes: number,
+  limiteSecao: number,
+  /** A rodada da baliza que destranca as cédulas, e a que **abre o
+   *  comparecimento** e decide as seções.
+   *
+   *  Não há campo de tempo: o prazo **é** `instante(rodada)`, e guardar os dois
+   *  só criaria divergência. As duas têm de estar no futuro na hora de abrir —
+   *  uma rodada já vencida tem assinatura publicada, e aí as cédulas abririam
+   *  na hora e as seções seriam moíveis. Quem calcula é `rodada_em` no wasm, o
+   *  mesmo código que o contrato confere. */
+  rodada = 0,
+  rodadaAbertura = 0,
   d?: Diario,
 ) =>
   enviar(
@@ -486,11 +762,18 @@ export const abrir = (
       u32(fecha_em),
       xdr.ScVal.scvBool(anel),
       u32(secoes),
+      u32(limiteSecao),
+      u64(rodada),
+      u64(rodadaAbertura),
     ],
     d,
     `proposta ${id.slice(0, 8)}… · ${perguntas.length} pergunta${perguntas.length === 1 ? "" : "s"} · ` +
       `mesa ${limiar} de ${mesa.length} · ${anel ? "caderno separado da urna" : "voto identificado"}` +
-      (secoes > 1 ? ` · ${secoes} seções` : ""),
+      (limiteSecao > 0
+        ? ` · seções de ${limiteSecao}, abrindo sozinhas`
+        : secoes > 1
+          ? ` · ${secoes} seções`
+          : ""),
   );
 
 /** O caderno: identificado, e é o único ato em que o nome da pessoa aparece. */
@@ -504,6 +787,8 @@ export const comparecer = (
   d?: Diario,
   /** O tamanho do eleitorado: é o teto do anel, e dimensiona a folga. */
   aptos = 40,
+  /** Quantas seções além da prevista declarar. Cobre quem entrar no meio. */
+  janela = 0,
 ) =>
   enviar(
     c,
@@ -512,6 +797,7 @@ export const comparecer = (
     d,
     `proposta ${id.slice(0, 8)}… · seção ${secao} · folha ${indice} · caminho com ${caminho.length} irmão${caminho.length === 1 ? "" : "s"}`,
     folgaDoCaderno(aptos),
+    janela > 0 ? chavesDeAnel(id, secao, secao + janela) : [],
   );
 
 /**
@@ -533,6 +819,13 @@ export function votarAnonimo(
   provas: { a0: string; a1: string; e0: string; z0: string; e1: string; z1: string }[],
   provasSoma: { a: string; z: string }[],
   escolhas: number[],
+  /** Os criptogramas da fechadura, concatenados em hexadecimal: 160 bytes por
+   *  opção confidencial. Vazio quando a proposta não tem fechadura.
+   *
+   *  O contrato não os lê — não pode, o host não tem pareamento com saída de
+   *  valor. Ele confere a forma e os carrega no evento, e quem decifra é
+   *  qualquer pessoa, depois da rodada. */
+  cripto = "",
   d?: Diario,
 ) {
   if (c.tipo !== "efemera") {
@@ -586,6 +879,7 @@ export function votarAnonimo(
         ),
       ),
       vetor(escolhas.map(u32)),
+      bytes(cripto),
     ],
     d,
     `proposta ${id.slice(0, 8)}… · seção ${secao} · anel com ${anel.length} · ${compromissos.length} compromisso${compromissos.length === 1 ? "" : "s"}`,

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { CarteiraEfemera } from "../carteira";
-import { lerChaveDeAnel } from "../lista";
+import { esquecerChaveDeAnel, lerChaveDeAnel } from "../lista";
 import { fase, ledgerAtual, lerAnel, lerGeradorH, lerHp, lerProposta, REDE, votarAnonimo, type PropostaRede } from "../rede";
 import { carregar } from "../wasm";
 import { useDiario } from "./comum";
@@ -13,6 +13,7 @@ type Etapa = "escolha" | "revisao" | "enviando" | "concluido";
 const propostaDemo: PropostaRede = {
   perguntas: [{ opcoes: 3, confidencial: true }], raiz_aptos: new Uint8Array(),
   mesa: [], limiar: 0, abre_em: 0, fecha_em: Number.MAX_SAFE_INTEGER, anel: true, secoes: 1,
+  rodada: 0n, rodada_abertura: 0n,
 };
 const opcoesDemo = [
   { titulo: "Aprovar", descricao: "Sou a favor da proposta." },
@@ -105,15 +106,24 @@ function Urna({ id, demo }: { id: string; demo: boolean }) {
         const [hp, h] = await Promise.all([lerHp(id), lerGeradorH()]);
         const i = anel.indexOf(guardada.publica);
         if (i < 0) throw new Error("Sua chave não está no grupo de participantes desta votação.");
+        // A fechadura: `p.rodada` é a rodada da baliza em que a cédula
+        // destranca, e `0` é a proposta sem fechadura. O `r` é cifrado aqui
+        // dentro, na mesma chamada em que nasce — sai da aba já ilegível, para
+        // uma chave que ainda não existe no mundo.
         const c = w.cedula_anonima(id, hp, h, anel, i, guardada.secreta,
           [{ opcoes: p.perguntas[0].opcoes, confidencial: true }], new Uint32Array([escolha]),
-        ) as { imagem: string; c0: string; z: string[]; cedula: { compromissos: string[]; provas: never[]; provas_soma: never[]; escolhas: number[] } };
+          p.rodada,
+        ) as { imagem: string; c0: string; z: string[]; cedula: { compromissos: string[]; provas: never[]; provas_soma: never[]; escolhas: number[]; cripto: string } };
         diario({ tipo: "nota", txt: "Cédula e prova de participação preparadas neste navegador." });
         setProgresso(1);
         const efemera = await CarteiraEfemera.nascer();
         setProgresso(2);
-        const hash = await votarAnonimo(efemera, id, guardada.secao, anel, c.imagem, c.c0, c.z, c.cedula.compromissos, c.cedula.provas, c.cedula.provas_soma, c.cedula.escolhas, diario);
+        const hash = await votarAnonimo(efemera, id, guardada.secao, anel, c.imagem, c.c0, c.z, c.cedula.compromissos, c.cedula.provas, c.cedula.provas_soma, c.cedula.escolhas, c.cedula.cripto, diario);
         if (!montada.current) return;
+        // A cédula entrou: a chave de anel deixa de ser útil e passa a ser só
+        // o vínculo entre você e ela. Morre aqui.
+        esquecerChaveDeAnel(id);
+        diario({ tipo: "nota", txt: "a chave de participação foi apagada — nada mais liga você à sua cédula" });
         setTx(hash);
       }
       if (montada.current) { setEscolha(null); setEtapa("concluido"); }
@@ -156,7 +166,9 @@ function Urna({ id, demo }: { id: string; demo: boolean }) {
       <summary><Icone nome="lock" /><span>Sobre a privacidade do voto</span><span className="disclosure-plus" aria-hidden="true">+</span></summary>
       <p>A presença é pública. A cédula usa outra chave para separar sua escolha da sua identidade.</p>
       {quantidade > 0 && <p>{quantidade} participantes no conjunto{demo ? " · dados ilustrativos" : ""}.</p>}
-      <p>A prova de participação usa o grupo de quem compareceu. Esta cédula não compartilha com a mesa o segredo que permitiria abri-la individualmente; a apuração deste modo ainda não está disponível.</p>
+      <p>A prova de participação usa o grupo de quem compareceu. Esta cédula não compartilha com mesa nenhuma o segredo que permitiria abri-la individualmente.</p>
+      {p?.rodada ? <p>Em vez de mesa, esta votação tem <strong>fechadura de tempo</strong>: a cédula viaja cifrada para a rodada {String(p.rodada)} da baliza drand. Antes daquele instante a chave que a abre não foi publicada, e nem quem organizou a tem; abrir mais cedo exigiria conluio de um limiar dos operadores da baliza. Depois dela, <strong>qualquer pessoa</strong> abre, e é assim que o placar existe sem depender de ninguém de confiança. O que continua protegido é o vínculo: uma cédula aberta não diz de quem ela é.</p> : <p>A apuração deste modo ainda não está disponível.</p>}
+      <p>Depois de enviar, <strong>nem você consegue voltar ao próprio voto</strong>. Duas coisas morrem no mesmo instante: o número que esconde a escolha, que {p?.rodada ? "sai desta aba cifrado para uma rodada futura e nunca em claro" : "nunca é gravado em lugar nenhum"}, e a chave de participação, que é apagada assim que a cédula entra — com ela, alguém acharia qual das cédulas é a sua. Quem quiser que você prove em quem votou precisa estar olhando a sua tela agora.</p>
       <p>Na testnet, o serviço que financia a chave de uso único pode ver seu IP. Preserve a chave de participação neste navegador.</p>
     </details>
     {demo && <p className="demo-note">Prévia interativa · nenhuma transação real</p>}

@@ -6,3 +6,10 @@ shares/
 demo/
 cliente-wasm/pacote/
 cliente-wasm/pacote-node/
+
+# Os instantâneos do SDK não são dados-ouro, apesar do nome (SPEC §5, DEC-015).
+# Eles mudam a cada execução porque a cédula sorteia um `r` novo a cada vez —
+# e é esse sorteio que não pode ser determinístico. Ficam no disco para
+# depurar, e fora do git para não sujar todo diff com milhares de linhas que
+# ninguém lê e que nada prendem.
+contrato/test_snapshots/

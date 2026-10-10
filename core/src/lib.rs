@@ -10,6 +10,7 @@ pub mod cds;
 pub mod merkle;
 pub mod pedersen;
 pub mod ponto;
+pub mod relogio;
 pub mod shamir;
 pub mod soma;
 

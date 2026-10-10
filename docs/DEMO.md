@@ -488,10 +488,9 @@ não publicou.
 > vetar a assembleia inteira — negação de serviço contra a própria eleição.
 > Removida aquela função, o único caminho até aqui é comparecimento baixo.
 >
-> Nenhum sistema eleitoral sério recusa contar. O Brasil protege a célula
-> pequena **antes**, agregando seções com menos de 50 eleitores (TSE,
-> Res. 23.669/2021); quando há nulidade, o remédio é eleição nova (CE art. 224),
-> não ausência de resultado. O remédio aqui é o mesmo: estender o prazo, ou
+> Nenhum sistema eleitoral sério recusa contar. A prática é proteger a célula
+> pequena **antes**, agregando seções abaixo de um piso; quando há nulidade, o
+> remédio é eleição nova, não ausência de resultado. O remédio aqui é o mesmo: estender o prazo, ou
 > refazer com um eleitorado que caiba no sigilo.
 
 **Narração:**
@@ -532,7 +531,7 @@ cd cli && cargo build --release && cd ..
 ```
 
 ```bash
-export TESSERA_CONTRATO=CBYKJOBOIKSLXFLYQHYNFEJER643TY6KFVHLVTNUQNNDO5JRJPYDI2B6
+export TESSERA_CONTRATO=CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH
 python3 console/ponte.py
 ```
 
@@ -674,7 +673,7 @@ Nada fora desta tabela deve ser afirmado em quadro.
 
 | | |
 |---|---|
-| Contrato (testnet) | `CBYKJOBOIKSLXFLYQHYNFEJER643TY6KFVHLVTNUQNNDO5JRJPYDI2B6` |
+| Contrato (testnet) | `CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH` |
 | Wasm otimizado | 22.584 B = **29,2 KB** |
 | Testes | **112** · bls-smoke 13, core 49, contrato 25, cli 25 |
 | `votar`, custo | **9.805.000 + 13.501.500 por opção sigilosa** |

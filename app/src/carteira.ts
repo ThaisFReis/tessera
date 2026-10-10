@@ -12,7 +12,7 @@ export interface Carteira {
 /**
  * A carteira de uso único — e é ela que torna o voto desvinculado.
  *
- * A urna brasileira não esconde o voto de quem tem acesso: ela **quebra o
+ * O voto secreto não esconde a cédula de quem tem acesso à urna: ele **quebra o
  * vínculo**. O caderno diz quem compareceu, a urna diz o que foi votado, e nada
  * liga os dois. Aqui o papel do caderno é da carteira de identidade da pessoa,
  * que assina `comparecer`; o papel da urna é desta, que assina a cédula e é

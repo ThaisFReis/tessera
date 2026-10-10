@@ -30,6 +30,8 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 
+import { instrucoes } from "./medir.mjs";
+
 const require = createRequire(import.meta.url);
 const wasm = require("../../cliente-wasm/pacote-node/tessera_cliente.js");
 
@@ -38,7 +40,7 @@ const HORIZON = "https://horizon-testnet.stellar.org";
 const FRIENDBOT = "https://friendbot.stellar.org";
 const PASSPHRASE = Networks.TESTNET;
 const CONTRATO = process.env.TESSERA_CONTRATO ??
-  "CBYKJOBOIKSLXFLYQHYNFEJER643TY6KFVHLVTNUQNNDO5JRJPYDI2B6";
+  "CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH";
 
 const ELEITORADO = 2;
 const COMPARECEM = 1;
@@ -58,6 +60,9 @@ const bN = (h) => xdr.ScVal.scvBytes(hexBytes(h));
 // rodar. Foi o que custou duas rodadas de testnet para achar.
 const fr = (h) => nativeToScVal(BigInt("0x" + h), { type: "u256" });
 const u32 = (n) => xdr.ScVal.scvU32(n);
+const u64 = (n) => xdr.ScVal.scvU64(new xdr.Uint64(BigInt(n)));
+// Sem fechadura de tempo nestas cargas: o criptograma vai vazio.
+const semCripto = () => xdr.ScVal.scvBytes(new Uint8Array(0));
 const vec = (v) => xdr.ScVal.scvVec(v);
 const addr = (g) => new Address(g).toScVal();
 // 44 bytes: SCV_ADDRESS ‖ ACCOUNT ‖ ED25519 ‖ chave. `toScAddress()` dá 40 e
@@ -101,6 +106,9 @@ async function enviar(par, metodo, args) {
     .build();
   const sim = await servidor.simulateTransaction(bruta);
   if (rpc.Api.isSimulationError(sim)) throw new Error(`${metodo}: ${sim.error}`);
+  // Mede **antes** de enviar: se o SDK mudar de forma, o script para aqui em
+  // vez de gastar uma rodada inteira e imprimir um custo que não foi medido.
+  const cpu = instrucoes(sim, metodo);
   const pronta = rpc.assembleTransaction(bruta, sim).build();
   pronta.sign(par);
   const envio = await servidor.sendTransaction(pronta);
@@ -110,7 +118,7 @@ async function enviar(par, metodo, args) {
   for (let i = 0; i < 60; i++) {
     const r = await servidor.getTransaction(envio.hash);
     if (r.status === rpc.Api.GetTransactionStatus.SUCCESS) {
-      return { hash: envio.hash, cpu: sim.cost?.cpuInsns, taxa: pronta.fee };
+      return { hash: envio.hash, cpu, taxa: pronta.fee };
     }
     if (r.status === rpc.Api.GetTransactionStatus.FAILED) {
       throw new Error(`${metodo} falhou on-chain: ${envio.hash}`);
@@ -176,6 +184,10 @@ async function main() {
     u32(abreEm),
     u32(fechaEm),
     xdr.ScVal.scvBool(true),
+    u32(1),      // secoes
+    u32(0),      // limite_secao
+    u64(0),      // rodada da fechadura: 0 = sem fechadura
+    u64(0),      // rodada de abertura: 0, porque é uma seção só
   ]);
   diz(`proposta ${id.slice(0, 12)}…`);
   diz(`comparecimento até o ledger ${abreEm} · votação até ${fechaEm}`);
@@ -221,6 +233,7 @@ async function main() {
     const c = wasm.cedula_anonima(
       id, hp, h, anel, i, chaves[i].secreta,
       [{ opcoes: OPCOES.length, confidencial: true }], [escolha],
+      0n, // sem fechadura
     );
     const par = await nascer();
     efemeras.push(par.publicKey());
@@ -235,6 +248,7 @@ async function main() {
         vec(c.cedula.provas.map(provaCds)),
         vec(c.cedula.provas_soma.map(provaSoma)),
         vec(c.cedula.escolhas.map(u32)),
+        semCripto(),
       ]);
       diz("SONDA: c0 adulterado PASSOU — isso é grave");
     } catch (e) {
@@ -246,6 +260,7 @@ async function main() {
       vec(c.cedula.provas.map(provaCds)),
       vec(c.cedula.provas_soma.map(provaSoma)),
       vec(c.cedula.escolhas.map(u32)),
+      semCripto(),
     ]);
     diz(`cédula ${i + 1} de ${COMPARECEM} · de ${par.publicKey().slice(0, 8)}… · imagem ${c.imagem.slice(0, 12)}…`);
     if (i === 0) diz(`   cpu ${r.cpu} · taxa ${r.taxa} stroops · anel de ${anel.length}`);

@@ -99,6 +99,30 @@ pub fn para_hex(p: &G1Affine) -> String {
     serializar(p).iter().map(|b| format!("{:02x}", b)).collect()
 }
 
+// ---------- G2, para a baliza ----------
+
+pub const TAMANHO_G2: usize = 192;
+
+/// Ponto G2 → 192 bytes, como o host lê.
+///
+/// Cada coordenada é de `Fp2`, e a ordem entre `c0` e `c1` é a divergência
+/// silenciosa deste arquivo elevada ao quadrado. A ordem usada aqui — **`c1`
+/// antes de `c0`**, que é a convenção zcash do BLS12-381 — não foi deduzida:
+/// está travada por `contrato` `o_host_confere_a_baliza_e_a_ordem_de_g2_e_medida`,
+/// que tenta as duas e deixa o pareamento do host decidir qual passa.
+pub fn serializar_g2(p: &ark_bls12_381::G2Affine) -> [u8; TAMANHO_G2] {
+    let mut saida = [0u8; TAMANHO_G2];
+    if p.is_zero() {
+        saida[0] = 0x40;
+        return saida;
+    }
+    let (x, y) = (p.x().unwrap(), p.y().unwrap());
+    for (i, f) in [&x.c1, &x.c0, &y.c1, &y.c0].iter().enumerate() {
+        saida[i * 48..(i + 1) * 48].copy_from_slice(&f.into_bigint().to_bytes_be());
+    }
+    saida
+}
+
 #[cfg(test)]
 mod testes {
     use super::*;

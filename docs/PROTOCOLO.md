@@ -737,6 +737,31 @@ só no contrato.
 > junto, não depois — sem ela o recurso é uma armadilha. O que fica para a v1.1
 > é a **abstenção** por pergunta, que precisa de uma disjuntiva a mais.
 
+#### Abrir cédula por cédula não move o piso
+
+Acrescentado quando a apuração deixou de ser tudo-ou-nada (`SPEC` DEC-009): o
+resultado passa a sair de um **subconjunto** das cédulas, cada uma aberta
+individualmente. Isso é informação pública nova, então o teorema do começo desta
+seção se aplica a ela — e o que ele diz é que o piso **não** muda de lugar.
+
+O piso protege o **conjunto de anonimato**, que é o anel: quem poderia ter
+depositado aquela cédula. Abrir cédula por cédula revela conteúdos anônimos e
+não encolhe o anel — com 10 no anel e 2 cédulas abertas, cada uma das duas
+continua podendo ser de qualquer um dos 10. Logo o piso é sobre o **anel**, não
+sobre quantas abriram.
+
+E tem de ser, porque o contrário reabriria exatamente a porta que a subseção
+seguinte fechou: se `apurar` exigisse `τ` cédulas **abertas**, uma coligação
+sabotaria o próprio criptograma, o número de abertas cairia abaixo de `τ`, e a
+apuração travaria. Seria a falha de liveness induzível de fora de volta, agora
+por outro caminho — e o requisito novo é que ninguém consiga travar o placar.
+
+Então: a conferência de `τ` do caminho novo é contra o tamanho do anel da seção,
+que é onde o contrato já a faz quando há seções
+(`contrato/src/lib.rs`, `AnonimatoInsuficiente`), e **nunca** contra o
+subconjunto que abriu. O portão `conf > 0 && conf < TAU` continua valendo para
+quem apura com mesa.
+
 #### Por que isto é quórum, e não recusa
 
 Esta seção defendia a troca como *"converte uma quebra de privacidade numa
@@ -746,34 +771,34 @@ de fora**: três pessoas abrindo o voto encolhiam o conjunto sigiloso abaixo de
 τ e vetavam a assembleia inteira. Recusar o resultado correto deixa de ser
 prudência e vira negação de serviço contra a própria eleição.
 
-Nenhum sistema eleitoral sério aceita isso. Vale olhar o brasileiro, que é
-grande e muito contestado:
+Nenhum sistema eleitoral sério aceita isso. Os caminhos que um sistema maduro
+oferece a quem contesta são todos de **conferir**, nunca de parar:
 
 | Quando alguém contesta | O que o sistema faz |
 |---|---|
-| Boletim de Urna | cada urna publica seus totais; qualquer pessoa soma todas e compara com o oficial |
-| RDV | registro digital embaralhado, permite recontagem a qualquer tempo |
-| Votação paralela | urnas sorteadas votam em público no dia, e se confere se contaram o que foi digitado |
-| Nulidade provada | eleição **nova** (CE art. 224) |
+| Totais por urna | cada urna publica os seus; qualquer pessoa soma todas e compara com o oficial |
+| Registro embaralhado | permite recontagem a qualquer tempo, sem reabrir o vínculo |
+| Verificação paralela | urnas sorteadas votam em público no dia, e se confere se contaram o que foi digitado |
+| Nulidade provada | eleição **nova** |
 
 Em nenhum desses caminhos o sistema devolve "não vou contar". E o problema da
-célula pequena ele resolve **antes**: seção com menos de 50 eleitores é agregada
-a outra (TSE, Res. 23.669/2021). Protege-se mudando o tamanho da urna, nunca
-recusando a contagem depois.
+célula pequena ele resolve **antes**: seção abaixo de um piso é agregada a
+outra. Protege-se mudando o tamanho da urna, nunca recusando a contagem
+depois.
 
 Removido `votar_publico()`, toda cédula é sigilosa e não há partição a induzir.
 O único caminho até abaixo de τ passa a ser **comparecimento baixo** — que não é
 ataque, é quórum. E quórum se declara na abertura, junto com o prazo e a mesa;
 não aparece como surpresa na apuração.
 
-O remédio é o mesmo do Brasil: estender o prazo, ou refazer com um eleitorado
-que caiba no sigilo. O que não existe mais é um terceiro provocar a recusa.
+O remédio é o de sempre: estender o prazo, ou refazer com um eleitorado que
+caiba no sigilo. O que não existe mais é um terceiro provocar a recusa.
 
 > **Onde Tessera é melhor que a urna**, e vale dizer: um total falso não é
 > apenas auditável depois — ele **não é representável**. A mesa não consegue
-> publicar números que não fechem contra o acumulador. A contestação brasileira
-> precisa de auditoria porque o sistema *poderia* ter contado errado; aqui o
-> contrato recusa antes de publicar.
+> publicar números que não fechem contra o acumulador. Contestar uma urna comum
+> exige auditoria porque o sistema *poderia* ter contado errado; aqui o contrato
+> recusa antes de publicar.
 
 ## 7. Orçamento de custo
 
@@ -1120,7 +1145,7 @@ contrato recusa.
 | Recusa por `τ` demonstrada na rede (D3) | ✅ feito |
 | Vídeo de demonstração ponta a ponta | **pendente** |
 
-Contrato na testnet: `CBYKJOBOIKSLXFLYQHYNFEJER643TY6KFVHLVTNUQNNDO5JRJPYDI2B6`.
+Contrato na testnet: `CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH`.
 129 testes passando em quatro pacotes, Wasm de 29,2 KB otimizado.
 
 **Congelamento de código: 2026-10-04, 12:00.** Submissão fecha 2026-10-05 19:00.

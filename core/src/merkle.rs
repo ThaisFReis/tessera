@@ -57,9 +57,6 @@ pub struct Apto {
     /// Peso, ou identificador de faixa. Conferido contra a folha, nunca
     /// aceito do que quem vota afirma.
     pub peso: u32,
-    /// Em que seção esta pessoa vota. `0` quando a votação não tem seções.
-    /// Como o peso: conferido contra a folha, nunca aceito da chamada.
-    pub secao: u32,
 }
 
 /// `H(0x00 ‖ endereço ‖ peso_be ‖ secao_be)`.
@@ -68,49 +65,99 @@ pub fn folha(a: &Apto) -> Hash {
     h.update([DOM_FOLHA]);
     h.update(&a.endereco);
     h.update(a.peso.to_be_bytes());
-    h.update(a.secao.to_be_bytes());
     h.finalize().into()
 }
 
-/// A divisão em seções, **derivável da lista por qualquer um**.
+/// Quantas pessoas uma seção deve ter, em média.
 ///
-/// Um anel só esconde dentro do conjunto que publica, e o custo de verificá-lo
-/// cresce com o tamanho: por isso as seções existem. Mas quem as monta decide
-/// quem se esconde atrás de quem, e um organizador de má-fé poria o dissidente
-/// numa seção sozinho — anel de um, voto ligado à pessoa, sem precisar de
-/// conluio nenhum.
+/// O número governa as duas pontas ao mesmo tempo, e isso não é coincidência
+/// arranjada — é onde as duas restrições se cruzam:
 ///
-/// Então ele não escolhe. A ordem vem de `H(0x03 ‖ proposta ‖ endereço)` e as
-/// seções são distribuídas em rodízio sobre essa ordem, o que as deixa do mesmo
-/// tamanho a menos de um. Qualquer pessoa com a lista recalcula e confere.
+/// - **por baixo**, o desequilíbrio. A seção é derivada por hash, e hash joga
+///   bolas em urnas: com média 10 por seção a chance de alguma cair abaixo de
+///   `τ = 5` é de 3,5% a 22% conforme o tamanho; com média 20 é de 0,0% nos
+///   ensaios. Abaixo de `τ` aquela seção simplesmente não vota, e o projeto
+///   prefere falhar a vazar — mas falhar sem necessidade é desenho ruim;
+/// - **por cima**, a CPU. Verificar um anel custa 10.822.850 instruções por
+///   membro, então um anel de 20 usa 54% do teto de uma transação.
 ///
-/// O que ele ainda pode fazer é moer o `id` da proposta procurando um sorteio
-/// que lhe agrade. Com seções de tamanho igual isso não produz uma seção de um,
-/// que é o ataque que importa — mas é um limite, e está declarado.
-pub fn dividir(proposta: &[u8], enderecos: &[Vec<u8>], secoes: u32) -> Vec<u32> {
-    let n = enderecos.len();
-    if secoes <= 1 || n == 0 {
-        return vec![0; n];
+/// Logo: vinte.
+pub const ALVO_SECAO: u32 = 20;
+
+/// Teto de membros numa seção, pela CPU.
+///
+/// Medido em `contrato` `ate_quantas_pessoas_cabe_um_anel`: **32 membros custam
+/// 387.387.254 instruções, 96,8% do teto** de 400.000.000, e 34 estoura. Trinta
+/// e dois é onde para.
+///
+/// Os dois números juntos são o que fecha a conta: com teto 32 e alvo 20, a
+/// chance de uma seção cair abaixo de `τ` fica em 0,002% na pior faixa pequena
+/// e 0,071% em mil aptos. Com teto 30 havia uma faixa cega de 33 a 39 aptos, em
+/// que uma seção passava do teto e duas ficavam com média 16 — foi medir o teto
+/// de verdade que a fechou.
+pub const MAX_SECAO: u32 = 32;
+
+/// Quantas seções para um eleitorado deste tamanho.
+///
+/// Parte da média-alvo e só acrescenta seção quando a média passaria do teto de
+/// CPU. O resultado fica sempre em `[ALVO_SECAO, MAX_SECAO]`, que é a faixa onde
+/// o desequilíbrio do hash não derruba ninguém abaixo de `τ` — travado em
+/// `o_dimensionamento_mantem_a_secao_acima_de_tau`.
+pub fn secoes_para(aptos: usize) -> u32 {
+    let mut secoes = ((aptos as u32) / ALVO_SECAO).max(1);
+    while aptos as u32 / secoes > MAX_SECAO {
+        secoes += 1;
     }
-    let mut ordem: Vec<(Hash, usize)> = enderecos
+    secoes
+}
+
+/// A seção de uma pessoa: `H(0x03 ‖ assinatura ‖ endereço) mod secoes`.
+///
+/// **Vem da baliza, não do identificador da proposta** — e a diferença é a
+/// DEC-012. Enquanto a seção saía de `H(0x03 ‖ proposta ‖ endereço)`, quem
+/// organizava escolhia o identificador e podia moê-lo até pôr o dissidente numa
+/// seção com atacantes: cada atacante conhece a própria imagem de chave,
+/// elimina a própria cédula, e o que sobra é a da vítima. Conjunto de anonimato
+/// efetivo igual a 1, sem quebrar criptografia nenhuma.
+///
+/// Derivando da assinatura da rodada de abertura, moer não existe: na hora de
+/// `abrir` aquela assinatura não existe no mundo. Depois de `abre_em` a seção é
+/// determinística e pública — e **tem de ser**, porque um anel só verifica
+/// contra um conjunto nomeado, então esconder a seção é impossível neste
+/// desenho. O que se ganha não é sigilo da seção, é a impossibilidade de
+/// **escolher** quem se esconde atrás de quem.
+///
+/// Por que `mod` e não o rodízio que equilibrava: o contrato tem de **conferir**
+/// a seção, senão quem vota escolhe a sua e o ataque volta por outra porta. O
+/// rodízio exige a lista inteira do eleitorado dentro da transação; o `mod` é um
+/// hash e uma divisão. O desequilíbrio que isso traz é pago pelo
+/// dimensionamento de [`ALVO_SECAO`], e o piso de `τ` continua sendo a rede de
+/// proteção. Ver DEC-013.
+///
+/// **`assinatura` são os 96 bytes não comprimidos**, do jeito que o host do
+/// Soroban os lê e guarda — `relogio::assinatura_para_host` faz a conversão. A
+/// baliza publica comprimido em 48; alimentar isto com os 48 daria outra divisão
+/// em silêncio, e o contrato recusaria a seção sem dizer por quê.
+pub fn secao_de(assinatura: &[u8], endereco: &[u8], secoes: u32) -> u32 {
+    if secoes <= 1 {
+        return 0;
+    }
+    let mut h = Sha256::new();
+    h.update([DOM_SECAO]);
+    h.update(assinatura);
+    h.update(endereco);
+    let d: Hash = h.finalize().into();
+    let n = u64::from_be_bytes(d[..8].try_into().unwrap());
+    (n % secoes as u64) as u32
+}
+
+/// A divisão inteira, para o cliente mostrar antes de a votação abrir. O
+/// contrato nunca a chama: ele confere uma seção de cada vez com [`secao_de`].
+pub fn dividir(assinatura: &[u8], enderecos: &[Vec<u8>], secoes: u32) -> Vec<u32> {
+    enderecos
         .iter()
-        .enumerate()
-        .map(|(i, e)| {
-            let mut h = Sha256::new();
-            h.update([DOM_SECAO]);
-            h.update(proposta);
-            h.update(e);
-            (h.finalize().into(), i)
-        })
-        .collect();
-    // O índice entra no critério para que listas com endereços repetidos não
-    // dependam da estabilidade do `sort`.
-    ordem.sort_unstable();
-    let mut secao = vec![0u32; n];
-    for (k, (_, i)) in ordem.iter().enumerate() {
-        secao[*i] = (k % secoes as usize) as u32;
-    }
-    secao
+        .map(|e| secao_de(assinatura, e, secoes))
+        .collect()
 }
 
 /// `H(0x01 ‖ esquerda ‖ direita)`.
@@ -253,7 +300,6 @@ mod testes {
             .map(|i| Apto {
                 endereco: (i as u64).to_be_bytes().to_vec(),
                 peso: 1,
-                secao: 0,
             })
             .collect()
     }
@@ -262,24 +308,70 @@ mod testes {
         (0..n).map(|i| (i as u64).to_be_bytes().to_vec()).collect()
     }
 
+    /// **A garantia mudou de lugar, não desapareceu.** O rodízio equilibrava
+    /// por construção e não dava para conferir dentro de uma transação; o `mod`
+    /// confere num hash e desequilibra. Então o que sustenta o piso passa a ser
+    /// o **dimensionamento**: com `secoes_para`, nenhuma seção cai abaixo de `τ`.
+    ///
+    /// O teste varre muitas assinaturas de propósito. Uma única assinatura não
+    /// diria nada: a seção é função dela, e a pergunta é sobre a distribuição.
     #[test]
-    fn a_divisao_e_equilibrada_e_ninguem_fica_sozinho() {
-        for (n, secoes) in [(30usize, 3u32), (30, 2), (10, 3), (7, 2), (100, 5)] {
-            let d = dividir(b"proposta", &enderecos(n), secoes);
-            let mut contagem = vec![0usize; secoes as usize];
-            for s in &d {
-                contagem[*s as usize] += 1;
-            }
-            let menor = *contagem.iter().min().unwrap();
-            let maior = *contagem.iter().max().unwrap();
+    fn o_dimensionamento_mantem_a_secao_acima_de_tau() {
+        const TAU: usize = 5;
+        for n in [21usize, 31, 32, 33, 35, 39, 40, 59, 60, 61, 100, 200, 500] {
+            let es = enderecos(n);
+            let secoes = secoes_para(n);
+            // O teto é CPU e vale sempre; o alvo é estatístico e cede na
+            // faixa logo acima do teto, onde partir em duas é o único jeito de
+            // caber. O que **não** cede é o piso de `τ`, asserido abaixo.
+            let media = n / secoes as usize;
             assert!(
-                maior - menor <= 1,
-                "{} em {} seções: {:?} — rodízio devia equilibrar",
-                n,
-                secoes,
-                contagem
+                media <= MAX_SECAO as usize,
+                "{n} em {secoes} seções dá média {media}, acima do teto de CPU"
             );
-            assert_eq!(menor, n / secoes as usize);
+            for rodada in 0u64..200 {
+                let assinatura = sha2::Sha256::digest(rodada.to_be_bytes());
+                let d = dividir(&assinatura, &es, secoes);
+                let mut contagem = vec![0usize; secoes as usize];
+                for s in &d {
+                    contagem[*s as usize] += 1;
+                }
+                let menor = *contagem.iter().min().unwrap();
+                assert!(
+                    menor >= TAU,
+                    "{n} em {secoes} seções, rodada {rodada}: {contagem:?} — \
+                     seção abaixo de τ, e aquelas pessoas não votariam"
+                );
+            }
+        }
+    }
+
+    /// **DEC-012.** A seção vem da baliza, não do identificador da proposta. É o
+    /// que impede quem organiza de escolher quem se esconde atrás de quem.
+    #[test]
+    fn a_secao_vem_da_baliza_e_nao_do_identificador() {
+        let es = enderecos(40);
+        let a = dividir(b"assinatura da rodada 100", &es, 2);
+        let b = dividir(b"assinatura da rodada 101", &es, 2);
+        assert_ne!(a, b, "a assinatura não entra na derivação");
+    }
+
+    /// E o corolário que é o conserto de verdade: **moer o identificador não
+    /// isola ninguém**, porque o identificador não entra. Antes da DEC-012
+    /// entrava, e quem organizava gerava propostas até o alvo cair onde queria.
+    #[test]
+    fn moer_o_identificador_nao_isola_ninguem() {
+        let es = enderecos(40);
+        let assinatura = b"a assinatura que a baliza publicou";
+        let referencia = dividir(assinatura, &es, 2);
+        // Dez mil tentativas de moer: nenhuma muda a seção de ninguém.
+        for tentativa in 0u64..10_000 {
+            let _proposta = sha2::Sha256::digest(tentativa.to_be_bytes());
+            assert_eq!(
+                dividir(assinatura, &es, 2),
+                referencia,
+                "moer a proposta mudou a divisão na tentativa {tentativa}"
+            );
         }
     }
 
@@ -302,11 +394,11 @@ mod testes {
     }
 
     #[test]
-    fn a_divisao_muda_com_a_proposta() {
-        let es = enderecos(20);
+    fn a_divisao_muda_com_a_rodada() {
+        let es = enderecos(40);
         assert_ne!(
-            dividir(b"uma", &es, 4),
-            dividir(b"outra", &es, 4),
+            dividir(b"uma", &es, 2),
+            dividir(b"outra", &es, 2),
             "duas votações dariam sempre os mesmos vizinhos"
         );
     }
@@ -317,21 +409,20 @@ mod testes {
         assert_eq!(dividir(b"p", &enderecos(5), 0), vec![0; 5]);
     }
 
+    /// **A folha não carrega mais seção** (DEC-012), e isso é amarra mais forte,
+    /// não mais fraca: a seção deixa de estar presa a um campo que quem organiza
+    /// escolhe na hora de montar a lista, e passa a estar presa a uma assinatura
+    /// que não existe naquele momento.
+    ///
+    /// O teste olha a fonte, porque é a única forma de provar uma ausência.
     #[test]
-    fn a_secao_esta_presa_na_folha() {
-        let a = Apto {
-            endereco: vec![7u8; 32],
-            peso: 1,
-            secao: 0,
-        };
-        let b = Apto {
-            secao: 1,
-            ..a.clone()
-        };
-        assert_ne!(
-            folha(&a),
-            folha(&b),
-            "trocar de seção não mudou a folha: o votante escolheria a sua"
+    fn a_folha_nao_carrega_mais_secao() {
+        let fonte = include_str!("merkle.rs");
+        let corpo = &fonte[fonte.find("pub fn folha(").unwrap()..];
+        let corpo = &corpo[..corpo.find("\n}").unwrap()];
+        assert!(
+            !corpo.contains("secao"),
+            "a seção voltou para a folha: ela é escolhida por quem monta a lista"
         );
     }
 
@@ -357,7 +448,6 @@ mod testes {
         let intruso = Apto {
             endereco: vec![0xEE; 32],
             peso: 1,
-            secao: 0,
         };
         for i in 0..16 {
             let c = arv.caminho(i).unwrap();
@@ -384,13 +474,11 @@ mod testes {
         let mentindo = Apto {
             endereco: aptos[3].endereco.clone(),
             peso: 1000,
-            secao: 0,
         };
         assert!(!verificar(&mentindo, &c, &raiz), "peso inflado foi aceito");
         let menos = Apto {
             endereco: aptos[3].endereco.clone(),
             peso: 0,
-            secao: 0,
         };
         assert!(!verificar(&menos, &c, &raiz));
     }
@@ -444,7 +532,6 @@ mod testes {
         let a = Apto {
             endereco: vec![7u8; 32],
             peso: 3,
-            secao: 0,
         };
         let f = folha(&a);
         assert_ne!(f, no(&f, &f));
@@ -546,7 +633,6 @@ mod vetor {
                 Apto {
                     endereco: e,
                     peso: 1,
-                    secao: 0,
                 }
             })
             .collect()

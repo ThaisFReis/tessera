@@ -19,15 +19,15 @@ use soroban_sdk::{
 /// fora, e três pessoas bastavam para vetar a assembleia inteira. Recusar o
 /// resultado correto virava negação de serviço contra a eleição.
 ///
-/// Nenhum sistema eleitoral sério aceita isso. O Brasil protege a célula
-/// pequena **antes**, agregando seções com menos de 50 eleitores, e nunca
-/// recusa a contagem depois (TSE, Res. 23.669/2021); quando há nulidade, o
-/// remédio é eleição nova (CE art. 224), não ausência de resultado.
+/// Nenhum sistema eleitoral sério aceita isso. A prática é proteger a célula
+/// pequena **antes** — agregando seções abaixo de um piso — e nunca recusar a
+/// contagem depois; quando há nulidade, o remédio é eleição nova, não ausência
+/// de resultado.
 ///
 /// Removido `votar_publico`, não há partição a induzir: toda cédula é
 /// sigilosa, e o único jeito de ficar abaixo de `TAU` é comparecimento baixo.
-/// O remédio é o mesmo do Brasil — estender o prazo ou refazer com um
-/// eleitorado que caiba no sigilo.
+/// O remédio é o de sempre — estender o prazo ou refazer com um eleitorado que
+/// caiba no sigilo.
 ///
 /// Perguntas públicas não mexem nisso: são do estatuto, iguais para todos, e
 /// não distinguem um eleitor de outro.
@@ -106,6 +106,30 @@ pub enum Erro {
     /// Numa votação aberta não há lista: o caminho de Merkle tem de vir vazio,
     /// e a seção quem decide é o contrato.
     VotacaoAberta = 33,
+    /// A rodada da fechadura de tempo não é a que `fim_tempo` determina. É o
+    /// portão que impede cifrar para uma rodada no passado — que abriria na
+    /// hora — ou longe no futuro, que nunca abriria. Ver SPEC INV-22.
+    RodadaNaoFecha = 34,
+    /// A rodada da fechadura ainda não venceu: a chave que decifra as cédulas
+    /// não existe no mundo. Recusar aqui é o que torna INV-18 incondicional.
+    RelogioAindaNaoAbriu = 35,
+    /// A lista de compromissos apresentada não re-encadeia no que as cédulas
+    /// escreveram. É omissão ou invenção — ver SPEC INV-20.
+    CadeiaNaoFecha = 36,
+    /// A apuração apresentada abre **menos** cédulas que a já guardada. Só um
+    /// conjunto estritamente maior substitui — ver SPEC INV-21.
+    NaoMelhora = 37,
+    /// O criptograma não tem 160 bytes por opção confidencial.
+    CriptogramaMalFormado = 38,
+    /// A assinatura apresentada não é a da rodada de abertura desta proposta.
+    /// `e(σ, g₂) != e(H₁(rodada), P)` — é um relé mentindo, ou a rodada errada.
+    BalizaNaoConfere = 39,
+    /// A rodada de abertura ainda não venceu: a assinatura que decide as seções
+    /// não existe no mundo, então ninguém pode comparecer.
+    AberturaAindaNaoVenceu = 40,
+    /// A assinatura da rodada de abertura não foi registrada. Qualquer pessoa
+    /// pode registrá-la, e sem ela não há seção para conferir.
+    BalizaNaoRegistrada = 41,
 }
 
 #[contracttype]
@@ -153,6 +177,28 @@ pub enum Chave {
     /// primeira cédula dela chega. A cédula traz a lista inteira e o contrato
     /// compara — 32 bytes de estado em vez de `n` pontos relidos a cada voto.
     DigestoAnel(BytesN<32>, u32),
+    /// Quantas pessoas já compareceram. Entrada de tamanho fixo, de propósito:
+    /// é ela que decide a seção na votação aberta, e um `u32` não muda de
+    /// tamanho, então o footprint declarado continua valendo quando várias
+    /// pessoas comparecem no mesmo instante.
+    Caderno(BytesN<32>),
+    /// **A cadeia de compromissos da seção**: `(sha256(anterior ‖
+    /// compromissos), quantas cédulas)`, atualizada por cada cédula anônima.
+    ///
+    /// Trinta e seis bytes que **não crescem** — ao contrário de `Anel`, que
+    /// cresce 96 B por pessoa e produziu a §11-D. É ela que prova, na apuração,
+    /// que a lista apresentada é exatamente o conjunto de cédulas daquela
+    /// seção: omitir uma muda o encadeamento, inventar uma também.
+    Cadeia(BytesN<32>, u32),
+    /// `(quantas cédulas abriram, totais confidenciais)` daquela seção. Só é
+    /// substituído por uma apuração que abra **mais** cédulas (INV-21).
+    ResultadoSecao(BytesN<32>, u32),
+    /// Quantas seções já têm resultado. Quando bate com `secoes`, o placar
+    /// existe.
+    SecoesApuradas(BytesN<32>),
+    /// A assinatura da baliza da rodada de abertura, **já conferida pelo
+    /// contrato**, nos 96 bytes que o host lê. É dela que sai a seção.
+    Abertura(BytesN<32>),
     /// Uma imagem de chave já usada. **Não é um endereço**: é `I = x·Hp`, que
     /// identifica a pessoa dentro desta proposta e em nenhuma outra.
     ImagemUsada(BytesN<32>, BytesN<32>),
@@ -200,6 +246,27 @@ pub struct Proposta {
     pub abre_em: u32,
     /// Sequência de ledger a partir da qual não se vota mais.
     pub fecha_em: u32,
+    /// A rodada da baliza que destranca as cédulas.
+    ///
+    /// `fecha_em` é sequência de ledger e a fechadura precisa de relógio: a
+    /// rodada vence num instante. Não existe campo de tempo separado porque
+    /// seria redundante — o instante **é** `instante(rodada)`, e guardar os dois
+    /// só criaria uma divergência possível. A apuração exige os dois portões: a
+    /// sequência passou e a rodada venceu.
+    ///
+    /// `0` é proposta sem fechadura — a da mesa, que continua existindo.
+    pub rodada: u64,
+    /// A rodada da baliza que **abre o comparecimento**, e de cuja assinatura
+    /// sai a seção de cada pessoa (DEC-012).
+    ///
+    /// Ela fica entre `abrir` e o começo do comparecimento, e é essa posição que
+    /// faz o desenho funcionar: na hora de `abrir` a assinatura não existe, então
+    /// quem organiza não consegue moer o que quer que seja até isolar alguém; e
+    /// quando as pessoas comparecem ela já existe, então cada uma sabe a sua
+    /// seção. Rodadas saem a cada 3 segundos. Ver §11-J.
+    ///
+    /// `0` é proposta sem seções derivadas da baliza.
+    pub rodada_abertura: u64,
     /// **O caderno e a urna, separados.**
     ///
     /// Com `anel = true` a proposta tem duas fases: até `abre_em` as pessoas
@@ -210,8 +277,10 @@ pub struct Proposta {
     /// É o desenho da urna: o caderno diz quem faltou — e voto obrigatório
     /// precisa disso —, a cédula não diz de quem é, e nada liga os dois.
     pub anel: bool,
-    /// Em quantas seções o eleitorado foi dividido. `1` é a votação sem
-    /// seções — um anel só, com todo mundo que compareceu.
+    /// Quantas seções existem **agora**.
+    ///
+    /// Na fechada é fixo: sai da lista na abertura. Na aberta cresce sozinho —
+    /// a seção enche até `limite_secao` e a próxima abre.
     ///
     /// A seção existe porque verificar um anel custa 10.822.850 instruções por
     /// membro: um anel de 30 usa 91,4% do teto de CPU de uma transação, e só
@@ -222,6 +291,12 @@ pub struct Proposta {
     /// votação inteira. O resultado continua único — o acumulador é por
     /// proposta e não sabe de que seção veio cada cédula.
     pub secoes: u32,
+    /// Quantas pessoas cabem numa seção antes de a próxima abrir. `0` é uma
+    /// seção só, sem limite.
+    ///
+    /// Só tem efeito na votação aberta: na fechada a lista é conhecida e a
+    /// divisão sai dela na abertura, presa na folha de Merkle.
+    pub limite_secao: u32,
 }
 
 /// Prova disjuntiva de Cramer–Damgård–Schoenmakers: `v ∈ {0,1}`.

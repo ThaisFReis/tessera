@@ -45,3 +45,27 @@ export function lerChaveDeAnel(proposta: string): ChaveDeAnel | null {
   const v = localStorage.getItem(chaveAnel(proposta));
   return v ? (JSON.parse(v) as ChaveDeAnel) : null;
 }
+
+/**
+ * Apaga a chave de anel. **Chamado assim que a cédula entra.**
+ *
+ * Depois de votar ela não serve para mais nada — e serve contra quem a tem:
+ * de `secreta` sai a imagem `I = x·Hp`, e a imagem está na cédula, no ledger,
+ * em claro. Quem ler este `localStorage` acha **qual das cédulas é sua**.
+ *
+ * Esse é exatamente o vínculo que o anel existe para não haver. Guardá-lo
+ * depois do voto seria reconstruí-lo num arquivo local, de graça.
+ *
+ * Sobrescreve antes de remover, como `recibo::queimar` faz na CLI: o
+ * `localStorage` não garante que remover apague os bytes.
+ */
+export function esquecerChaveDeAnel(proposta: string) {
+  const k = chaveAnel(proposta);
+  try {
+    const v = localStorage.getItem(k);
+    if (v) localStorage.setItem(k, "0".repeat(v.length));
+    localStorage.removeItem(k);
+  } catch {
+    /* aba anônima ou cota: não pode derrubar o voto que já entrou */
+  }
+}

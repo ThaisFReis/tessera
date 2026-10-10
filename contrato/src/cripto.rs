@@ -23,6 +23,8 @@ pub const DST_SOMA: &[u8] = b"TESSERA-V1-SOMA";
 
 const DOM_FOLHA: u8 = 0x00;
 const DOM_NO: u8 = 0x01;
+/// Separação de domínio da seção, igual à do `core`.
+const DOM_SECAO: u8 = 0x03;
 
 /// Gerador canônico de G1, não comprimido: `be_bytes(X) ‖ be_bytes(Y)`.
 ///
@@ -236,11 +238,37 @@ pub fn verificar_soma(
 /// de 64 bytes bem escolhida seria apresentada como nó interno.
 ///
 /// Custa 127.863 em profundidade 8, 13.128 por nível (sonda 13).
+/// A seção de uma pessoa: `H(0x03 ‖ assinatura ‖ endereço) mod secoes`.
+///
+/// Espelha `core::merkle::secao_de`, e a divergência entre as duas é pega a cada
+/// `cargo test` por `a_secao_do_contrato_bate_com_a_do_core`. Repetir aqui em
+/// vez de importar o `core` é a mesma escolha da aritmética da rodada: o `core`
+/// é dev-dependency, e trazê-lo para o runtime arrastaria arkworks para dentro
+/// do Wasm por causa de um sha256.
+///
+/// **A assinatura é da baliza, não o identificador da proposta** — DEC-012.
+/// Enquanto saía da proposta, quem organizava moía o identificador até pôr o
+/// dissidente numa seção cheia de atacantes, e cada atacante elimina a própria
+/// cédula até sobrar a da vítima.
+pub fn secao_da_baliza(env: &Env, assinatura: &BytesN<96>, votante: &Address, secoes: u32) -> u32 {
+    if secoes <= 1 {
+        return 0;
+    }
+    let mut buf = Bytes::from_slice(env, &[DOM_SECAO]);
+    buf.extend_from_array(&assinatura.to_array());
+    buf.append(&votante.clone().to_xdr(env));
+    let d = env.crypto().sha256(&buf).to_array();
+    let mut n = 0u64;
+    for b in d.iter().take(8) {
+        n = (n << 8) | *b as u64;
+    }
+    (n % secoes as u64) as u32
+}
+
 pub fn verificar_aptidao(
     env: &Env,
     votante: &Address,
     peso: u32,
-    secao: u32,
     indice: u32,
     irmaos: &Vec<BytesN<32>>,
     raiz: &BytesN<32>,
@@ -248,7 +276,6 @@ pub fn verificar_aptidao(
     let mut buf = Bytes::from_slice(env, &[DOM_FOLHA]);
     buf.append(&votante.clone().to_xdr(env));
     buf.extend_from_array(&peso.to_be_bytes());
-    buf.extend_from_array(&secao.to_be_bytes());
     let mut atual = env.crypto().sha256(&buf).to_bytes();
 
     let mut i = indice;
