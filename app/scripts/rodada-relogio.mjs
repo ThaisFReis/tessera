@@ -60,6 +60,26 @@ const FOLGA_RODADA = Number(process.env.FOLGA_RODADA ?? 60);
 /** Segundos por ledger na testnet, para converter a janela em tempo. */
 const SEGUNDOS_POR_LEDGER = 5;
 
+/**
+ * **O modo semeadura, para gravar o vídeo** (T-004).
+ *
+ * `CONVIDADO=G…` põe um endereço de fora na lista de aptos — o de quem vai
+ * aparecer no vídeo — sem comparecer nem votar por ele. `SEMEAR=1` para o
+ * roteiro depois de depositar as cédulas, com a janela ainda aberta, e imprime
+ * tudo o que o apresentador precisa colar no dapp.
+ *
+ * Por que isto existe: desde T-026 o placar em claro só sai com `τ = 5` cédulas
+ * abertas no agregado. Um vídeo com um votante só **nunca** produz placar — a
+ * recusa seria correta e o vídeo, inútil. Então o eleitorado é real e já está no
+ * ledger, e o que acontece diante da câmera é uma cédula a mais e a apuração.
+ */
+const CONVIDADO = process.env.CONVIDADO ?? "";
+const SEMEAR = process.env.SEMEAR === "1";
+/** Ledgers de cada fase. O padrão serve ao roteiro headless; o vídeo precisa de
+ *  mais, porque tem gente clicando. */
+const LEDGERS_CADERNO = Number(process.env.LEDGERS_CADERNO ?? 0);
+const LEDGERS_URNA = Number(process.env.LEDGERS_URNA ?? 0);
+
 const servidor = new rpc.Server(RPC);
 const contrato = new Contract(CONTRATO);
 
@@ -194,17 +214,23 @@ async function main() {
   leitor = await nascer();
   const membros = [];
   for (let i = 0; i < N; i++) membros.push(await nascer());
-  const enderecos = membros.map((m) => xdrDe(m.publicKey()));
-  const pesos = membros.map(() => 1);
+  // O convidado entra na **lista de aptos** e em mais nada: este roteiro não
+  // tem a chave dele, e é essa a graça — quem comparece e vota por ele é a
+  // pessoa diante da câmera, no dapp.
+  const chavesPublicas = membros.map((m) => m.publicKey());
+  if (CONVIDADO) chavesPublicas.push(CONVIDADO);
+  const enderecos = chavesPublicas.map(xdrDe);
+  const pesos = chavesPublicas.map(() => 1);
   const id = bytesHex(Keypair.random().rawPublicKey().subarray(0, 32));
   const raiz = wasm.raiz_de_aptos(enderecos, pesos);
-  diz(`${N} identidades financiadas · raiz de aptos ${raiz.slice(0, 16)}…`);
-  diz("uma seção só: a divisão em seções é outro assunto (§11-N)");
+  diz(`${chavesPublicas.length} aptos · raiz ${raiz.slice(0, 16)}…`);
+  if (CONVIDADO) diz(`o convidado ${CONVIDADO.slice(0, 8)}… está na lista e NÃO vota aqui`);
+  diz("uma seção só: é o que o dimensionamento recomenda até 32 pessoas");
 
   titulo("abrir, sem mesa e com fechadura de tempo");
   const agora = await ledgerAtual();
-  const abreEm = agora + 12 + 2 * N;
-  const fechaEm = abreEm + 12 + 2 * N;
+  const abreEm = agora + (LEDGERS_CADERNO || 12 + 2 * N);
+  const fechaEm = abreEm + (LEDGERS_URNA || 12 + 2 * N);
   // A rodada que destranca as cédulas: a que vence pouco depois de a janela
   // fechar. Tem de estar no futuro agora, senão o contrato recusa com
   // `RodadaNaoFecha` — uma rodada vencida já tem assinatura publicada, e as
@@ -293,6 +319,32 @@ async function main() {
   }
   diz("o contrato aceitou a sabotada: ele confere a **forma** do criptograma, e");
   diz("não pode conferir o conteúdo — o host não tem pareamento com valor.");
+
+  if (SEMEAR) {
+    const agoraL = await ledgerAtual();
+    titulo("semeado · a urna está aberta e a câmera pode ligar");
+    console.log("");
+    diz(`proposta      ${id}`);
+    diz(`contrato      ${CONTRATO}`);
+    diz(`votação até   ledger ${fechaEm} (faltam ${fechaEm - agoraL}, ~${Math.round((fechaEm - agoraL) * SEGUNDOS_POR_LEDGER / 60)} min)`);
+    diz(`rodada        ${rodada}, vence em ${venceEm - agoraSeg()}s`);
+    diz(`cédulas       ${enviadas.length} depositadas · ${enviadas.filter((c) => !c.sabota).length} vão abrir`);
+    console.log("");
+    diz("A LISTA DE APTOS, para colar no dapp:");
+    console.log("");
+    console.log(chavesPublicas.join("\n"));
+    console.log("");
+    if (CONVIDADO) {
+      diz(`o convidado é o último da lista, índice ${chavesPublicas.length - 1}`);
+    } else {
+      diz("sem CONVIDADO: ninguém de fora pode votar nesta proposta");
+    }
+    diz(`dapp:  /#/votacao/${id}`);
+    console.log("");
+    for (const [rotulo, hash] of hashes) console.log(`  ${rotulo.padEnd(26)} ${hash}`);
+    console.log("");
+    return;
+  }
 
   titulo("antes do fim da janela, nenhum placar — nem parcial");
   const apurador = await nascer();
