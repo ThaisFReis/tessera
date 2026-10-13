@@ -27,7 +27,7 @@ const OUTRA = "AAAAGAAAAAE=";
 {
   const t = new UmaCedula();
   t.registrar(CEDULA);
-  assert.throws(() => t.registrar(OUTRA), /já assinou outra cédula/,
+  assert.throws(() => t.registrar(OUTRA), /already signed another ballot/,
     "a chave de uso único aceitou uma SEGUNDA cédula — a desvinculação cai");
 }
 
@@ -35,7 +35,7 @@ const OUTRA = "AAAAGAAAAAE=";
 {
   const t = new UmaCedula();
   t.registrar(null);
-  assert.throws(() => t.registrar(null), /já assinou outra cédula/,
+  assert.throws(() => t.registrar(null), /already signed another ballot/,
     "sem conseguir identificar a operação, a trava TEM de recusar a segunda");
 }
 
@@ -43,7 +43,7 @@ const OUTRA = "AAAAGAAAAAE=";
 {
   const t = new UmaCedula();
   t.registrar(CEDULA);
-  assert.throws(() => t.registrar(null), /já assinou outra cédula/);
+  assert.throws(() => t.registrar(null), /already signed another ballot/);
 }
 
 console.log("✓ uma cédula por chave, e a reassinatura da mesma é permitida");

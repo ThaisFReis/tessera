@@ -4,33 +4,30 @@ import { Icone } from "../ui";
 import "./inicio.css";
 
 const ETAPAS = [
-  { titulo: "Compareça.", texto: "Registre sua presença. Em uma votação com lista de aptos, o caderno permite conferir quem compareceu e quem faltou." },
-  { titulo: "Vote.", texto: "No modo anônimo, uma assinatura em anel prova sua participação no grupo sem identificar qual integrante enviou a cédula." },
-  { titulo: "Confira.", texto: "Com fechadura de tempo, qualquer pessoa pode apurar após o encerramento e a publicação da rodada da baliza. O dapp faz essa apuração ao abrir o resultado." },
+  { titulo: "Check in.", texto: "Register your attendance. With an eligibility list, the register shows who checked in and who is absent." },
+  { titulo: "Vote.", texto: "In anonymous mode, a ring signature proves membership in the group without identifying which participant sent the ballot." },
+  { titulo: "Verify.", texto: "With a time lock, anyone can tally after voting closes and the beacon round is published. The dapp starts tallying when you open the results page." },
 ];
 
 export default function Inicio() {
   return (
     <main className="landing">
       <section className="landing-hero" aria-labelledby="inicio-titulo">
-        <span className="eyebrow">VOTAÇÃO EM SOROBAN · STELLAR TESTNET</span>
-        <h1 id="inicio-titulo">Sua presença é pública.<br /><span>Sua cédula é anônima.</span></h1>
+        <span className="eyebrow">VOTING ON SOROBAN · STELLAR TESTNET </span>
+        <h1 id="inicio-titulo">Your attendance is public. <br /><span>Your ballot is anonymous. </span></h1>
         <p className="landing-intro">
-          Um caderno para quem participa. Uma urna para as escolhas.
-          No modo anônimo do Tessera, a prova de participação não identifica
-          quem enviou cada cédula.
-        </p>
+          A register for participants. A ballot box for choices. In Tessera's anonymous mode, the proof of participation does not identify who sent each ballot.</p>
         <div className="landing-actions">
-          <Link className="primary-button" to="/demo/votar">Experimentar a cédula <Icone nome="arrow" /></Link>
-          <Link className="secondary-button" to="/votacoes">Ver votações</Link>
+          <Link className="primary-button" to="/demo/votar">Try the ballot <Icone nome="arrow" /></Link>
+          <Link className="secondary-button" to="/votacoes">View votes </Link>
         </div>
-        <p className="landing-note">Prévia sem enviar transações. Votações na rede de testes.</p>
+        <p className="landing-note">The preview sends no transactions. Live votes run on testnet.</p>
       </section>
 
       <section className="landing-flow" aria-labelledby="fluxo-titulo">
         <div className="landing-section-heading">
-          <span className="eyebrow">COMO FUNCIONA</span>
-          <h2 id="fluxo-titulo">Três passos.<br />Uma decisão coletiva.</h2>
+          <span className="eyebrow">HOW IT WORKS </span>
+          <h2 id="fluxo-titulo">Three steps. <br />One collective decision.</h2>
         </div>
         <ol className="landing-steps">
           {ETAPAS.map((etapa, i) => (
@@ -44,36 +41,36 @@ export default function Inicio() {
 
       <section className="landing-limits" aria-labelledby="limites-titulo">
         <div className="landing-section-heading">
-          <span className="eyebrow">ANTES DE PARTICIPAR</span>
-          <h2 id="limites-titulo">O que fica público.</h2>
-          <p>A presença e o placar agregado são públicos. Um resultado unânime pode revelar as escolhas de todos.</p>
+          <span className="eyebrow">BEFORE YOU PARTICIPATE </span>
+          <h2 id="limites-titulo">What stays public.</h2>
+          <p>Attendance and the aggregate tally are public. A unanimous result can reveal everyone's choice.</p>
         </div>
         <div className="landing-disclosures">
           <details open>
-            <summary>O sigilo depende do modo escolhido.</summary>
-            <p>O compromisso de Pedersen oculta a escolha. Com fechadura de tempo, o conteúdo das cédulas pode ser aberto depois da rodada; o anonimato de quem as enviou depende da assinatura em anel e do tamanho do grupo. Um anel de uma pessoa não oferece anonimato.</p>
+            <summary>Privacy depends on the voting mode.</summary>
+            <p>The Pedersen commitment hides the choice. With a time lock, ballot contents can be opened after the round; sender anonymity depends on the ring signature and the size of the group. A one-person ring offers no anonymity.</p>
           </details>
           <details>
-            <summary>Como a votação é apurada?</summary>
-            <p>Com fechadura de tempo, a apuração depende da baliza drand: se ela parar, não há alternativa prevista; um conluio de um limiar dos operadores pode abrir o conteúdo antes da hora. O contrato só aceita o resultado após o fechamento. Sem fechadura, a apuração com mesa é feita pela CLI. Uma votação em anel sem mesa e sem fechadura não apura.</p>
+            <summary>How are votes tallied?</summary>
+            <p>Time-locked tallying depends on the drand beacon. If it stops, there is no fallback; collusion by a threshold of operators could open contents early. The contract only accepts results after voting closes. Without a time lock, committee tallying uses the CLI. Ring ballots without a committee or time lock cannot be tallied.</p>
           </details>
           <details>
-            <summary>Quem pode participar?</summary>
-            <p>Na votação fechada, quem organiza define a lista de aptos. Na aberta, uma pessoa pode criar várias carteiras: esse modo demonstra o sigilo, mas não garante um voto por pessoa. Os participantes do anel são públicos.</p>
+            <summary>Who can participate?</summary>
+            <p>In a restricted vote, the organizer defines the eligibility list. In an open vote, one person can create multiple wallets: this demonstrates privacy but does not guarantee one vote per person. Ring membership is public.</p>
           </details>
           <details>
-            <summary>Quais são os outros limites?</summary>
-            <p>O anonimato do anel é computacional, não perfeito. O protocolo não impede que alguém observe sua tela enquanto você vota, nem que um cliente adulterado guarde sua escolha. O projeto não foi auditado por terceiros e está na testnet.</p>
+            <summary>What are the other limitations?</summary>
+            <p>Ring anonymity is computational, not perfect. The protocol cannot prevent someone from watching your screen while you vote or a modified client from recording your choice. The project has not been independently audited and runs on testnet.</p>
           </details>
         </div>
       </section>
 
       <section className="landing-end" aria-labelledby="organizar-titulo">
-        <div><span className="eyebrow">PARA QUEM ORGANIZA</span><h2 id="organizar-titulo">Abra a próxima votação.</h2></div>
-        <Link className="secondary-button" to="/abrir">Organizar votação <Icone nome="arrow" /></Link>
+        <div><span className="eyebrow">FOR ORGANIZERS </span><h2 id="organizar-titulo">Create the next vote.</h2></div>
+        <Link className="secondary-button" to="/abrir">Organize a vote <Icone nome="arrow" /></Link>
       </section>
       <a className="landing-contract" href={`${REDE.explorer}/contract/${REDE.contrato}`} target="_blank" rel="noopener noreferrer">
-        Conferir contrato na testnet <span>{REDE.contrato.slice(0, 8)}…{REDE.contrato.slice(-4)} ↗</span>
+        View the testnet contract  <span>{REDE.contrato.slice(0, 8)}…{REDE.contrato.slice(-4)} ↗</span>
       </a>
     </main>
   );

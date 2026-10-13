@@ -433,6 +433,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 
 | ID | Título | Deps | Lê | Estado | Critérios de aceitação |
 |---|---|---|---|---|---|
+| T-030 | Dapp em inglês | T-029 | §2, §4, §5 | review | Pedido de traduzir todo o dapp; navegação, formulários, cédula, apuração, bastidores, acessibilidade, metadados e mensagens em inglês; links e ABI preservados. Guarda do diário cobre também termos ingleses. |
 | T-029 | Corrigir e simplificar a landing do dapp | T-020 | §2, §4, §5 | review | Pedido direto de atualização da landing em 2026-10-13; texto alinhado à apuração com fechadura, limites explícitos, layout responsivo e artefato dapp regenerado. Build, testes do app, Rust, fmt, clippy e guardas passam. |
 | T-000 | Spec de trabalho e mudança do protocolo | — | — | done | `docs/SPEC.md` no formato do `CLAUDE.md`; protocolo em `PROTOCOLO.md`; 19 citações no código repontadas; portões passam |
 | T-001 | README volta a dizer a verdade | — | — | done | PR #1 |
@@ -1030,6 +1031,12 @@ tamanho do conjunto de anonimato. Entra em T-022 ou vira tarefa própria?
 Contexto: pedido explícito de corrigir e atualizar a landing, podendo simplificá-la. A página ainda negava apuração sem mesa e trazia custos anteriores à fechadura.
 Decisão: apresentar o fluxo em três etapas, remover os custos desatualizados e explicar a apuração e os limites em divulgações nativas. CSS restrito à landing; manter as rotas e regenerar o artefato estático em `dapp/`.
 Consequências: conteúdo distingue abertura da cédula e anonimato, registra a dependência da baliza e os limites da votação aberta. Nenhuma interface do protocolo mudou.
+
+---
+
+### DEC-022: Inglês como idioma do dapp (2026-10-13, T-030)
+
+Pedido explícito de trocar o idioma da aplicação. Traduzir a apresentação, preservando rotas, chaves de armazenamento, métodos, campos e códigos da ABI. Erros do WASM recebem tradução na borda da interface; erros do contrato mantêm seus números. O guarda de segredos passa a reconhecer termos ingleses sem remover os portugueses. Avisos antigos sobre totais por seção e baliza foram alinhados às invariantes atuais. O link de bastidores passa a usar o fragmento do roteador.
 
 ---
 

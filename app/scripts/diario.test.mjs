@@ -26,6 +26,11 @@ for (const txt of [
   `segredo da mesa ${HEX}`,
   `chave privada = ${HEX}`,
   `semente ${HEX}`,
+  `secret key = ${HEX}`,
+  `private key = ${HEX}`,
+  `blinding factor = ${HEX}`,
+  `randomness = ${HEX}`,
+  `seed = ${HEX}`,
 ]) {
   assert.equal(suspeito(txt), true, `o guarda DEIXOU PASSAR: ${txt}`);
 }
@@ -33,6 +38,8 @@ for (const txt of [
 /* Passam: ou é só a palavra, ou é um valor que é público de propósito. */
 for (const txt of [
   "a chave secreta do anel fica nesta aba, e só aqui",
+  "The secret ring key stays in this browser tab only",
+  `public key = ${HEX}`,
   "o r que esconde o seu voto nasceu e morreu nesta aba",
   `chave pública = ${HEX}`,
   `raiz de aptos = ${HEX}`,

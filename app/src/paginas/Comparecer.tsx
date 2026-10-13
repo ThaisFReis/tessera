@@ -1,3 +1,4 @@
+import { mensagemErro } from "../mensagens";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CarteiraLocal } from "../carteira";
@@ -8,7 +9,7 @@ import { Aviso, Icone, LinkBastidores, Passos, Trilha } from "../ui";
 import { useDiario } from "./comum";
 import "./votar.css";
 
-const PASSOS = ["Montando o seu caminho de Merkle", "Criando a chave de participação", "Confirmando na Stellar"];
+const PASSOS = ["Building your Merkle proof", "Creating your participation key", "Confirming on Stellar"];
 
 /* VOTANTE, primeiro ato: o caderno.
    É o único momento em que o nome da pessoa aparece — e é ele que permite voto
@@ -44,7 +45,7 @@ export default function Comparecer() {
     setFalha("");
     setOcupado(true);
     setProgresso(0);
-    diario({ tipo: "ato", txt: "foi confirmar a presença, com o próprio nome" });
+    diario({ tipo: "ato", txt: "Started checking in with the participant's identity" });
     try {
       const w = await carregar();
       const c = await CarteiraLocal.abrir();
@@ -52,12 +53,12 @@ export default function Comparecer() {
       const indice = lista.indexOf(meu);
       if (aberta === false && indice < 0) {
         throw new Error(
-          `${meu} não está na lista de aptos desta votação. O contrato recusaria com NaoEstaNaListaDeAptos.`,
+          `${meu} is not on this vote's eligibility list. The contract would reject it with NaoEstaNaListaDeAptos.`,
         );
       }
 
       const prop = await lerProposta(id);
-      if (!prop) throw new Error("Esta votação não foi encontrada.");
+      if (!prop) throw new Error("This vote was not found.");
 
       // Na votação aberta não há lista, logo não há caminho de Merkle — e a
       // seção vem da ordem de chegada; quem entrar no meio empurra, e é por
@@ -68,7 +69,7 @@ export default function Comparecer() {
             irmaos: string[];
             indice: number;
           });
-      diario({ tipo: "val", txt: `caminho de Merkle com ${caminho.irmaos.length} irmão${caminho.irmaos.length === 1 ? "" : "s"}` });
+      diario({ tipo: "val", txt: `Merkle path with ${caminho.irmaos.length} sibling${caminho.irmaos.length === 1 ? "" : "s"}` });
 
       // **A seção vem da baliza** (DEC-012), não da lista e não do
       // identificador da proposta. Enquanto saía da proposta, quem organizava
@@ -83,21 +84,21 @@ export default function Comparecer() {
         const assinatura = await lerAbertura(id);
         if (!assinatura) {
           throw new Error(
-            "A rodada da baliza que decide as seções ainda não foi registrada. " +
-              "Qualquer pessoa pode registrá-la assim que a rodada vencer, e sem " +
-              "ela o contrato recusa o comparecimento.",
+            "The beacon round that determines section allocation has not been registered yet. " +
+              "Anyone can register it once it is published. Without it, " +
+              "the contract rejects check-in.",
           );
         }
         seccao = w.secao_de(assinatura, enderecoXdr(meu), prop.secoes) as number;
-        diario({ tipo: "val", txt: `seção ${seccao} de ${prop.secoes} — derivada da baliza, não escolhida` });
+        diario({ tipo: "val", txt: `section ${seccao} of ${prop.secoes} — derived from the beacon, not chosen` });
       } else {
         seccao = 0;
       }
 
       setProgresso(1);
       const chave = w.nova_chave_de_anel() as { secreta: string; publica: string };
-      diario({ tipo: "nota", txt: "a chave secreta do anel fica nesta aba, e só aqui" });
-      diario({ tipo: "val", txt: `chave pública = ${chave.publica.slice(0, 24)}…` });
+      diario({ tipo: "nota", txt: "The secret ring key stays in this browser tab only" });
+      diario({ tipo: "val", txt: `public key = ${chave.publica.slice(0, 24)}…` });
 
       setProgresso(2);
       await comparecer(
@@ -115,13 +116,13 @@ export default function Comparecer() {
       // palpite do cliente.
       const secao = (await lerSecao(id, meu)) ?? seccao;
       if (secao !== seccao) {
-        diario({ tipo: "val", txt: `o contrato pôs você na seção ${secao}, por ordem de chegada` });
+        diario({ tipo: "val", txt: `The contract assigned you to section ${secao}, in arrival order` });
       }
       // Sem ela não há voto depois. Perder esta aba é perder o voto.
       guardarChaveDeAnel(id, { ...chave, secao });
       ir(`/votacao/${id}`);
     } catch (e) {
-      const msg = String((e as Error).message ?? e);
+      const msg = mensagemErro(e);
       setFalha(msg);
       diario({ tipo: "x", txt: msg });
     } finally {
@@ -132,73 +133,66 @@ export default function Comparecer() {
   return (
     <main className="voting-page">
       <div className="voting-breadcrumb">
-        <Link to={`/votacao/${id}`}><span aria-hidden="true">←</span> Voltar</Link>
+        <Link to={`/votacao/${id}`}><span aria-hidden="true">←</span> Back </Link>
       </div>
-      <h1 className="sr-only">Sua presença</h1>
+      <h1 className="sr-only">Your attendance</h1>
       <Trilha etapas={[
-        { label: "Presença", completo: false, ativo: true },
-        { label: "Voto", completo: false, ativo: false },
-        { label: "Confirmação", completo: false, ativo: false },
+        { label: "Check-in", completo: false, ativo: true },
+        { label: "Vote", completo: false, ativo: false },
+        { label: "Confirmation", completo: false, ativo: false },
       ]} />
 
-      <section className="ballot-panel" aria-label="Confirmação de presença" aria-busy={ocupado}>
+      <section className="ballot-panel" aria-label="Attendance confirmation" aria-busy={ocupado}>
         <div className="ballot-topline">
-          <span className="eyebrow">VOTAÇÃO · {id.slice(0, 8) || "—"}</span>
-          <span className="ballot-status"><span className="status-dot" />Comparecimento</span>
+          <span className="eyebrow">VOTE ·  {id.slice(0, 8) || "—"}</span>
+          <span className="ballot-status"><span className="status-dot" />Check-in </span>
         </div>
 
         <div className="ballot-body stage-enter">
-          <h2>Este é o caderno.</h2>
+          <h2>This is the attendance register.</h2>
           <p className="ballot-description">
-            Ele é <strong>identificado e público</strong>: o ledger vai mostrar que você
-            compareceu, e é disso que sai a lista de quem faltou. Ele não mostra em que você
-            votou — a cédula vem depois, de outra chave.
-          </p>
+            It is  <strong>identified and public </strong>: the ledger records your attendance. With an eligibility list, this reveals who is absent. It does not record your choice — your ballot comes later, from a different key.</p>
 
           {aberta === null ? (
-            <p className="campo-ajuda" style={{ marginTop: 29 }}>Lendo a votação…</p>
+            <p className="campo-ajuda" style={{ marginTop: 29 }}>Loading the vote…</p>
           ) : aberta ? (
             <div className="stage-enter">
               <p className="review-note" style={{ marginTop: 29 }}>
-                <Icone nome="users" /> Votação aberta: não há lista, e você entra como chegou.
-              </p>
+                <Icone nome="users" /> Open participation: no eligibility list is required.</p>
               <div className="ballot-action">
                 <button className="primary-button" onClick={enviar} disabled={ocupado}>
-                  {ocupado ? "Comparecendo…" : "Confirmar minha presença"} <Icone nome="arrow" />
-                </button>
+                  {ocupado ? "Checking in…" : "Confirm my attendance"} <Icone nome="arrow" />
+</button>
               </div>
               {ocupado && <Passos passos={PASSOS} atual={progresso} />}
             </div>
           ) : lista.length === 0 ? (
             <div className="stage-enter">
               <label className="campo" style={{ marginTop: 29 }}>
-                <span className="eyebrow">A LISTA DE APTOS</span>
+                <span className="eyebrow">ELIGIBILITY LIST </span>
                 <textarea
                   value={colada}
                   onChange={(e) => setColada(e.target.value)}
                   rows={6}
-                  placeholder="um endereço G… por linha"
+                  placeholder="One G… address per line"
                 />
                 <span className="campo-ajuda">
-                  Ela não está na rede, de propósito: o contrato guarda 32 bytes de raiz e nada
-                  mais. Cole aqui a lista que o organizador entregou.
-                </span>
+                  The list is not stored on-chain: the contract stores only its 32-byte root. Paste the list provided by the organizer. </span>
               </label>
               <div className="ballot-action">
                 <button className="primary-button" onClick={aceitarColada} disabled={!colada.trim()}>
-                  Usar esta lista <Icone nome="arrow" />
-                </button>
+                  Use this list <Icone nome="arrow" />
+</button>
               </div>
             </div>
           ) : (
             <div className="stage-enter">
               <p className="review-note" style={{ marginTop: 29 }}>
-                <Icone nome="users" /> {lista.length} aptos nesta lista.
-              </p>
+                <Icone nome="users" /> {lista.length} eligible participants on this list.</p>
               <div className="ballot-action">
                 <button className="primary-button" onClick={enviar} disabled={ocupado}>
-                  {ocupado ? "Comparecendo…" : "Confirmar minha presença"} <Icone nome="arrow" />
-                </button>
+                  {ocupado ? "Checking in…" : "Confirm my attendance"} <Icone nome="arrow" />
+</button>
               </div>
               {ocupado && <Passos passos={PASSOS} atual={progresso} />}
             </div>
@@ -208,16 +202,11 @@ export default function Comparecer() {
       </section>
 
       <details className="privacy-details">
-        <summary><Icone nome="lock" /><span>Por que a presença é pública</span><span className="disclosure-plus" aria-hidden="true">+</span></summary>
+        <summary><Icone nome="lock" /><span>Why attendance is public </span><span className="disclosure-plus" aria-hidden="true">+</span></summary>
         <p>
-          Sem o caderno não dá para saber quem faltou, e sem isso não existe voto obrigatório.
-          É a mesma separação da urna: o caderno diz quem veio, a urna diz o que foi votado, e
-          nada liga os dois.
-        </p>
+          With an eligibility list, the register shows who is absent, making mandatory participation possible. Attendance and ballots are separate: the register records who checked in, while the ballot box records the choices.</p>
         <p>
-          A chave de participação criada aqui fica neste navegador. Ela é o que assina a cédula
-          depois, sem o seu endereço junto — perder esta aba é perder o voto.
-        </p>
+          The participation key created here stays in this browser tab. It signs your ballot later without attaching your address. Losing this tab means losing the key needed to vote.</p>
       </details>
 
       <p className="bastidores-rodape"><LinkBastidores origem="comparecer" /></p>

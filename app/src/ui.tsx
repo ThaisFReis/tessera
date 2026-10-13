@@ -60,7 +60,7 @@ export function Passos({ passos, atual }: { passos: string[]; atual: number }) {
   return <ol className="sending-steps" aria-live="polite">
     {passos.map((s, i) => <li key={s} className={i <= atual ? "reached" : ""}>
       <span>{i < atual ? <Icone nome="check" /> : i === atual ? <span className="status-dot" /> : `0${i + 1}`}</span>
-      {s}{i === atual && <span className="sr-only">, em andamento</span>}
+      {s}{i === atual && <span className="sr-only">, in progress </span>}
     </li>)}
   </ol>;
 }
@@ -69,7 +69,7 @@ export type Etapa = { label: string; completo: boolean; ativo: boolean };
 
 /** Presença · Voto · Confirmação — a mesma trilha em `/comparecer` e `/votar`. */
 export function Trilha({ etapas }: { etapas: Etapa[] }) {
-  return <ol className="voting-steps" aria-label="Etapas da participação">
+  return <ol className="voting-steps" aria-label="Participation steps">
     {etapas.map((s, i) => <li key={s.label} className={`${s.completo ? "complete" : ""} ${s.ativo ? "current" : ""}`} aria-current={s.ativo ? "step" : undefined}>
       <span className="step-number">{s.completo ? <Icone nome="check" /> : `0${i + 1}`}</span>
       <span>{s.label}</span>
@@ -83,7 +83,7 @@ export function Trilha({ etapas }: { etapas: Etapa[] }) {
  * numa segunda janela ao lado desta.
  */
 export function LinkBastidores({ origem }: { origem?: string }) {
-  return <a className="link-bastidores" href={origem ? `/bastidores?origem=${origem}` : "/bastidores"} target="_blank" rel="noopener noreferrer">
-    <Icone nome="terminal" /> VER NOS BASTIDORES <span aria-hidden="true">↗</span>
+  return <a className="link-bastidores" href={origem ? `#/bastidores?origem=${origem}` : "#/bastidores"} target="_blank" rel="noopener noreferrer">
+    <Icone nome="terminal" /> VIEW ACTIVITY LOG  <span aria-hidden="true">↗</span>
   </a>;
 }

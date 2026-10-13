@@ -1,3 +1,4 @@
+import { mensagemErro } from "./mensagens";
 /**
  * O placar que aparece sozinho.
  *
@@ -121,8 +122,8 @@ export async function apurarSozinho(
         diario?.({
           tipo: "nota",
           txt:
-            `seção ${s}: a cadeia registrou ${quantas} cédula${quantas === 1 ? "" : "s"} e ` +
-            `eu li ${cedulas.length} dos eventos. Não apuro com lista incompleta.`,
+            `Section ${s}: the chain recorded ${quantas} ballot${quantas === 1 ? "" : "s"} and ` +
+            `only ${cedulas.length} were read from events. Cannot tally an incomplete list.`,
         });
         continue;
       }
@@ -133,13 +134,13 @@ export async function apurarSozinho(
       diario?.({
         tipo: "nota",
         txt:
-          `seção ${s}: a assinatura da rodada ${p.rodada} conferiu no pareamento, e ` +
-          `${a.abriram} de ${a.cedulas} cédulas abriram`,
+          `Section ${s}: the signature of round ${p.rodada} passed pairing verification, and ` +
+          `${a.abriram} of ${a.cedulas} ballots were opened`,
       });
       if (a.abriram < a.cedulas) {
         diario?.({
           tipo: "nota",
-          txt: `${a.cedulas - a.abriram} criptograma${a.cedulas - a.abriram === 1 ? "" : "s"} não abriu — cada um custa só o próprio voto, e o placar segue`,
+          txt: `${a.cedulas - a.abriram} ciphertext${a.cedulas - a.abriram === 1 ? "" : "s"} failed to open — only the affected votes are lost; tallying continues`,
         });
       }
 
@@ -154,7 +155,7 @@ export async function apurarSozinho(
         } catch (e) {
           diario?.({
             tipo: "nota",
-            txt: `a seção ${s} não foi gravada no ledger: ${String((e as Error).message ?? e)}. A conta acima não depende disso.`,
+            txt: `Section ${s} was not recorded on-chain: ${mensagemErro(e)}. The calculation above remains valid independently.`,
           });
         }
       }
@@ -212,8 +213,8 @@ export async function apurarSozinho(
       diario?.({
         tipo: "nota",
         txt:
-          `${soma.abriram} cédula${soma.abriram === 1 ? "" : "s"} aberta${soma.abriram === 1 ? "" : "s"} no total, e o piso de anonimato é ${TAU}: ` +
-          `o contrato não grava um placar em claro que denunciaria quem votou.`,
+          `${soma.abriram} ballot${soma.abriram === 1 ? "" : "s"} opened in total; the anonymity threshold is ${TAU}: ` +
+          `The contract will not publish a tally below the anonymity threshold.`,
       });
       return avancar({ ...pronto, publicado: false });
     }
@@ -247,14 +248,14 @@ export async function apurarSozinho(
       );
       avancar({ ...pronto, publicado: true, tx });
     } catch (e) {
-      const porque = String((e as Error).message ?? e);
+      const porque = mensagemErro(e);
       diario?.({
         tipo: "nota",
-        txt: `o placar não foi gravado no ledger: ${porque}. A conta acima não depende disso.`,
+        txt: `The tally was not recorded on-chain: ${porque}. The calculation above remains valid independently.`,
       });
       avancar({ ...pronto, publicado: false });
     }
   } catch (e) {
-    avancar({ tipo: "falha", porque: String((e as Error).message ?? e) });
+    avancar({ tipo: "falha", porque: mensagemErro(e) });
   }
 }

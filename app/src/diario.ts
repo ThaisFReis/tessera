@@ -50,7 +50,7 @@ const TETO = 300;
  * Então o crivo olha para a **conjunção**: um nome de segredo e um valor na
  * mesma linha. Nome sozinho passa; valor sozinho passa; os dois juntos, não.
  */
-const NOMES = /\bsecret[ao]|\bsegredo|\baleatori|\bacaso|\bprivad[ao]|\bnonce\b|\bsemente\b/i;
+const NOMES = /\bsecret\b|\bprivate\b|\brandomness\b|\bblinding\b|\bseed\b|\bsecret[ao]|\bsegredo|\baleatori|\bacaso|\bprivad[ao]|\bnonce\b|\bsemente\b/i;
 /** Um valor é uma corrida longa de hexadecimal ou base64 — o formato de todo
  *  escalar e todo ponto que este sistema manipula. */
 const VALOR = /[0-9a-f]{16,}|[A-Za-z0-9+/_-]{24,}={0,2}/i;
@@ -61,7 +61,7 @@ export function suspeito(txt: string): boolean {
   return FATOR.test(txt) || (NOMES.test(txt) && VALOR.test(txt));
 }
 
-export const RECUSA = "passo recusado pelo guarda do diário";
+export const RECUSA = "Entry rejected by the activity log guard";
 
 /* ---------- a loja ---------- */
 

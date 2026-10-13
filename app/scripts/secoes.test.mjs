@@ -31,13 +31,13 @@ assert.equal(secaoNasceuPequena(30, 0), null);
 /* A frase diz o número que a pessoa precisa para decidir. */
 const p = secaoNasceuPequena(24, 5);
 const txt = explicar(24, 5, p);
-assert.match(txt, /24 pessoas em 5 seções/);
-assert.match(txt, /cerca de 4 por seção/);
-assert.match(txt, /No máximo 4 seções/);
-assert.match(txt, /a menor fica abaixo da média/);
+assert.match(txt, /24 people in 5 sections/);
+assert.match(txt, /about 4 per section/);
+assert.match(txt, /Use at most 4 sections/);
+assert.match(txt, /the smallest can fall below the average/);
 
 const q = secaoNasceuPequena(3, 1);
-assert.match(explicar(3, 1, q), /Nem com uma seção só/);
+assert.match(explicar(3, 1, q), /Even a single section/);
 
 console.log("seções: a divisão que nasce abaixo do piso é recusada na hora de abrir");
 

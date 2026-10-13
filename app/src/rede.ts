@@ -100,26 +100,52 @@ export type Diario = Anotar;
  * `Error(Contract, #30)`, que não diz nada a ninguém.
  */
 const ERROS: Record<number, string> = {
-  1: "PropostaJaExiste", 2: "PropostaNaoExiste", 3: "OpcoesForaDaFaixa",
-  4: "LimiarInvalido", 5: "PrazoNoPassado", 6: "VotacaoEncerrada",
-  7: "VotacaoAindaAberta", 8: "JaVotou", 9: "NaoEstaNaListaDeAptos",
-  10: "PesoNaoUnitario", 11: "ProvaBinariaInvalida", 12: "ProvaDeSomaInvalida",
-  13: "PontoForaDoSubgrupo", 14: "AberturaNaoFecha", 15: "JaApurada",
-  16: "MesaAbaixoDoLimiar", 17: "NaoEMembroDaMesa", 18: "MembroRepetido",
-  19: "AnonimatoInsuficiente", 20: "ArgumentoMalFormado", 21: "EscolhaForaDoBinario",
-  22: "SomaDiferenteDoPeso", 23: "TotalDiferenteDoComparecimento", 24: "MembroJaEndossou",
-  25: "PerguntasForaDaFaixa", 26: "VotacaoAindaNaoComecou", 27: "ComparecimentoEncerrado",
-  28: "JaCompareceu", 29: "AnelInvalido", 30: "ImagemJaUsada", 31: "ModoErrado",
-  32: "SecaoInvalida", 33: "VotacaoAberta", 34: "RodadaNaoFecha",
-  35: "RelogioAindaNaoAbriu", 36: "CadeiaNaoFecha", 37: "NaoMelhora",
-  38: "CriptogramaMalFormado",
+  1: "Proposal already exists",
+  2: "Proposal not found",
+  3: "Option count is out of range",
+  4: "Invalid threshold",
+  5: "Deadline is in the past",
+  6: "Voting has closed",
+  7: "Voting is still open",
+  8: "Already voted",
+  9: "Not on the eligibility list",
+  10: "Only unit voting weights are supported",
+  11: "Invalid binary proof",
+  12: "Invalid sum proof",
+  13: "Point is outside the required subgroup",
+  14: "Opening does not match the commitments",
+  15: "Already tallied",
+  16: "Committee threshold not met",
+  17: "Not a committee member",
+  18: "Duplicate committee member",
+  19: "Insufficient anonymity",
+  20: "Malformed argument",
+  21: "Choice must be binary",
+  22: "Sum does not match voting weight",
+  23: "Total does not match attendance",
+  24: "Member already endorsed this tally",
+  25: "Question count is out of range",
+  26: "Voting has not started",
+  27: "Check-in has closed",
+  28: "Already checked in",
+  29: "Invalid ring signature",
+  30: "This participation key has already voted",
+  31: "Incorrect voting mode",
+  32: "Invalid section",
+  33: "This vote has open participation",
+  34: "Beacon round does not match",
+  35: "Time lock has not opened",
+  36: "Ballot chain does not match",
+  37: "Tally does not improve the recorded result",
+  38: "Malformed ciphertext",
+
 };
 
 /** Arredondar para inteiro faz uma chamada barata ler "0% do teto", que soa
  *  como ausência de medida em vez de medida pequena. */
 function porcento(cpu: number): string {
   const p = (cpu / 400_000_000) * 100;
-  return p < 1 ? `${p.toFixed(2).replace(".", ",")}%` : `${Math.round(p)}%`;
+  return p < 1 ? `${p.toFixed(2)}%` : `${Math.round(p)}%`;
 }
 
 /** Dá nome ao número, e deixa o resto intacto. */
@@ -141,7 +167,7 @@ export function resumir(bruto: string): string {
   const inteiro = traduzir(bruto);
   const corte = inteiro.search(/\n\s*Event log/);
   if (corte < 0) return inteiro;
-  return `${inteiro.slice(0, corte).trim()} · log de diagnóstico no console`;
+  return `${inteiro.slice(0, corte).trim()} · diagnostic log in the console`;
 }
 
 // ---------- travessia de tipos ----------
@@ -199,7 +225,7 @@ async function ler(metodo: string, ...args: xdr.ScVal[]): Promise<unknown> {
     .build();
   const sim = await servidor.simulateTransaction(tx);
   if (rpc.Api.isSimulationError(sim)) {
-    throw new Error(`${metodo}: ${sim.error}`);
+    throw new Error(resumir(`${metodo}: ${sim.error}`));
   }
   return scValToNative(sim.result!.retval);
 }
@@ -339,7 +365,7 @@ export const registrarAbertura = (c: Carteira, id: string, assinaturaHost: strin
     "registrar_abertura",
     [bytesN(id), bytesN(assinaturaHost)],
     d,
-    `proposta ${id.slice(0, 8)}… · assinatura da baliza, 96 bytes`,
+    `proposal ${id.slice(0, 8)}… · beacon signature, 96 bytes`,
   );
 
 export const lerAnel = async (id: string, secao: number): Promise<string[]> =>
@@ -465,12 +491,12 @@ export async function buscarBaliza(rodada: number | bigint): Promise<string> {
   const r = await fetch(`${BALIZA.rele}/${BALIZA.cadeia}/rounds/${rodada}`);
   if (!r.ok) {
     throw new Error(
-      `a baliza ainda não publicou a rodada ${rodada} (ou o relé está fora): HTTP ${r.status}`,
+      `The beacon has not published round ${rodada} (or the relay is unavailable): HTTP ${r.status}`,
     );
   }
   const j = (await r.json()) as { round: number; signature: string };
   if (BigInt(j.round) !== BigInt(rodada)) {
-    throw new Error(`o relé respondeu a rodada ${j.round} em vez de ${rodada}`);
+    throw new Error(`The relay returned round ${j.round} instead of ${rodada}`);
   }
   const w = await carregar();
   // Lança se o pareamento não fechar. É o único portão, e é por aqui que passa
@@ -597,7 +623,7 @@ export const apurarSecao = (
       vetor(a.abertas.map((b) => xdr.ScVal.scvBool(b))),
     ],
     d,
-    `proposta ${id.slice(0, 8)}… · seção ${secao} · ${a.abriram} de ${a.cedulas} cédulas abriram`,
+    `proposal ${id.slice(0, 8)}… · section ${secao} · ${a.abriram} of ${a.cedulas} ballots opened`,
   );
 
 /**
@@ -627,7 +653,7 @@ export const publicarResultado = (
       vetor(aberturas.map(escalar)),
     ],
     d,
-    `proposta ${id.slice(0, 8)}… · ${secoes.length} seção${secoes.length === 1 ? "" : "ões"} · placar ${totais.join(" · ")}`,
+    `proposal ${id.slice(0, 8)}… · ${secoes.length} section${secoes.length === 1 ? "" : "s"} · tally ${totais.join(" · ")}`,
   );
 
 // ---------- escrita ----------
@@ -658,7 +684,7 @@ async function enviar(
       // Taxa curta não é erro do voto: a transação não entrou em ledger nenhum.
       // Re-simular junto com o lance maior também renova o footprint.
       if (lance >= LANCES - 1 || !(e instanceof NaoEntrou)) throw e;
-      diario?.({ tipo: "nota", txt: "o ledger está disputado; subindo o lance e tentando de novo" });
+      diario?.({ tipo: "nota", txt: "The ledger is busy; increasing the fee bid and retrying" });
     }
   }
 }
@@ -709,7 +735,7 @@ async function uma(
     const cpu = r.instructions();
     diario?.({
       tipo: "val",
-      txt: `${cpu.toLocaleString("pt-BR")} instruções de CPU · ${porcento(cpu)} do teto de 400 M`,
+      txt: `${cpu.toLocaleString("en-US")} CPU instructions · ${porcento(cpu)} of the 400 M limit`,
     });
   } catch {
     /* o SDK mudou de forma: o custo é informação, não pode derrubar o voto */
@@ -765,7 +791,7 @@ async function uma(
 
   // O declarado, não o cobrado: com folga de escrita os dois divergem bastante,
   // e o cobrado só existe depois que a transação entra.
-  diario?.({ tipo: "val", txt: `taxa reservada = ${Number(pronta.fee).toLocaleString("pt-BR")} stroops` });
+  diario?.({ tipo: "val", txt: `reserved fee = ${Number(pronta.fee).toLocaleString("en-US")} stroops` });
 
   const assinada = TransactionBuilder.fromXDR(
     await carteira.assinar(pronta.toXDR()),
@@ -775,8 +801,8 @@ async function uma(
   if (envio.status === "ERROR") {
     const motivo = envio.errorResult?.result().switch().name;
     if (motivo === "txInsufficientFee") throw new NaoEntrou(motivo);
-    diario?.({ tipo: "x", txt: resumir(`a rede recusou: ${motivo ?? JSON.stringify(envio.errorResult)}`) });
-    throw new Error(`a rede recusou a transação: ${motivo ?? "sem motivo declarado"}`);
+    diario?.({ tipo: "x", txt: resumir(`Network rejected the transaction: ${motivo ?? JSON.stringify(envio.errorResult)}`) });
+    throw new Error(`Network rejected the transaction: ${motivo ?? "no reason provided"}`);
   }
 
   for (let i = 0; i < 180; i++) {
@@ -786,19 +812,19 @@ async function uma(
       // por isso que declarar folga de escrita sai quase de graça.
       const cobrado = r.resultXdr?.feeCharged?.()?.toString();
       if (cobrado) {
-        diario?.({ tipo: "val", txt: `taxa cobrada = ${Number(cobrado).toLocaleString("pt-BR")} stroops · o resto volta` });
+        diario?.({ tipo: "val", txt: `charged fee = ${Number(cobrado).toLocaleString("en-US")} stroops · the remainder is refunded` });
       }
       diario?.({ tipo: "ok", txt: `tx ${envio.hash}` });
       return envio.hash;
     }
     if (r.status === rpc.Api.GetTransactionStatus.FAILED) {
-      diario?.({ tipo: "x", txt: `a rede recusou · tx ${envio.hash}` });
-      throw new Error(`transação falhou: ${envio.hash}`);
+      diario?.({ tipo: "x", txt: `Network rejected · tx ${envio.hash}` });
+      throw new Error(`Transaction failed: ${envio.hash}`);
     }
     await new Promise((s) => setTimeout(s, 1000));
   }
   // Nunca foi incluída: preterida por quem ofereceu mais. Vale subir o lance.
-  throw new NaoEntrou("a transação não entrou em nenhum ledger a tempo");
+  throw new NaoEntrou("The transaction was not included in a ledger before the timeout");
 }
 
 export const abrir = (
@@ -851,12 +877,12 @@ export const abrir = (
       u64(rodadaAbertura),
     ],
     d,
-    `proposta ${id.slice(0, 8)}… · ${perguntas.length} pergunta${perguntas.length === 1 ? "" : "s"} · ` +
-      `mesa ${limiar} de ${mesa.length} · ${anel ? "caderno separado da urna" : "voto identificado"}` +
+    `proposal ${id.slice(0, 8)}… · ${perguntas.length} question${perguntas.length === 1 ? "" : "s"} · ` +
+      `committee ${limiar} of ${mesa.length} · ${anel ? "attendance separate from ballots" : "identified voting"}` +
       (limiteSecao > 0
-        ? ` · seções de ${limiteSecao}, abrindo sozinhas`
+        ? ` · sections of ${limiteSecao}, created automatically`
         : secoes > 1
-          ? ` · ${secoes} seções`
+          ? ` · ${secoes} sections`
           : ""),
   );
 
@@ -879,7 +905,7 @@ export const comparecer = (
     "comparecer",
     [bytesN(id), endereco(c.endereco()), ponto(chaveAnel), vetor(caminho.map(bytesN)), u32(indice), u32(secao)],
     d,
-    `proposta ${id.slice(0, 8)}… · seção ${secao} · folha ${indice} · caminho com ${caminho.length} irmão${caminho.length === 1 ? "" : "s"}`,
+    `proposal ${id.slice(0, 8)}… · section ${secao} · leaf ${indice} · path with ${caminho.length} sibling${caminho.length === 1 ? "" : "s"}`,
     folgaDoCaderno(aptos),
     janela > 0 ? chavesDeAnel(id, secao, secao + janela) : [],
   );
@@ -914,9 +940,9 @@ export function votarAnonimo(
 ) {
   if (c.tipo !== "efemera") {
     throw new Error(
-      "a cédula só pode ser assinada por uma chave de uso único. Assinar com a " +
-        "carteira de identidade recria no ledger exatamente o vínculo que o anel " +
-        "existe para quebrar.",
+      "A ballot must be signed with a one-time key. Signing with the " +
+        "identity wallet would recreate the on-chain link that the ring signature " +
+        "is intended to prevent.",
     );
   }
   return enviar(
@@ -966,6 +992,6 @@ export function votarAnonimo(
       bytes(cripto),
     ],
     d,
-    `proposta ${id.slice(0, 8)}… · seção ${secao} · anel com ${anel.length} · ${compromissos.length} compromisso${compromissos.length === 1 ? "" : "s"}`,
+    `proposal ${id.slice(0, 8)}… · section ${secao} · ring size ${anel.length} · ${compromissos.length} commitment${compromissos.length === 1 ? "" : "s"}`,
   );
 }

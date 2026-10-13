@@ -1,3 +1,4 @@
+import { mensagemErro } from "../mensagens";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { assembleias, ledgerAtual, type Assembleia, type Fase } from "../rede";
@@ -6,14 +7,14 @@ import { Carregando, Estado, Icone } from "../ui";
 const minutos = (l: number) => Math.max(0, Math.round((l * 6) / 60));
 
 const BALDES: { fase: Fase | "abertas"; titulo: string; nota: string }[] = [
-  { fase: "votacao", titulo: "votando agora", nota: "as cédulas estão entrando" },
+  { fase: "votacao", titulo: "voting now", nota: "ballots are being accepted" },
   {
     fase: "comparecimento",
-    titulo: "comparecimento aberto",
-    nota: "o caderno ainda aceita gente; a votação abre depois",
+    titulo: "check-in open",
+    nota: "participants can check in; voting opens afterward",
   },
-  { fase: "agendada", titulo: "vão abrir", nota: "a janela ainda não começou" },
-  { fase: "encerrada", titulo: "encerradas", nota: "a urna fechou" },
+  { fase: "agendada", titulo: "upcoming", nota: "the window has not started" },
+  { fase: "encerrada", titulo: "closed", nota: "voting has ended" },
 ];
 
 function Linha({ a, ledger }: { a: Assembleia; ledger: number }) {
@@ -30,8 +31,8 @@ function Linha({ a, ledger }: { a: Assembleia; ledger: number }) {
         )}
       </span>
       <span className="cartao-nota">
-        {a.anel ? "caderno separado da urna" : "voto identificado"} ·{" "}
-        {a.perguntas} pergunta{a.perguntas === 1 ? "" : "s"}
+        {a.anel ? "attendance separate from ballots" : "identified voting"} ·{" "}
+        {a.perguntas} question {a.perguntas === 1 ? "" : "s"}
       </span>
     </Link>
   );
@@ -51,7 +52,7 @@ export default function Votacoes() {
         setLedger(l);
         setTudo(a);
       } catch (e) {
-        if (vivo) setFalha(String((e as Error).message ?? e));
+        if (vivo) setFalha(mensagemErro(e));
       }
     })();
     return () => {
@@ -65,23 +66,21 @@ export default function Votacoes() {
     <main className="pagina">
       <header>
         <span className="eyebrow">LEDGER {ledger || "—"}</span>
-        <h1>Votações.</h1>
+        <h1>Votes.</h1>
         <p className="pagina-sub">
-          Lidas dos eventos da rede, sem índice e sem servidor. O que aparece aqui é o que o
-          contrato registrou — nada passa por um intermediário que pudesse omitir uma votação.
-        </p>
+          Read directly from contract events on the network, without a separate index or backend. This list covers the recent event window available from the RPC provider.</p>
       </header>
 
       {falha && (
-        <Estado titulo="A rede não respondeu." curto>
+        <Estado titulo="The network did not respond." curto>
           <p className="error-message" role="alert">{falha}</p>
         </Estado>
       )}
-      {tudo === null && !falha && <Carregando titulo="Lendo a rede." nota="Procurando votações nos eventos do contrato." />}
+      {tudo === null && !falha && <Carregando titulo="Reading the network." nota="Looking for votes in contract events." />}
       {vazio && (
-        <Estado titulo="Nenhuma nas últimas ~3 horas." curto>
-          <p>A janela de eventos é curta de propósito: uma janela larga devolve zero em silêncio.</p>
-          <Link className="primary-button" to="/abrir">Abrir uma votação <Icone nome="arrow" /></Link>
+        <Estado titulo="None in the last ~3 hours." curto>
+          <p>Only recent events are queried. Older votes may still be accessible through their direct links.</p>
+          <Link className="primary-button" to="/abrir">Create a vote <Icone nome="arrow" /></Link>
         </Estado>
       )}
 
@@ -93,7 +92,7 @@ export default function Votacoes() {
             <section key={fase} className="stage-enter">
               <h2>
                 {titulo.toUpperCase()} · {n.length}
-              </h2>
+</h2>
               <p>{nota}</p>
               <div>
                 {n.map((a) => (

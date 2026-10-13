@@ -1,3 +1,4 @@
+import { mensagemErro } from "../mensagens";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CarteiraLocal } from "../carteira";
@@ -8,12 +9,12 @@ import { explicar, secaoNasceuPequena } from "../secoes";
 import { Aviso, Icone, LinkBastidores, Passos } from "../ui";
 import { useDiario } from "./comum";
 
-const PASSOS = ["Montando a raiz de aptos", "Assinando", "Confirmando na Stellar"];
+const PASSOS = ["Building the eligibility root", "Signing", "Confirming on Stellar"];
 
 /* ORGANIZADOR. Monta a cédula, o eleitorado e a janela, e abre na rede. */
 export default function Abrir() {
   const [aptos, setAptos] = useState("");
-  const [opcoes, setOpcoes] = useState("aprovar, rejeitar");
+  const [opcoes, setOpcoes] = useState("approve, reject");
   const [anel, setAnel] = useState(true);
   const [fechadura, setFechadura] = useState(true);
   const [mesa, setMesa] = useState("");
@@ -36,23 +37,23 @@ export default function Abrir() {
     setFalha("");
     setOcupado(true);
     setProgresso(0);
-    diario({ tipo: "ato", txt: "abriu uma votação" });
+    diario({ tipo: "ato", txt: "Started a new vote" });
     try {
       const lista = aberta ? [] : linhas(aptos);
       if (!aberta && lista.length < 2) {
-        throw new Error("o eleitorado precisa de ao menos duas pessoas");
+        throw new Error("The electorate must include at least two people");
       }
       const n = linhas(opcoes).length;
-      if (n < 2) throw new Error("a pergunta precisa de ao menos duas opções");
+      if (n < 2) throw new Error("The question must have at least two options");
       // O teto é do orçamento de CPU: cada opção sigilosa custa uma prova
       // disjuntiva, e o contrato recusa com `OpcoesForaDaFaixa`.
       if (n > MAX_OPCOES) {
-        throw new Error(`a pergunta cabe em até ${MAX_OPCOES} opções, e esta tem ${n}`);
+        throw new Error(`A question supports up to ${MAX_OPCOES} options; this one has ${n}`);
       }
 
       if (secoes < 1 || (!aberta && secoes > lista.length)) {
         throw new Error(
-          aberta ? "as seções precisam ser ao menos uma" : `as seções têm de estar entre 1 e ${lista.length}`,
+          aberta ? "There must be at least one section" : `The number of sections must be between 1 and ${lista.length}`,
         );
       }
 
@@ -68,7 +69,7 @@ export default function Abrir() {
 
       const w = await carregar();
       const c = await CarteiraLocal.abrir();
-      diario({ tipo: "val", txt: `organizador = ${c.endereco()}` });
+      diario({ tipo: "val", txt: `organizer = ${c.endereco()}` });
 
       // O identificador nasce antes da raiz, e não é detalhe: a divisão em
       // seções é derivada dele, então a raiz depende dele.
@@ -80,9 +81,9 @@ export default function Abrir() {
       // 32 zeros é o sentinela de votação aberta: não há lista, e o contrato
       // pula a prova de Merkle.
       const raiz = aberta ? RAIZ_ABERTA : w.raiz_de_aptos(xdrs, pesos);
-      diario({ tipo: "val", txt: aberta ? "sem lista: votação aberta" : `raiz de aptos = ${raiz}` });
+      diario({ tipo: "val", txt: aberta ? "No eligibility list: open participation" : `eligibility root = ${raiz}` });
       if (!aberta) {
-        diario({ tipo: "nota", txt: "32 bytes vão para o contrato. A lista não vai." });
+        diario({ tipo: "nota", txt: "Only the 32-byte root goes on-chain, not the list." });
       }
       // **A seção não é decidida aqui, e isso é o ponto** (DEC-012). Ela sai da
       // assinatura da rodada da baliza que abre o comparecimento — uma
@@ -93,7 +94,7 @@ export default function Abrir() {
       if (!aberta && secoes > 1) {
         diario({
           tipo: "nota",
-          txt: `${secoes} seções — a divisão sai da baliza depois, e nem quem abre a conhece agora`,
+          txt: `${secoes} sections — the beacon determines the allocation later; even the organizer cannot know it now`,
         });
       }
 
@@ -110,13 +111,13 @@ export default function Abrir() {
       const membros = linhas(mesa);
       const k = membros.length === 0 ? 0 : limiar;
       if (membros.length > 0 && (k < 1 || k > membros.length)) {
-        throw new Error(`o limiar tem de estar entre 1 e ${membros.length}`);
+        throw new Error(`The threshold must be between 1 and ${membros.length}`);
       }
       // O contrato recusa com `MembroRepetido`: um endereço duas vezes na mesa
       // conta duas parcelas para a mesma pessoa, e o limiar deixa de significar
       // o que diz.
       if (new Set(membros).size !== membros.length) {
-        throw new Error("a mesa tem um endereço repetido, e o contrato recusa");
+        throw new Error("The committee contains a duplicate address, which the contract rejects");
       }
 
       const agora = await ledgerAtual();
@@ -140,15 +141,15 @@ export default function Abrir() {
       if (comFechadura) {
         diario({
           tipo: "nota",
-          txt: `fechadura na rodada ${rodada} da baliza — a chave que abre as cédulas nasce sozinha quando a janela fechar`,
+          txt: `Time lock at beacon round ${rodada} — the key for opening ballots is published when the voting window closes`,
         });
       }
       // `abre >= fecha` é votação de duração zero, recusada com `PrazoNoPassado`.
       if (fecha <= abre) {
-        throw new Error("a janela de votação precisa durar ao menos um minuto");
+        throw new Error("The voting window must last at least one minute");
       }
       if (membros.length === 0) {
-        diario({ tipo: "nota", txt: "sem mesa: ninguém poderá apurar, e é isso que se quis" });
+        diario({ tipo: "nota", txt: "No committee: this configuration cannot produce a tally" });
       }
       setProgresso(1);
       await abrir(
@@ -162,7 +163,7 @@ export default function Abrir() {
       if (!aberta) guardarLista(proposta, lista);
       ir(`/votacao/${proposta}`);
     } catch (e) {
-      const msg = String((e as Error).message ?? e);
+      const msg = mensagemErro(e);
       setFalha(msg);
       diario({ tipo: "x", txt: msg });
     } finally {
@@ -173,74 +174,65 @@ export default function Abrir() {
   return (
     <main className="pagina pagina-estreita">
       <header>
-        <span className="eyebrow">ORGANIZADOR</span>
-        <h1>Abrir uma votação.</h1>
+        <span className="eyebrow">ORGANIZER </span>
+        <h1>Create a vote.</h1>
       </header>
 
       <section>
-        <h2>A PERGUNTA</h2>
+        <h2>THE QUESTION</h2>
         <label className="campo">
-          <span className="eyebrow">OPÇÕES</span>
+          <span className="eyebrow">OPTIONS </span>
           <input value={opcoes} onChange={(e) => setOpcoes(e.target.value)} />
-          <span className="campo-ajuda">Separadas por vírgula. A pergunta é sigilosa.</span>
+          <span className="campo-ajuda">Separate options with commas. This question uses confidential ballots. </span>
         </label>
       </section>
 
       <section>
-        <h2>QUEM PODE VOTAR</h2>
+        <h2>WHO CAN VOTE</h2>
         <label className="escolha-modo">
           <input type="radio" name="eleitorado" checked={aberta} onChange={() => setAberta(true)} />
           <span>
-            <strong>qualquer pessoa</strong>
+            <strong>Anyone </strong>
             <span className="campo-ajuda">
-              Quem chegar vota, sem lista nenhuma. É o modo da demonstração aberta.
-            </span>
+              No eligibility list is required. This is the open demo mode. </span>
           </span>
         </label>
         <label className="escolha-modo" style={{ marginTop: 9 }}>
           <input type="radio" name="eleitorado" checked={!aberta} onChange={() => setAberta(false)} />
           <span>
-            <strong>só quem está na lista</strong>
+            <strong>Only listed participants </strong>
             <span className="campo-ajuda">
-              A lista não vai para a rede — só a raiz de Merkle. Ela fica guardada neste navegador
-              e você precisa entregá-la a quem vota.
-            </span>
+              Only the Merkle root goes on-chain. The list stays in this browser, and you must share it with voters. </span>
           </span>
         </label>
 
         {aberta ? (
           <Aviso tipo="nota">
-            <strong>Numa votação aberta o total não significa nada.</strong> Qualquer pessoa vota
-            quantas vezes quiser criando carteiras novas, e na testnet o friendbot as financia de
-            graça. Também não existe lista de quem faltou, logo não existe voto obrigatório.
-            <br />
-            O que continua valendo é o que importa: <strong>ninguém descobre a escolha de
-            ninguém, e nada liga uma pessoa à cédula dela</strong>. É sigilo que esta votação
-            demonstra, não contagem.
-          </Aviso>
+            <strong>An open vote cannot guarantee a meaningful count. </strong> Anyone can vote repeatedly by creating new wallets, which Friendbot funds for free on testnet. Without an eligibility list, there is no list of absentees or mandatory participation. <br />
+            The anonymous ballot mechanism still applies:  <strong>participation and ballot submission remain separate </strong>. This mode demonstrates ballot privacy, not one vote per person. </Aviso>
         ) : (
           <label className="campo" style={{ marginTop: 20 }}>
-            <span className="eyebrow">ENDEREÇOS APTOS</span>
+            <span className="eyebrow">ELIGIBLE ADDRESSES </span>
             <textarea
               value={aptos}
               onChange={(e) => setAptos(e.target.value)}
               rows={6}
-              placeholder="um endereço G… por linha"
+              placeholder="One G… address per line"
             />
           </label>
         )}
       </section>
 
       <section>
-        <h2>O MODO</h2>
+        <h2>VOTING MODE</h2>
         <label className="escolha-modo">
           <input type="checkbox" checked={anel} onChange={(e) => setAnel(e.target.checked)} />
           <span>
-            <strong>caderno separado da urna</strong>
+            <strong>Separate attendance from ballots </strong>
             <span className="campo-ajuda">
               {anel
-                ? "quem comparece aparece com nome; a cédula sai de uma chave de uso único e não liga a ninguém"
-                : "a cédula sai do endereço de quem vota: o ledger mostra que você votou, nunca em quê"}
+                ? "Attendance is public; ballots use a one-time key and a ring signature to hide the sender within the group"
+                : "The ballot is sent from the voter's address: the ledger records who voted, while the choice is hidden by a commitment"}
             </span>
           </span>
         </label>
@@ -248,11 +240,11 @@ export default function Abrir() {
 
       {anel && (
         <section>
-          <h2>AS SEÇÕES</h2>
+          <h2>SECTIONS</h2>
           {aberta ? (
             <>
               <label className="campo campo-estreito">
-                <span className="eyebrow">PESSOAS POR SEÇÃO</span>
+                <span className="eyebrow">PEOPLE PER SECTION </span>
                 <input
                   type="number"
                   value={limite}
@@ -261,26 +253,20 @@ export default function Abrir() {
                 />
               </label>
               <p>
-                Você não adivinha quanta gente vem: diz o tamanho da seção e o contrato conta.{" "}
-                <strong>A seção enche e a próxima abre sozinha.</strong>
-              </p>
+                Choose a section size without guessing how many people will join. {" "}
+                <strong>When a section fills up, the contract opens the next one. </strong>
+</p>
               <p>
-                Verificar um anel custa <strong>10.822.850 instruções por membro</strong>. Com 30
-                pessoas num anel só, cada cédula usa 91,4% do teto de CPU de uma transação e só
-                uma entra por ledger — medido: 18 de 30 em 646 s, o resto expirou. Em seções de
-                dez, a mesma cédula custa 37,2% e três entram por ledger.
-              </p>
+                Verifying a ring costs  <strong>10,822,850 instructions per member </strong>. With 30 people in one ring, each ballot uses 91.4% of a transaction's CPU limit and only one fits per ledger — measured: 18 of 30 in 646 s; the rest expired. In sections of ten, a ballot uses 37.2% and three fit per ledger.</p>
               {limite < 5 && (
                 <Aviso tipo="erro">
-                  Abaixo de cinco o contrato recusa a cédula: um anel pequeno demais não esconde
-                  quem está nele. Use cinco ou mais.
-                </Aviso>
+                  Below five participants, the contract rejects the ballot: the ring is too small to provide the required anonymity. Use five or more. </Aviso>
               )}
             </>
           ) : (
             <>
               <label className="campo campo-estreito">
-                <span className="eyebrow">QUANTAS</span>
+                <span className="eyebrow">NUMBER OF SECTIONS </span>
                 <input
                   type="number"
                   value={secoes}
@@ -289,39 +275,28 @@ export default function Abrir() {
                 />
               </label>
               <p>
-                <strong>Você não escolhe quem fica com quem</strong>, e nem pode: a divisão sai
-                da assinatura de uma rodada da baliza que <em>ainda não venceu</em> neste
-                instante. Não há o que moer. Quando ela for publicada, qualquer pessoa com a
-                lista recalcula e confere. Se o organizador escolhesse, poria um dissidente numa
-                seção sozinho e leria o voto dele.
-              </p>
+                <strong>You cannot choose who shares a section </strong>. Allocation comes from the signature of a beacon round that  <em>has not happened yet </em> . Once published, anyone with the list can recompute and verify the allocation. This prevents an organizer from deliberately isolating a voter.</p>
             </>
           )}
           <p>
-            O preço é o conjunto de anonimato: ele passa a ser a sua seção, não a votação inteira.
-            Com mesa, o resultado é único — o acumulador não sabe de que seção veio cada cédula.
-            Com fechadura de tempo os totais são <strong>por seção</strong>, e a consequência tem
-            de ser dita: numa seção unânime, qualquer pessoa sabe em que cada um dos seus membros
-            votou. Até 32 pessoas, uma seção só é a configuração recomendada — acima disso o
-            anel estoura o teto de CPU, e aí as seções deixam de ser escolha.
-          </p>
+            The trade-off is the anonymity set: it becomes your section, not the entire electorate. With either a committee or a time lock, the contract publishes  <strong>one aggregate tally </strong>. Sections store commitment sums, not individual section totals. A unanimous overall result can still reveal everyone's choice. Ring size is also limited by the transaction CPU budget.</p>
         </section>
       )}
 
       <section>
-        <h2>A MESA</h2>
+        <h2>TALLYING COMMITTEE</h2>
         <label className="campo">
-          <span className="eyebrow">MEMBROS</span>
+          <span className="eyebrow">MEMBERS </span>
           <textarea
             value={mesa}
             onChange={(e) => setMesa(e.target.value)}
             rows={3}
-            placeholder="um endereço por linha — deixe vazio para não haver mesa"
+            placeholder="One address per line — leave empty for no committee"
           />
         </label>
         {mesa.trim() && (
           <label className="campo campo-estreito">
-            <span className="eyebrow">LIMIAR</span>
+            <span className="eyebrow">THRESHOLD </span>
             <input
               type="number"
               value={limiar}
@@ -332,15 +307,12 @@ export default function Abrir() {
         )}
         <p>
           {mesa.trim()
-            ? "Quem está aqui pode reunir as parcelas e publicar o total — e o contrato recusa qualquer total que não abra o acumulado."
-            : "Deixe vazio e ninguém poderá apurar."}
-        </p>
+            ? "Committee members combine their shares and publish the total. The contract rejects any total that does not match the accumulated commitments."
+            : "Without a committee, this mode cannot produce a tally."}
+</p>
         <p>
-          <strong>Numa cédula em anel o fator de aleatoriedade não é repartido com ninguém</strong>,
-          nem com a mesa. Então, em anel, mesa é só decoração: ninguém reconstrói a abertura e
-          ninguém publica total. Sem mesa, o contrato diz isso em vez de a tela pedir desculpas —
-          qualquer total afirmado cai em <code>AberturaNaoFecha</code>.
-        </p>
+          <strong>A ring ballot does not share its blinding factor with anyone </strong>, including the committee. Without a time lock, adding a committee does not make ring ballots tallyable. Any total without a valid opening is rejected with  <code>AberturaNaoFecha</code>.
+</p>
         {anel && !mesa.trim() ? (
           <>
             <label className="escolha-modo">
@@ -350,43 +322,36 @@ export default function Abrir() {
                 onChange={(e) => setFechadura(e.target.checked)}
               />
               <span>
-                <strong>fechadura de tempo</strong>
+                <strong>Time lock </strong>
                 <span className="campo-ajuda">
                   {fechadura
-                    ? "o placar aparece sozinho quando a janela fechar, sem mesa e sem ninguém de confiança"
-                    : "sem fechadura: o sigilo é absoluto, e o resultado é impossível"}
+                    ? "The results page tallies after the window closes and the beacon publishes the required round, without a committee"
+                    : "Without a time lock, ring ballots remain hidden and cannot be tallied"}
                 </span>
               </span>
             </label>
             {fechadura ? (
               <>
                 <p>
-                  A cédula sai cifrada para uma rodada de uma baliza pública que vence quando a
-                  janela fechar. <strong>Antes daquele instante ninguém abre</strong> — nem você,
-                  que está abrindo esta votação. Depois dele, qualquer pessoa abre e apura, e é
-                  isso que torna o placar impossível de travar: não depende de ninguém voltar.
-                </p>
+                  Ballots are encrypted for a public beacon round scheduled at the end of the voting window.  <strong>The opening key is not published before that round </strong> . After publication, anyone can open and tally the ballots without waiting for voters to return.</p>
                 <p>
-                  O que isso custa: a baliza é uma suposição de confiança. Um conluio de um limiar
-                  dos seus operadores abriria o conteúdo das cédulas antes da hora, e{" "}
-                  <strong>se ela parar de publicar, o placar não sai e não há plano B</strong>. O
-                  que não depende dela é o sigilo até o fim da janela, que é o relógio do ledger.
-                </p>
+                  The beacon is a trust assumption: collusion by a threshold of its operators could open ballot contents early, and  {" "}
+                  <strong>if it stops publishing, the tally cannot proceed and there is no fallback </strong>. Independently of the beacon, the ledger clock prevents the contract from accepting a tally before the voting window closes.</p>
               </>
             ) : (
-              <p>O preço é este: o sigilo é absoluto, e o resultado é impossível.</p>
+              <p>In this configuration, ballots remain hidden and no tally can be produced.</p>
             )}
           </>
         ) : (
-          <p>O preço é este: o sigilo é absoluto, e o resultado é impossível.</p>
+          <p>In this configuration, ballots remain hidden and no tally can be produced.</p>
         )}
       </section>
 
       <section>
-        <h2>A JANELA</h2>
+        <h2>TIMING</h2>
         <div className="campo-duplo">
           <label className="campo">
-            <span className="eyebrow">{anel ? "COMPARECIMENTO" : "ESPERA"} (MIN)</span>
+            <span className="eyebrow">{anel ? "CHECK-IN" : "WAIT"} (MIN)</span>
             <input
               type="number"
               value={minCaderno}
@@ -395,7 +360,7 @@ export default function Abrir() {
             />
           </label>
           <label className="campo">
-            <span className="eyebrow">VOTAÇÃO (MIN)</span>
+            <span className="eyebrow">VOTING (MIN) </span>
             <input
               type="number"
               value={minVoto}
@@ -408,8 +373,8 @@ export default function Abrir() {
 
       <section>
         <button className="primary-button" onClick={enviar} disabled={ocupado}>
-          {ocupado ? "Abrindo…" : "Abrir na testnet"} <Icone nome="arrow" />
-        </button>
+          {ocupado ? "Creating…" : "Create on testnet"} <Icone nome="arrow" />
+</button>
         {ocupado && <Passos passos={PASSOS} atual={progresso} />}
         {falha && <Aviso tipo="erro">{falha}</Aviso>}
         <LinkBastidores origem="abrir" />

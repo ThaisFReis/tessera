@@ -41,7 +41,7 @@ export class CarteiraEfemera implements Carteira {
     const par = Keypair.random();
     const r = await fetch(`${REDE.friendbot}?addr=${par.publicKey()}`);
     if (!r.ok && r.status !== 400) {
-      throw new Error(`o friendbot recusou financiar a chave: ${r.status}`);
+      throw new Error(`Friendbot could not fund the key: ${r.status}`);
     }
     return new CarteiraEfemera(par);
   }
@@ -104,7 +104,7 @@ export class CarteiraLocal implements Carteira {
       localStorage.setItem(chave, semente);
       const r = await fetch(`${REDE.friendbot}?addr=${par.publicKey()}`);
       if (!r.ok && r.status !== 400) {
-        throw new Error(`o friendbot recusou financiar a identidade: ${r.status}`);
+        throw new Error(`Friendbot could not fund the identity: ${r.status}`);
       }
     }
     return new CarteiraLocal(Keypair.fromSecret(semente));
