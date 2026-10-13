@@ -11,7 +11,7 @@ A versão em inglês é `docs/VIDEO-PITCH.en.md`, com os mesmos oito blocos.
 > governança votar em segredo e ainda assim qualquer pessoa reconferir o
 > resultado — e ele está de pé, medido, na testnet.
 
-**Duração real: 3min56** de fala, a 160 palavras por minuto, sem contar as
+**Duração real: 3min58** de fala, a 160 palavras por minuto, sem contar as
 pausas. Eu tentei fazer caber em 3min00 e não cabe sem estragar a demonstração,
 que é o único bloco que convence sozinho. Se o limite for duro em 3 minutos,
 corte nesta ordem — cada corte está marcado no texto:
@@ -20,7 +20,7 @@ corte nesta ordem — cada corte está marcado no texto:
 2. o parágrafo do meio do §6, o do custo da apuração (−13s);
 3. a primeira frase do §5, até "parte difícil" (−7s).
 
-Dá 3min31 — ainda acima de três minutos. Abaixo disso o §4 começa a perder as
+Dá 3min33 — ainda acima de três minutos. Abaixo disso o §4 começa a perder as
 duas colunas, e aí o vídeo não prova mais nada.
 
 ---
@@ -64,12 +64,12 @@ produção" nem "trustless", e nunca promete resultado se a baliza parar.
 |---|---|---|---|
 | 1 Gancho | 01 capa | 0:00–0:08 | você, ou a capa |
 | 2 Problema | 02 | 0:08–0:32 | slide |
-| 3 Desenho | 03 | 0:32–1:21 | slide |
-| 4 Demonstração | 04 | 1:21–2:06 | **captura de tela** |
-| 5 Por que Stellar | 05 | 2:06–2:26 | slide |
-| 6 Evidência | 06 | 2:26–2:57 | slide |
-| 7 Time | — | 2:57–3:29 | você, ou o Karn |
-| 8 Fecho | 07 | 3:29–3:56 | slide |
+| 3 Desenho | 03 | 0:32–1:36 | slide |
+| 4 Demonstração | 04 | 1:36–2:21 | **captura de tela** |
+| 5 Por que Stellar | 05 | 2:21–2:41 | slide |
+| 6 Evidência | 06 | 2:41–3:12 | slide |
+| 7 Time | — | 3:12–3:32 | você, ou o Karn |
+| 8 Fecho | 07 | 3:32–3:58 | slide |
 
 O §7 não tem slide no deck — veja a nota no fim desta página.
 
@@ -108,7 +108,7 @@ paga o trabalho dele." O conselheiro sozinho já faz o trabalho.
 
 ---
 
-## 3. O desenho — 0:32 a 1:21
+## 3. O desenho — 0:32 a 1:36
 
 **Tela:** slide 03.
 
@@ -121,16 +121,21 @@ paga o trabalho dele." O conselheiro sozinho já faz o trabalho.
 > votou, sem dizer o que você votou. Sozinho esse número não serve para nada.
 > Mas dá para somar todos eles e conferir o resultado.
 >
-> E quem abre? Se a votação não tem prazo, ninguém. Nunca. Nem eu. Se tem
-> prazo, qualquer pessoa abre depois que ele vence. A chave não fica guardada
-> com ninguém. Ela nasce sozinha na hora marcada, de um sorteio público que não
-> é meu.
+> E abrir uma cédula, para ver o que ela votou? Depende de como a votação foi
+> aberta. No modo simples, ninguém abre. Nunca. Nem eu. O resultado sai da
+> soma, e cédula nenhuma é aberta uma por uma.
+>
+> No modo com fechadura de tempo, qualquer pessoa abre. Mas só depois da hora
+> marcada, e a chave não fica guardada com ninguém: ela nasce sozinha, de um
+> sorteio público, no instante combinado.
+>
+> E abrir uma cédula mostra o que ela votou. Nunca de quem ela é.
 
 **Direção:** "Nem eu" é o ponto de virada do pitch inteiro. Não corra nele.
 
 ---
 
-## 4. A demonstração — 1:21 a 2:06
+## 4. A demonstração — 1:36 a 2:21
 
 **Tela:** captura do dapp. É o bloco mais longo de propósito, e é o único que
 não pode encolher.
@@ -161,7 +166,7 @@ verdade.
 
 ---
 
-## 5. Por que Stellar — 2:06 a 2:26
+## 5. Por que Stellar — 2:21 a 2:41
 
 **Tela:** slide 05.
 
@@ -177,7 +182,7 @@ verdade.
 
 ---
 
-## 6. A evidência — 2:26 a 2:57
+## 6. A evidência — 2:41 a 3:12
 
 **Tela:** slide 06, o lima.
 
@@ -198,51 +203,47 @@ faz o trabalho sozinho.
 
 ---
 
-## 7. O time — 2:57 a 3:29
+## 7. O time — 3:12 a 3:32
 
 **Tela:** o repositório do Karn, ou você. Veja a nota no fim.
 
 > Eu sou Thais Reis, engenheira de software no Rio de Janeiro. Eu construo
-> aplicação de ponta a ponta: cliente, API, banco, contrato e deploy. Já
-> entreguei uma plataforma de ingressos em produção sozinha, e ela rodou um
-> evento de verdade, com gente na porta.
+> aplicação de ponta a ponta: cliente, API, banco, contrato e deploy.
 >
-> Três primeiros lugares em hackathon. E a Stellar me convidou para o Builder
-> Summit, entre uns cem construtores.
->
-> Tessera também não é a minha primeira governança. Eu mantenho o Karn, um
-> protocolo de governança aberto. É exatamente onde isto aqui encaixa.
+> Três primeiros lugares em hackathon. E Tessera também não é a minha primeira
+> governança. Eu mantenho o Karn, um protocolo de governança aberto. É
+> exatamente onde ele encaixa.
 
-**De onde vem cada afirmação** (currículo, 13/10/2026), para o caso de alguém
-perguntar:
+**De onde vem cada afirmação** (currículo, 13/10/2026):
 
-- **"aplicação de ponta a ponta"** e **"plataforma de ingressos"** — Yalla,
-  engenheira **única** do produto: cliente em React, API em Node/TypeScript,
-  esquema em PostgreSQL, contratos e deploy. O primeiro evento ao vivo fechou
-  com 113 ingressos em 8 faixas, 98 presentes e 257 vouchers de bar resgatados,
-  nenhum expirado, com pico de 39 check-ins por hora. Os contratos eram dois,
-  atualizáveis, em Rust, e um upgrade foi executado ao vivo em produção.
+- **"aplicação de ponta a ponta"** — Yalla, engenheira **única** do produto:
+  cliente em React, API em Node/TypeScript, esquema em PostgreSQL, contratos em
+  Rust e deploy.
 - **"três primeiros lugares"** — Monad Blitz Rio de Janeiro (2026), Hackathon
-  Nola "God Level, Code Your Future" (2025) e Morro Makers (2025). São os três
-  com primeiro lugar; o prêmio da Stellar é financiamento, não disputa, e por
-  isso aparece separado na frase seguinte.
-- **"a Stellar me convidou para o Builder Summit"** — Stellar Instaward via
-  Stellar 37º (2026), programa regional da SDF; convite ao Builder Summit entre
-  cerca de cem construtores.
+  Nola "God Level, Code Your Future" (2025) e Morro Makers (2025).
 - **"eu mantenho o Karn"** — protocolo de governança aberto, fundadora e única
   contribuidora: três contratos em Rust, 53 testes, 5 achados de segurança
   documentados e resolvidos, SDK em TypeScript publicado no npm.
 
-> **O que eu deliberadamente não disse:** há quantos anos você escreve Rust. O
-> currículo não dá essa data, e número sem medição não entra — é a mesma regra
-> que vale para os números do contrato.
+**O que ficou de fora, e vale ter na ponta da língua** se o júri perguntar:
+
+- **Stellar Instaward via Stellar 37º (2026)**, programa regional da SDF, e
+  convite ao **Builder Summit** entre cerca de cem construtores. É a credencial
+  mais forte que você tem **para este júri em específico** — a SDF já te
+  escolheu uma vez. Ela saiu do texto e eu não a coloco de volta sem você pedir,
+  mas se houver Q&A, é a primeira coisa a dizer.
+- Os números do primeiro evento ao vivo da Yalla: 113 ingressos em 8 faixas, 98
+  presentes, 257 vouchers de bar resgatados sem nenhum expirado, pico de 39
+  check-ins por hora.
+- Dois contratos atualizáveis em Rust, com autoridade de admin e de upgrade
+  separadas de propósito, e um upgrade executado ao vivo em produção.
 
 > **Confirme antes de gravar:** o bloco assume **solo**. Se houver mais alguém
 > em Tessera — design, consultoria, revisão — me diga e eu reescrevo.
 
 ---
 
-## 8. O fecho — 3:29 a 3:56
+## 8. O fecho — 3:32 a 3:58
 
 **Tela:** slide 07.
 
@@ -386,8 +387,8 @@ seu nome do lado. [slowly] Para sempre. [pause]
 dele. Ou no contribuidor que vota contra a baleia que paga o trabalho dele.
 [pause]
 
-Essas pessoas não votam errado. [pause] [let down] Elas só não votam. [long
-pause] E isso não aparece em lugar nenhum.
+Essas pessoas não votam errado. [pause] [let down] Elas só não votam. 
+[long pause] E isso não aparece em lugar nenhum.
 ```
 
 ### 3 · desenho
@@ -402,10 +403,16 @@ Então o Tessera não grava o seu voto. Ele grava um número que prova que você
 votou, sem dizer o que você votou. Sozinho esse número não serve para nada. Mas
 dá para somar todos eles e conferir o resultado. [pause]
 
-[curious] E quem abre? [pause] Se a votação não tem prazo, ninguém. Nunca.
-[pause] [slowly] Nem eu. [long pause] Se tem prazo, qualquer pessoa abre depois
-que ele vence. A chave não fica guardada com ninguém. Ela nasce sozinha na hora
-marcada, de um sorteio público que não é meu.
+[curious] E abrir uma cédula, para ver o que ela votou? [pause] Depende de como
+a votação foi aberta. No modo simples, ninguém abre. Nunca. [pause] [slowly] Nem
+eu. [pause] O resultado sai da soma, e cédula nenhuma é aberta uma por uma.
+[long pause]
+
+No modo com fechadura de tempo, qualquer pessoa abre. Mas só depois da hora
+marcada, e a chave não fica guardada com ninguém: ela nasce sozinha, de um
+sorteio público, no instante combinado. [pause]
+
+E abrir uma cédula mostra o que ela votou. [slowly] Nunca de quem ela é.
 ```
 
 ### 4 · demonstração
@@ -461,15 +468,11 @@ as contas do zero e confere o resultado.
 
 ```
 Eu sou Thais Reis, engenheira de software no Rio de Janeiro. [pause] Eu construo
-aplicação de ponta a ponta: cliente, API, banco, contrato e deploy. Já entreguei
-uma plataforma de ingressos em produção sozinha, e ela rodou um evento de
-verdade, com gente na porta. [pause]
+aplicação de ponta a ponta: cliente, API, banco, contrato e deploy. [long pause]
 
-[proud] Três primeiros lugares em hackathon. E a Stellar me convidou para o
-Builder Summit, entre uns cem construtores. [long pause]
-
-Tessera também não é a minha primeira governança. Eu mantenho o Karn, um
-protocolo de governança aberto. [slowly] É exatamente onde isto aqui encaixa.
+[proud] Três primeiros lugares em hackathon. [pause] E Tessera também não é a
+minha primeira governança. Eu mantenho o Karn, um protocolo de governança
+aberto. [slowly] É exatamente onde ele encaixa.
 ```
 
 ### 8 · fecho

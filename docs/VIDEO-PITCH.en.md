@@ -11,7 +11,7 @@ The Portuguese version is `docs/VIDEO-PITCH.md`, with the same eight blocks.
 > governance body to vote in secret and still have anyone re-check the result —
 > and it is standing, measured, on testnet.
 
-**Real length: 4min10** of speech at 160 words a minute, pauses not counted. I
+**Real length: 4min11** of speech at 160 words a minute, pauses not counted. I
 tried to make it fit 3min00 and it does not fit without wrecking the demo, which
 is the only block that convinces on its own. If the limit is a hard three
 minutes, cut in this order — each cut is marked in the text:
@@ -20,7 +20,7 @@ minutes, cut in this order — each cut is marked in the text:
 2. the middle paragraph of §6, the one about tally cost (−15s);
 3. the first sentence of §5, through "the hard part" (−7s).
 
-That lands at 3min43 — still over three minutes. Below that §4 starts losing
+That lands at 3min45 — still over three minutes. Below that §4 starts losing
 the two columns, and then the video stops proving anything.
 
 ---
@@ -66,12 +66,12 @@ and never promises a result if the beacon stops.
 |---|---|---|---|
 | 1 Hook | 01 cover | 0:00–0:09 | you, or the cover |
 | 2 Problem | 02 | 0:09–0:35 | slide |
-| 3 Design | 03 | 0:35–1:26 | slide |
-| 4 Demo | 04 | 1:26–2:13 | **screen capture** |
-| 5 Why Stellar | 05 | 2:13–2:34 | slide |
-| 6 Evidence | 06 | 2:34–3:08 | slide |
-| 7 Team | — | 3:08–3:39 | you, or Karn |
-| 8 Close | 07 | 3:39–4:10 | slide |
+| 3 Design | 03 | 0:35–1:41 | slide |
+| 4 Demo | 04 | 1:41–2:28 | **screen capture** |
+| 5 Why Stellar | 05 | 2:28–2:49 | slide |
+| 6 Evidence | 06 | 2:49–3:23 | slide |
+| 7 Team | — | 3:23–3:42 | you, or Karn |
+| 8 Close | 07 | 3:42–4:12 | slide |
 
 §7 has no slide in the deck — see the note at the end of this page.
 
@@ -112,7 +112,7 @@ pays for their work." The board member alone does the job.
 
 ---
 
-## 3. The design — 0:35 to 1:26
+## 3. The design — 0:35 to 1:41
 
 **Screen:** slide 03.
 
@@ -125,16 +125,21 @@ pays for their work." The board member alone does the job.
 > voted, without saying what you voted. On its own that number is useless. But
 > you can add all of them up and check the result.
 >
-> And who can open it? If the vote has no deadline, nobody. Ever. Not even me.
-> If it has a deadline, anyone can open it once the deadline passes. The key
-> isn't held by anyone. It is born on its own at the appointed time, out of a
-> public draw that isn't mine.
+> And opening a ballot, to see what it voted? That depends on how the vote was
+> set up. In the simple mode, nobody opens anything. Ever. Not even me. The
+> result comes out of the sum, and no ballot is ever opened one by one.
+>
+> With a time lock, anyone can open them. But only after the appointed hour,
+> and the key isn't held by anyone: it is born on its own, out of a public
+> draw, at the agreed moment.
+>
+> And opening a ballot shows what it voted. Never whose it is.
 
 **Direction:** "Not even me" is the turn of the whole pitch. Do not rush it.
 
 ---
 
-## 4. The demo — 1:26 to 2:13
+## 4. The demo — 1:41 to 2:28
 
 **Screen:** capture of the dapp. It is the longest block on purpose, and the one
 block that cannot shrink.
@@ -164,7 +169,7 @@ It is the only image in the video that proves something on its own. Don't say
 
 ---
 
-## 5. Why Stellar — 2:13 to 2:34
+## 5. Why Stellar — 2:28 to 2:49
 
 **Screen:** slide 05.
 
@@ -180,7 +185,7 @@ It is the only image in the video that proves something on its own. Don't say
 
 ---
 
-## 6. The evidence — 2:34 to 3:08
+## 6. The evidence — 2:49 to 3:23
 
 **Screen:** slide 06, the lime one.
 
@@ -202,50 +207,46 @@ the work by itself.
 
 ---
 
-## 7. The team — 3:08 to 3:39
+## 7. The team — 3:23 to 3:42
 
 **Screen:** the Karn repository, or you. See the note at the end.
 
 > I'm Thais Reis, a software engineer in Rio de Janeiro. I build applications
-> end to end: client, API, database, smart contracts and deployment. I shipped a
-> production ticketing platform on my own, and it ran a real event, with people
-> at the door.
+> end to end: client, API, database, smart contracts and deployment.
 >
-> Three first places at hackathons. And Stellar invited me to the Builder
-> Summit, one of about a hundred builders.
->
-> Tessera isn't my first governance protocol either. I maintain Karn, an open
-> governance protocol. This is exactly where it plugs in.
+> Three first places at hackathons. And Tessera isn't my first governance
+> protocol either. I maintain Karn, an open governance protocol. This is exactly
+> where it plugs in.
 
-**Where each claim comes from** (CV, 13 Oct 2026), in case anyone asks:
+**Where each claim comes from** (CV, 13 Oct 2026):
 
-- **"end to end"** and **"ticketing platform"** — Yalla, **sole** engineer on
-  the product: React client, Node/TypeScript API, PostgreSQL schema, contracts
-  and deployment. The first live event closed with 113 tickets across 8 tiers,
-  98 attendees and 257 bar vouchers redeemed with none expired, peaking at 39
-  check-ins per hour. The contracts were two upgradable Rust ones, and an upgrade
-  was executed live in production.
+- **"end to end"** — Yalla, **sole** engineer on the product: React client,
+  Node/TypeScript API, PostgreSQL schema, Rust contracts and deployment.
 - **"three first places"** — Monad Blitz Rio de Janeiro (2026), Hackathon Nola
-  "God Level, Code Your Future" (2025) and Morro Makers (2025). Those are the
-  three outright wins; the Stellar award is funding rather than a contest, which
-  is why it sits in the next sentence.
-- **"Stellar invited me to the Builder Summit"** — Stellar Instaward via Stellar
-  37º (2026), an SDF regional programme; invitation to the Builder Summit as one
-  of about a hundred builders.
+  "God Level, Code Your Future" (2025) and Morro Makers (2025).
 - **"I maintain Karn"** — open governance protocol, founder and sole
   contributor: three Rust contracts, 53 tests, 5 documented security findings
   resolved, a typed TypeScript SDK published to npm.
 
-> **What I deliberately left out:** how many years you have been writing Rust.
-> The CV does not give that date, and an unmeasured number does not go in — same
-> rule as the contract figures.
+**What was left out, and is worth having ready** if the judges ask:
+
+- **Stellar Instaward via Stellar 37º (2026)**, an SDF regional programme, and
+  the invitation to the **Builder Summit** as one of about a hundred builders.
+  It is the strongest credential you have **for this jury specifically** — the
+  SDF has already picked you once. It came out of the script and I won't put it
+  back unasked, but if there is a Q&A, it is the first thing to say.
+- The numbers from Yalla's first live event: 113 tickets across 8 tiers, 98
+  attendees, 257 bar vouchers redeemed with none expired, peaking at 39
+  check-ins per hour.
+- Two upgradable Rust contracts with deliberately disjoint admin and upgrade
+  authority, and one upgrade executed live in production.
 
 > **Confirm before recording:** the block assumes **solo**. If anyone else is on
 > Tessera — design, advice, review — tell me and I rewrite it.
 
 ---
 
-## 8. The close — 3:39 to 4:10
+## 8. The close — 3:42 to 4:12
 
 **Screen:** slide 07.
 
@@ -386,8 +387,8 @@ next to it. [slowly] Forever. [pause]
 person they report to. Or the contributor voting against the whale who pays for
 their work. [pause]
 
-These people don't vote wrong. [pause] [let down] They just don't vote. [long
-pause] And that never shows up anywhere.
+These people don't vote wrong. [pause] [let down] They just don't vote. 
+[long pause] And that never shows up anywhere.
 ```
 
 ### 3 · design
@@ -402,10 +403,16 @@ So Tessera doesn't record your vote. It records a number that proves you voted,
 without saying what you voted. On its own that number is useless. But you can
 add all of them up and check the result. [pause]
 
-[curious] And who can open it? [pause] If the vote has no deadline, nobody.
-Ever. [pause] [slowly] Not even me. [long pause] If it has a deadline, anyone
-can open it once the deadline passes. The key isn't held by anyone. It is born
-on its own at the appointed time, out of a public draw that isn't mine.
+[curious] And opening a ballot, to see what it voted? [pause] That depends on
+how the vote was set up. In the simple mode, nobody opens anything. Ever.
+[pause] [slowly] Not even me. [pause] The result comes out of the sum, and no
+ballot is ever opened one by one. [long pause]
+
+With a time lock, anyone can open them. But only after the appointed hour, and
+the key isn't held by anyone: it is born on its own, out of a public draw, at
+the agreed moment. [pause]
+
+And opening a ballot shows what it voted. [slowly] Never whose it is.
 ```
 
 ### 4 · demo
@@ -464,14 +471,11 @@ redoes the maths from scratch and checks the result.
 ```
 I'm Thais Reis, a software engineer in Rio de Janeiro. [pause] I build
 applications end to end: client, API, database, smart contracts and deployment.
-I shipped a production ticketing platform on my own, and it ran a real event,
-with people at the door. [pause]
+[long pause]
 
-[proud] Three first places at hackathons. And Stellar invited me to the Builder
-Summit, one of about a hundred builders. [long pause]
-
-Tessera isn't my first governance protocol either. I maintain Karn, an open
-governance protocol. [slowly] This is exactly where it plugs in.
+[proud] Three first places at hackathons. [pause] And Tessera isn't my first
+governance protocol either. I maintain Karn, an open governance protocol.
+[slowly] This is exactly where it plugs in.
 ```
 
 ### 8 · close
@@ -480,8 +484,8 @@ governance protocol. [slowly] This is exactly where it plugs in.
 This isn't magic, and there is fine print. [pause] If the vote has a deadline,
 it depends on that public draw. If the draw stops, no result comes out. If
 everyone votes the same way, the result gives everyone away, same as anywhere.
-And none of this has been audited. [slowly] I'm not going to say it has. [long
-pause]
+And none of this has been audited. [slowly] I'm not going to say it has. 
+[long pause]
 
 But checking a decision shouldn't cost exposing everyone's choice. [pause]
 
