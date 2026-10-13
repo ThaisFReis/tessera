@@ -60,7 +60,7 @@ segunda cédula da mesma pessoa sem revelar quem ela é.
 | Cliente CLI | ✅ rodada completa na testnet |
 | Verificador público, caminho com mesa | ✅ `tessera verificar` |
 | Verificador público, caminho **anônimo** | ✅ `tessera verificar --contrato` · anel, cadeia, imagem de chave e decifragem, sem arquivo local |
-| dapp (React, cripto no navegador) | ✅ roda local, **não publicado** |
+| dapp (React, cripto no navegador) | ✅ no ar em [thaisfreis.github.io/tessera/dapp](https://thaisfreis.github.io/tessera/dapp/) |
 | Fechadura de tempo (apuração **sem mesa**) | ✅ rodada ponta a ponta na testnet |
 | Apuração pelo dapp | ✅ com fechadura, sozinha, em qualquer número de seções · ⬜ com mesa, só pela CLI |
 | Console de demonstração | ✅ visor sobre a saída da CLI |
