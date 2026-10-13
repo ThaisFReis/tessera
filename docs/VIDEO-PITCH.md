@@ -58,8 +58,8 @@ assinatura no slide 07 — veja a nota no fim.
 
 **Tela:** você em câmera, ou a capa. Nada mais.
 
-> Uma urna em que ninguém — nem quem a abriu — consegue ligar uma cédula a
-> quem a depositou.
+> Uma votação em que ninguém — nem quem a abriu — consegue ligar uma cédula
+> a quem a depositou.
 >
 > Isso é Tessera, e está rodando agora na testnet da Stellar.
 
@@ -287,8 +287,8 @@ alternativa está ao lado — troque só se precisar.
 ### 1 · gancho
 
 ```
-Uma urna em que ninguém, nem quem a abriu, consegue ligar uma cédula a quem a
-depositou. [pause] Isso é Tessera, e está rodando agora na testnet da Stellar.
+Uma votação em que ninguém, nem quem a abriu, consegue ligar uma cédula a quem
+a depositou. [pause] Isso é Tessera, e está rodando agora na testnet da Stellar.
 ```
 
 ### 2 · problema
