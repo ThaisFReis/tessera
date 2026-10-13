@@ -11,7 +11,7 @@ The Portuguese version is `docs/VIDEO-PITCH.md`, with the same eight blocks.
 > governance body to vote in secret and still have anyone re-check the result —
 > and it is standing, measured, on testnet.
 
-**Real length: 4min05** of speech at 160 words a minute, pauses not counted. I
+**Real length: 4min10** of speech at 160 words a minute, pauses not counted. I
 tried to make it fit 3min00 and it does not fit without wrecking the demo, which
 is the only block that convinces on its own. If the limit is a hard three
 minutes, cut in this order — each cut is marked in the text:
@@ -20,7 +20,7 @@ minutes, cut in this order — each cut is marked in the text:
 2. the middle paragraph of §6, the one about tally cost (−15s);
 3. the first sentence of §5, through "the hard part" (−7s).
 
-That lands at 3min38 — still over three minutes. Below that §4 starts losing
+That lands at 3min43 — still over three minutes. Below that §4 starts losing
 the two columns, and then the video stops proving anything.
 
 ---
@@ -70,8 +70,8 @@ and never promises a result if the beacon stops.
 | 4 Demo | 04 | 1:26–2:13 | **screen capture** |
 | 5 Why Stellar | 05 | 2:13–2:34 | slide |
 | 6 Evidence | 06 | 2:34–3:08 | slide |
-| 7 Team | — | 3:08–3:35 | you, or Karn |
-| 8 Close | 07 | 3:35–4:05 | slide |
+| 7 Team | — | 3:08–3:39 | you, or Karn |
+| 8 Close | 07 | 3:39–4:10 | slide |
 
 §7 has no slide in the deck — see the note at the end of this page.
 
@@ -202,13 +202,14 @@ the work by itself.
 
 ---
 
-## 7. The team — 3:08 to 3:35
+## 7. The team — 3:08 to 3:39
 
 **Screen:** the Karn repository, or you. See the note at the end.
 
-> I'm Thais Reis, a software engineer in Rio de Janeiro. I write Rust
-> contracts, and I've pushed a contract upgrade to production, live, with
-> users on it, without taking anything down.
+> I'm Thais Reis, a software engineer in Rio de Janeiro. I build applications
+> end to end: client, API, database, smart contracts and deployment. I shipped a
+> production ticketing platform on my own, and it ran a real event, with people
+> at the door.
 >
 > Three first places at hackathons. And Stellar invited me to the Builder
 > Summit, one of about a hundred builders.
@@ -218,10 +219,12 @@ the work by itself.
 
 **Where each claim comes from** (CV, 13 Oct 2026), in case anyone asks:
 
-- **"I've pushed a contract upgrade to production"** — Yalla, sole engineer on
-  the product: two upgradable Rust contracts with a minter allowlist and
-  deliberately disjoint admin and upgrade authority, and one upgrade executed
-  live in production.
+- **"end to end"** and **"ticketing platform"** — Yalla, **sole** engineer on
+  the product: React client, Node/TypeScript API, PostgreSQL schema, contracts
+  and deployment. The first live event closed with 113 tickets across 8 tiers,
+  98 attendees and 257 bar vouchers redeemed with none expired, peaking at 39
+  check-ins per hour. The contracts were two upgradable Rust ones, and an upgrade
+  was executed live in production.
 - **"three first places"** — Monad Blitz Rio de Janeiro (2026), Hackathon Nola
   "God Level, Code Your Future" (2025) and Morro Makers (2025). Those are the
   three outright wins; the Stellar award is funding rather than a contest, which
@@ -242,7 +245,7 @@ the work by itself.
 
 ---
 
-## 8. The close — 3:35 to 4:05
+## 8. The close — 3:39 to 4:10
 
 **Screen:** slide 07.
 
@@ -459,9 +462,10 @@ redoes the maths from scratch and checks the result.
 ### 7 · team
 
 ```
-I'm Thais Reis, a software engineer in Rio de Janeiro. [pause] I write Rust
-contracts, and I've pushed a contract upgrade to production, live, with users on
-it, without taking anything down. [pause]
+I'm Thais Reis, a software engineer in Rio de Janeiro. [pause] I build
+applications end to end: client, API, database, smart contracts and deployment.
+I shipped a production ticketing platform on my own, and it ran a real event,
+with people at the door. [pause]
 
 [proud] Three first places at hackathons. And Stellar invited me to the Builder
 Summit, one of about a hundred builders. [long pause]
@@ -493,7 +497,7 @@ The screen should **show what the voice claims**, not illustrate generically.
 | While the voice says | On screen |
 |---|---|
 | "a software engineer in Rio de Janeiro" | you — photo or camera |
-| "I've pushed a contract upgrade to production" | the Rust contract, or the explorer page for the upgrade transaction |
+| "ticketing platform... people at the door" | the platform running, or a photo of the event door |
 | "three first places" | the three trophies, event logos or photos |
 | "Stellar invited me to the Builder Summit" | the Stellar logo, or a photo from the Summit |
 | "I maintain Karn" | the Karn repository |

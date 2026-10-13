@@ -11,7 +11,7 @@ A versão em inglês é `docs/VIDEO-PITCH.en.md`, com os mesmos oito blocos.
 > governança votar em segredo e ainda assim qualquer pessoa reconferir o
 > resultado — e ele está de pé, medido, na testnet.
 
-**Duração real: 3min51** de fala, a 160 palavras por minuto, sem contar as
+**Duração real: 3min56** de fala, a 160 palavras por minuto, sem contar as
 pausas. Eu tentei fazer caber em 3min00 e não cabe sem estragar a demonstração,
 que é o único bloco que convence sozinho. Se o limite for duro em 3 minutos,
 corte nesta ordem — cada corte está marcado no texto:
@@ -20,7 +20,7 @@ corte nesta ordem — cada corte está marcado no texto:
 2. o parágrafo do meio do §6, o do custo da apuração (−13s);
 3. a primeira frase do §5, até "parte difícil" (−7s).
 
-Dá 3min26 — ainda acima de três minutos. Abaixo disso o §4 começa a perder as
+Dá 3min31 — ainda acima de três minutos. Abaixo disso o §4 começa a perder as
 duas colunas, e aí o vídeo não prova mais nada.
 
 ---
@@ -68,8 +68,8 @@ produção" nem "trustless", e nunca promete resultado se a baliza parar.
 | 4 Demonstração | 04 | 1:21–2:06 | **captura de tela** |
 | 5 Por que Stellar | 05 | 2:06–2:26 | slide |
 | 6 Evidência | 06 | 2:26–2:57 | slide |
-| 7 Time | — | 2:57–3:24 | você, ou o Karn |
-| 8 Fecho | 07 | 3:24–3:51 | slide |
+| 7 Time | — | 2:57–3:29 | você, ou o Karn |
+| 8 Fecho | 07 | 3:29–3:56 | slide |
 
 O §7 não tem slide no deck — veja a nota no fim desta página.
 
@@ -198,13 +198,14 @@ faz o trabalho sozinho.
 
 ---
 
-## 7. O time — 2:57 a 3:24
+## 7. O time — 2:57 a 3:29
 
 **Tela:** o repositório do Karn, ou você. Veja a nota no fim.
 
-> Eu sou Thais Reis, engenheira de software no Rio de Janeiro. Eu escrevo
-> contrato em Rust, e já subi atualização de contrato em produção, com gente
-> usando, sem derrubar nada.
+> Eu sou Thais Reis, engenheira de software no Rio de Janeiro. Eu construo
+> aplicação de ponta a ponta: cliente, API, banco, contrato e deploy. Já
+> entreguei uma plataforma de ingressos em produção sozinha, e ela rodou um
+> evento de verdade, com gente na porta.
 >
 > Três primeiros lugares em hackathon. E a Stellar me convidou para o Builder
 > Summit, entre uns cem construtores.
@@ -215,10 +216,12 @@ faz o trabalho sozinho.
 **De onde vem cada afirmação** (currículo, 13/10/2026), para o caso de alguém
 perguntar:
 
-- **"já subi atualização de contrato em produção"** — Yalla, engenheira única do
-  produto: dois contratos atualizáveis em Rust, com lista de mintadores e
-  autoridade de admin e de upgrade deliberadamente separadas, e um upgrade
-  executado ao vivo em produção.
+- **"aplicação de ponta a ponta"** e **"plataforma de ingressos"** — Yalla,
+  engenheira **única** do produto: cliente em React, API em Node/TypeScript,
+  esquema em PostgreSQL, contratos e deploy. O primeiro evento ao vivo fechou
+  com 113 ingressos em 8 faixas, 98 presentes e 257 vouchers de bar resgatados,
+  nenhum expirado, com pico de 39 check-ins por hora. Os contratos eram dois,
+  atualizáveis, em Rust, e um upgrade foi executado ao vivo em produção.
 - **"três primeiros lugares"** — Monad Blitz Rio de Janeiro (2026), Hackathon
   Nola "God Level, Code Your Future" (2025) e Morro Makers (2025). São os três
   com primeiro lugar; o prêmio da Stellar é financiamento, não disputa, e por
@@ -239,7 +242,7 @@ perguntar:
 
 ---
 
-## 8. O fecho — 3:24 a 3:51
+## 8. O fecho — 3:29 a 3:56
 
 **Tela:** slide 07.
 
@@ -457,9 +460,10 @@ as contas do zero e confere o resultado.
 ### 7 · time
 
 ```
-Eu sou Thais Reis, engenheira de software no Rio de Janeiro. [pause] Eu escrevo
-contrato em Rust, e já subi atualização de contrato em produção, com gente
-usando, sem derrubar nada. [pause]
+Eu sou Thais Reis, engenheira de software no Rio de Janeiro. [pause] Eu construo
+aplicação de ponta a ponta: cliente, API, banco, contrato e deploy. Já entreguei
+uma plataforma de ingressos em produção sozinha, e ela rodou um evento de
+verdade, com gente na porta. [pause]
 
 [proud] Três primeiros lugares em hackathon. E a Stellar me convidou para o
 Builder Summit, entre uns cem construtores. [long pause]
@@ -489,7 +493,7 @@ A tela deve **mostrar o que a voz afirma**, não ilustrar genericamente.
 | Enquanto a voz diz | Na tela |
 |---|---|
 | "engenheira de software no Rio de Janeiro" | você — foto ou câmera |
-| "já subi atualização de contrato em produção" | o contrato em Rust, ou o explorer da transação de upgrade |
+| "plataforma de ingressos... com gente na porta" | a plataforma rodando, ou uma foto do evento na portaria |
 | "três primeiros lugares" | os três troféus, logos ou fotos dos eventos |
 | "a Stellar me convidou para o Builder Summit" | o logo da Stellar, ou a foto do Summit |
 | "eu mantenho o Karn" | o repositório do Karn |
