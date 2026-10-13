@@ -11,7 +11,7 @@ A versão em inglês é `docs/VIDEO-PITCH.en.md`, com os mesmos oito blocos.
 > governança votar em segredo e ainda assim qualquer pessoa reconferir o
 > resultado — e ele está de pé, medido, na testnet.
 
-**Duração real: 3min58** de fala, a 160 palavras por minuto, sem contar as
+**Duração real: 4min03** de fala, a 160 palavras por minuto, sem contar as
 pausas. Eu tentei fazer caber em 3min00 e não cabe sem estragar a demonstração,
 que é o único bloco que convence sozinho. Se o limite for duro em 3 minutos,
 corte nesta ordem — cada corte está marcado no texto:
@@ -20,7 +20,7 @@ corte nesta ordem — cada corte está marcado no texto:
 2. o parágrafo do meio do §6, o do custo da apuração (−13s);
 3. a primeira frase do §5, até "parte difícil" (−7s).
 
-Dá 3min33 — ainda acima de três minutos. Abaixo disso o §4 começa a perder as
+Dá 3min38 — ainda acima de três minutos. Abaixo disso o §4 começa a perder as
 duas colunas, e aí o vídeo não prova mais nada.
 
 ---
@@ -64,12 +64,12 @@ produção" nem "trustless", e nunca promete resultado se a baliza parar.
 |---|---|---|---|
 | 1 Gancho | 01 capa | 0:00–0:08 | você, ou a capa |
 | 2 Problema | 02 | 0:08–0:32 | slide |
-| 3 Desenho | 03 | 0:32–1:36 | slide |
-| 4 Demonstração | 04 | 1:36–2:21 | **captura de tela** |
-| 5 Por que Stellar | 05 | 2:21–2:41 | slide |
-| 6 Evidência | 06 | 2:41–3:12 | slide |
-| 7 Time | — | 3:12–3:32 | você, ou o Karn |
-| 8 Fecho | 07 | 3:32–3:58 | slide |
+| 3 Desenho | 03 | 0:32–1:41 | slide |
+| 4 Demonstração | 04 | 1:41–2:26 | **captura de tela** |
+| 5 Por que Stellar | 05 | 2:26–2:46 | slide |
+| 6 Evidência | 06 | 2:46–3:17 | slide |
+| 7 Time | — | 3:17–3:37 | você, ou o Karn |
+| 8 Fecho | 07 | 3:37–4:03 | slide |
 
 O §7 não tem slide no deck — veja a nota no fim desta página.
 
@@ -108,7 +108,7 @@ paga o trabalho dele." O conselheiro sozinho já faz o trabalho.
 
 ---
 
-## 3. O desenho — 0:32 a 1:36
+## 3. O desenho — 0:32 a 1:41
 
 **Tela:** slide 03.
 
@@ -121,13 +121,14 @@ paga o trabalho dele." O conselheiro sozinho já faz o trabalho.
 > votou, sem dizer o que você votou. Sozinho esse número não serve para nada.
 > Mas dá para somar todos eles e conferir o resultado.
 >
-> E abrir uma cédula, para ver o que ela votou? Depende de como a votação foi
-> aberta. No modo simples, ninguém abre. Nunca. Nem eu. O resultado sai da
-> soma, e cédula nenhuma é aberta uma por uma.
+> E quem abre uma cédula, para ver o que ela votou? Você pode nomear uma mesa
+> apuradora, repartir a chave entre essas pessoas, e confiar que elas apaguem
+> as cópias depois. Dá para fazer, e o Tessera faz.
 >
-> No modo com fechadura de tempo, qualquer pessoa abre. Mas só depois da hora
-> marcada, e a chave não fica guardada com ninguém: ela nasce sozinha, de um
-> sorteio público, no instante combinado.
+> Mas o modo que ele defende não tem mesa nenhuma. Ninguém tem chave. Nem eu.
+> As cédulas viajam cifradas para uma hora marcada, e nessa hora um sorteio
+> público publica a chave que abre todas. Aí qualquer pessoa reconta o
+> resultado sozinha, cédula por cédula.
 >
 > E abrir uma cédula mostra o que ela votou. Nunca de quem ela é.
 
@@ -135,7 +136,7 @@ paga o trabalho dele." O conselheiro sozinho já faz o trabalho.
 
 ---
 
-## 4. A demonstração — 1:36 a 2:21
+## 4. A demonstração — 1:41 a 2:26
 
 **Tela:** captura do dapp. É o bloco mais longo de propósito, e é o único que
 não pode encolher.
@@ -166,7 +167,7 @@ verdade.
 
 ---
 
-## 5. Por que Stellar — 2:21 a 2:41
+## 5. Por que Stellar — 2:26 a 2:46
 
 **Tela:** slide 05.
 
@@ -182,7 +183,7 @@ verdade.
 
 ---
 
-## 6. A evidência — 2:41 a 3:12
+## 6. A evidência — 2:46 a 3:17
 
 **Tela:** slide 06, o lima.
 
@@ -203,7 +204,7 @@ faz o trabalho sozinho.
 
 ---
 
-## 7. O time — 3:12 a 3:32
+## 7. O time — 3:17 a 3:37
 
 **Tela:** o repositório do Karn, ou você. Veja a nota no fim.
 
@@ -243,7 +244,7 @@ faz o trabalho sozinho.
 
 ---
 
-## 8. O fecho — 3:32 a 3:58
+## 8. O fecho — 3:37 a 4:03
 
 **Tela:** slide 07.
 
@@ -403,14 +404,14 @@ Então o Tessera não grava o seu voto. Ele grava um número que prova que você
 votou, sem dizer o que você votou. Sozinho esse número não serve para nada. Mas
 dá para somar todos eles e conferir o resultado. [pause]
 
-[curious] E abrir uma cédula, para ver o que ela votou? [pause] Depende de como
-a votação foi aberta. No modo simples, ninguém abre. Nunca. [pause] [slowly] Nem
-eu. [pause] O resultado sai da soma, e cédula nenhuma é aberta uma por uma.
-[long pause]
+[curious] E quem abre uma cédula, para ver o que ela votou? [pause] Você pode
+nomear uma mesa apuradora, repartir a chave entre essas pessoas, e confiar que
+elas apaguem as cópias depois. Dá para fazer, e o Tessera faz. [long pause]
 
-No modo com fechadura de tempo, qualquer pessoa abre. Mas só depois da hora
-marcada, e a chave não fica guardada com ninguém: ela nasce sozinha, de um
-sorteio público, no instante combinado. [pause]
+Mas o modo que ele defende não tem mesa nenhuma. Ninguém tem chave. [slowly] Nem
+eu. [pause] As cédulas viajam cifradas para uma hora marcada, e nessa hora um
+sorteio público publica a chave que abre todas. Aí qualquer pessoa reconta o
+resultado sozinha, cédula por cédula. [long pause]
 
 E abrir uma cédula mostra o que ela votou. [slowly] Nunca de quem ela é.
 ```

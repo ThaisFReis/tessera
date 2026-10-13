@@ -11,7 +11,7 @@ The Portuguese version is `docs/VIDEO-PITCH.md`, with the same eight blocks.
 > governance body to vote in secret and still have anyone re-check the result —
 > and it is standing, measured, on testnet.
 
-**Real length: 4min11** of speech at 160 words a minute, pauses not counted. I
+**Real length: 4min14** of speech at 160 words a minute, pauses not counted. I
 tried to make it fit 3min00 and it does not fit without wrecking the demo, which
 is the only block that convinces on its own. If the limit is a hard three
 minutes, cut in this order — each cut is marked in the text:
@@ -20,7 +20,7 @@ minutes, cut in this order — each cut is marked in the text:
 2. the middle paragraph of §6, the one about tally cost (−15s);
 3. the first sentence of §5, through "the hard part" (−7s).
 
-That lands at 3min45 — still over three minutes. Below that §4 starts losing
+That lands at 3min48 — still over three minutes. Below that §4 starts losing
 the two columns, and then the video stops proving anything.
 
 ---
@@ -65,13 +65,13 @@ and never promises a result if the beacon stops.
 | Block | Slide | Time | Screen |
 |---|---|---|---|
 | 1 Hook | 01 cover | 0:00–0:09 | you, or the cover |
-| 2 Problem | 02 | 0:09–0:35 | slide |
-| 3 Design | 03 | 0:35–1:41 | slide |
-| 4 Demo | 04 | 1:41–2:28 | **screen capture** |
-| 5 Why Stellar | 05 | 2:28–2:49 | slide |
-| 6 Evidence | 06 | 2:49–3:23 | slide |
-| 7 Team | — | 3:23–3:42 | you, or Karn |
-| 8 Close | 07 | 3:42–4:12 | slide |
+| 2 Problem | 02 | 0:09–0:34 | slide |
+| 3 Design | 03 | 0:34–1:44 | slide |
+| 4 Demo | 04 | 1:44–2:31 | **screen capture** |
+| 5 Why Stellar | 05 | 2:31–2:52 | slide |
+| 6 Evidence | 06 | 2:52–3:26 | slide |
+| 7 Team | — | 3:26–3:45 | you, or Karn |
+| 8 Close | 07 | 3:45–4:14 | slide |
 
 §7 has no slide in the deck — see the note at the end of this page.
 
@@ -90,7 +90,7 @@ and never promises a result if the beacon stops.
 
 ---
 
-## 2. The problem — 0:09 to 0:35
+## 2. The problem — 0:09 to 0:34
 
 **Screen:** slide 02.
 
@@ -112,7 +112,7 @@ pays for their work." The board member alone does the job.
 
 ---
 
-## 3. The design — 0:35 to 1:41
+## 3. The design — 0:34 to 1:44
 
 **Screen:** slide 03.
 
@@ -125,13 +125,14 @@ pays for their work." The board member alone does the job.
 > voted, without saying what you voted. On its own that number is useless. But
 > you can add all of them up and check the result.
 >
-> And opening a ballot, to see what it voted? That depends on how the vote was
-> set up. In the simple mode, nobody opens anything. Ever. Not even me. The
-> result comes out of the sum, and no ballot is ever opened one by one.
+> And who gets to open a ballot, to see what it voted? You can appoint a
+> tallying board, split the key between those people, and trust them to erase
+> their copies afterwards. That works, and Tessera supports it.
 >
-> With a time lock, anyone can open them. But only after the appointed hour,
-> and the key isn't held by anyone: it is born on its own, out of a public
-> draw, at the agreed moment.
+> But the mode it argues for has no board at all. Nobody holds a key. Not even
+> me. The ballots travel encrypted to an appointed hour, and at that hour a
+> public draw publishes the key that opens all of them. Then anyone can
+> recount the result on their own, ballot by ballot.
 >
 > And opening a ballot shows what it voted. Never whose it is.
 
@@ -139,7 +140,7 @@ pays for their work." The board member alone does the job.
 
 ---
 
-## 4. The demo — 1:41 to 2:28
+## 4. The demo — 1:44 to 2:31
 
 **Screen:** capture of the dapp. It is the longest block on purpose, and the one
 block that cannot shrink.
@@ -169,7 +170,7 @@ It is the only image in the video that proves something on its own. Don't say
 
 ---
 
-## 5. Why Stellar — 2:28 to 2:49
+## 5. Why Stellar — 2:31 to 2:52
 
 **Screen:** slide 05.
 
@@ -185,7 +186,7 @@ It is the only image in the video that proves something on its own. Don't say
 
 ---
 
-## 6. The evidence — 2:49 to 3:23
+## 6. The evidence — 2:52 to 3:26
 
 **Screen:** slide 06, the lime one.
 
@@ -207,7 +208,7 @@ the work by itself.
 
 ---
 
-## 7. The team — 3:23 to 3:42
+## 7. The team — 3:26 to 3:45
 
 **Screen:** the Karn repository, or you. See the note at the end.
 
@@ -246,7 +247,7 @@ the work by itself.
 
 ---
 
-## 8. The close — 3:42 to 4:12
+## 8. The close — 3:45 to 4:14
 
 **Screen:** slide 07.
 
@@ -403,14 +404,14 @@ So Tessera doesn't record your vote. It records a number that proves you voted,
 without saying what you voted. On its own that number is useless. But you can
 add all of them up and check the result. [pause]
 
-[curious] And opening a ballot, to see what it voted? [pause] That depends on
-how the vote was set up. In the simple mode, nobody opens anything. Ever.
-[pause] [slowly] Not even me. [pause] The result comes out of the sum, and no
-ballot is ever opened one by one. [long pause]
+[curious] And who gets to open a ballot, to see what it voted? [pause] You can
+appoint a tallying board, split the key between those people, and trust them to
+erase their copies afterwards. That works, and Tessera supports it. [long pause]
 
-With a time lock, anyone can open them. But only after the appointed hour, and
-the key isn't held by anyone: it is born on its own, out of a public draw, at
-the agreed moment. [pause]
+But the mode it argues for has no board at all. Nobody holds a key. [slowly] Not
+even me. [pause] The ballots travel encrypted to an appointed hour, and at that
+hour a public draw publishes the key that opens all of them. Then anyone can
+recount the result on their own, ballot by ballot. [long pause]
 
 And opening a ballot shows what it voted. [slowly] Never whose it is.
 ```
