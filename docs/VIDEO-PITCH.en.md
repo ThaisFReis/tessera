@@ -11,7 +11,7 @@ The Portuguese version is `docs/VIDEO-PITCH.md`, with the same eight blocks.
 > governance body to vote in secret and still have anyone re-check the result —
 > and it is standing, measured, on testnet.
 
-**Real length: 3min57** of speech at 160 words a minute, pauses not counted. I
+**Real length: 4min05** of speech at 160 words a minute, pauses not counted. I
 tried to make it fit 3min00 and it does not fit without wrecking the demo, which
 is the only block that convinces on its own. If the limit is a hard three
 minutes, cut in this order — each cut is marked in the text:
@@ -20,7 +20,7 @@ minutes, cut in this order — each cut is marked in the text:
 2. the middle paragraph of §6, the one about tally cost (−15s);
 3. the first sentence of §5, through "the hard part" (−7s).
 
-That lands at 3min30 — still over three minutes. Below that §4 starts losing
+That lands at 3min38 — still over three minutes. Below that §4 starts losing
 the two columns, and then the video stops proving anything.
 
 ---
@@ -64,20 +64,20 @@ and never promises a result if the beacon stops.
 
 | Block | Slide | Time | Screen |
 |---|---|---|---|
-| 1 Hook | 01 cover | 0:00–0:08 | you, or the cover |
-| 2 Problem | 02 | 0:08–0:31 | slide |
-| 3 Design | 03 | 0:31–1:19 | slide |
-| 4 Demo | 04 | 1:19–2:03 | **screen capture** |
-| 5 Why Stellar | 05 | 2:03–2:22 | slide |
-| 6 Evidence | 06 | 2:22–2:52 | slide |
-| 7 Team | — | 2:52–3:11 | `git log` scrolling |
-| 8 Close | 07 | 3:11–3:38 | slide |
+| 1 Hook | 01 cover | 0:00–0:09 | you, or the cover |
+| 2 Problem | 02 | 0:09–0:35 | slide |
+| 3 Design | 03 | 0:35–1:26 | slide |
+| 4 Demo | 04 | 1:26–2:13 | **screen capture** |
+| 5 Why Stellar | 05 | 2:13–2:34 | slide |
+| 6 Evidence | 06 | 2:34–3:08 | slide |
+| 7 Team | — | 3:08–3:35 | you, or Karn |
+| 8 Close | 07 | 3:35–4:05 | slide |
 
 §7 has no slide in the deck — see the note at the end of this page.
 
 ---
 
-## 1. The hook — 0:00 to 0:08
+## 1. The hook — 0:00 to 0:09
 
 **Screen:** you on camera, or the cover. Nothing else.
 
@@ -90,7 +90,7 @@ and never promises a result if the beacon stops.
 
 ---
 
-## 2. The problem — 0:08 to 0:31
+## 2. The problem — 0:09 to 0:35
 
 **Screen:** slide 02.
 
@@ -112,7 +112,7 @@ pays for their work." The board member alone does the job.
 
 ---
 
-## 3. The design — 0:31 to 1:19
+## 3. The design — 0:35 to 1:26
 
 **Screen:** slide 03.
 
@@ -134,7 +134,7 @@ pays for their work." The board member alone does the job.
 
 ---
 
-## 4. The demo — 1:19 to 2:03
+## 4. The demo — 1:26 to 2:13
 
 **Screen:** capture of the dapp. It is the longest block on purpose, and the one
 block that cannot shrink.
@@ -164,7 +164,7 @@ It is the only image in the video that proves something on its own. Don't say
 
 ---
 
-## 5. Why Stellar — 2:03 to 2:22
+## 5. Why Stellar — 2:13 to 2:34
 
 **Screen:** slide 05.
 
@@ -180,7 +180,7 @@ It is the only image in the video that proves something on its own. Don't say
 
 ---
 
-## 6. The evidence — 2:22 to 2:52
+## 6. The evidence — 2:34 to 3:08
 
 **Screen:** slide 06, the lime one.
 
@@ -202,26 +202,47 @@ the work by itself.
 
 ---
 
-## 7. The team — 2:52 to 3:11
+## 7. The team — 3:08 to 3:35
 
-**Screen:** `git log` scrolling. See the note at the end.
+**Screen:** the Karn repository, or you. See the note at the end.
 
-> I built this. Thais Reis. On my own.
+> I'm Thais Reis, a software engineer in Rio de Janeiro. I write Rust
+> contracts, and I've pushed a contract upgrade to production, live, with
+> users on it, without taking anything down.
 >
-> Twelve days. A hundred and twenty-two commits, from the protocol to the
-> screen. A hundred and ninety-five tests passing. All open, MIT licence.
+> Three first places at hackathons. And Stellar invited me to the Builder
+> Summit, one of about a hundred builders.
 >
-> I don't have a team to show you. I have a repository, and it has been public
-> since the first commit.
+> Tessera isn't my first governance protocol either. I maintain Karn, an open
+> governance protocol. This is exactly where it plugs in.
 
-> **Confirm before recording:** the script assumes **solo**, because the
-> repository history has a single author. If anyone else was involved — design,
-> advice, review — tell me and I rewrite this block. Naming who helped beats
-> looking solo by omission.
+**Where each claim comes from** (CV, 13 Oct 2026), in case anyone asks:
+
+- **"I've pushed a contract upgrade to production"** — Yalla, sole engineer on
+  the product: two upgradable Rust contracts with a minter allowlist and
+  deliberately disjoint admin and upgrade authority, and one upgrade executed
+  live in production.
+- **"three first places"** — Monad Blitz Rio de Janeiro (2026), Hackathon Nola
+  "God Level, Code Your Future" (2025) and Morro Makers (2025). Those are the
+  three outright wins; the Stellar award is funding rather than a contest, which
+  is why it sits in the next sentence.
+- **"Stellar invited me to the Builder Summit"** — Stellar Instaward via Stellar
+  37º (2026), an SDF regional programme; invitation to the Builder Summit as one
+  of about a hundred builders.
+- **"I maintain Karn"** — open governance protocol, founder and sole
+  contributor: three Rust contracts, 53 tests, 5 documented security findings
+  resolved, a typed TypeScript SDK published to npm.
+
+> **What I deliberately left out:** how many years you have been writing Rust.
+> The CV does not give that date, and an unmeasured number does not go in — same
+> rule as the contract figures.
+
+> **Confirm before recording:** the block assumes **solo**. If anyone else is on
+> Tessera — design, advice, review — tell me and I rewrite it.
 
 ---
 
-## 8. The close — 3:11 to 3:38
+## 8. The close — 3:35 to 4:05
 
 **Screen:** slide 07.
 
@@ -438,13 +459,15 @@ redoes the maths from scratch and checks the result.
 ### 7 · team
 
 ```
-I built this. [pause] Thais Reis. [pause] On my own. [long pause]
+I'm Thais Reis, a software engineer in Rio de Janeiro. [pause] I write Rust
+contracts, and I've pushed a contract upgrade to production, live, with users on
+it, without taking anything down. [pause]
 
-Twelve days. A hundred and twenty-two commits, from the protocol to the screen.
-A hundred and ninety-five tests passing. All open, MIT licence. [pause]
+[proud] Three first places at hackathons. And Stellar invited me to the Builder
+Summit, one of about a hundred builders. [long pause]
 
-[slowly] I don't have a team to show you. [pause] I have a repository, and it
-has been public since the first commit.
+Tessera isn't my first governance protocol either. I maintain Karn, an open
+governance protocol. [slowly] This is exactly where it plugs in.
 ```
 
 ### 8 · close
@@ -462,23 +485,27 @@ The decision belongs to all of us. [pause] The choice is yours. [long pause]
 Tessera.
 ```
 
-## The team block, with no face
+## What to show during the team block
 
-§7 was written to be said looking at the camera. "I don't have a team to show
-you" holds up on the eye, not on the text. With a cloned voice and no face, it
-hangs in the air.
+§7 is now about who you are, and every line in it has an obvious image behind it.
+The screen should **show what the voice claims**, not illustrate generically.
 
-Three ways out, from the one I'd take to the one I wouldn't:
+| While the voice says | On screen |
+|---|---|
+| "a software engineer in Rio de Janeiro" | you — photo or camera |
+| "I've pushed a contract upgrade to production" | the Rust contract, or the explorer page for the upgrade transaction |
+| "three first places" | the three trophies, event logos or photos |
+| "Stellar invited me to the Builder Summit" | the Stellar logo, or a photo from the Summit |
+| "I maintain Karn" | the Karn repository |
 
-1. **The repository on screen, scrolling.** `git log` running while the line is
-   said. The hundred and twenty-two commits stop being a number and become an
-   image — which is exactly what the line promises.
-2. **A still photo of you, with your name.** Honest and sufficient.
-3. **Slide 07 with a signature line.** It works, but the close loses force by
-   splitting attention with an authorship credit.
+If you can prepare **one**, prepare the last. Karn is the one that closes the
+pitch: the deck already says Tessera's intended integrations are Karn and
+OpenZeppelin's Governor, so the screen proves you are not proposing to plug into
+somebody else's thing — you maintain both ends.
 
-I recommend the first: it is the only one where the screen proves what the voice
-claims.
+If you can prepare none, your photo with your name is honest and sufficient.
+What I'd avoid is slide 07 with a signature line: the close loses force splitting
+attention with an authorship credit.
 
 > **Honesty note.** Nothing obliges you to say in the video that the narration is
 > synthetic — it is your own voice, cloned by you, and that is production, not

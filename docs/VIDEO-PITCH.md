@@ -11,7 +11,7 @@ A versão em inglês é `docs/VIDEO-PITCH.en.md`, com os mesmos oito blocos.
 > governança votar em segredo e ainda assim qualquer pessoa reconferir o
 > resultado — e ele está de pé, medido, na testnet.
 
-**Duração real: 3min42** de fala, a 160 palavras por minuto, sem contar as
+**Duração real: 3min51** de fala, a 160 palavras por minuto, sem contar as
 pausas. Eu tentei fazer caber em 3min00 e não cabe sem estragar a demonstração,
 que é o único bloco que convence sozinho. Se o limite for duro em 3 minutos,
 corte nesta ordem — cada corte está marcado no texto:
@@ -20,7 +20,7 @@ corte nesta ordem — cada corte está marcado no texto:
 2. o parágrafo do meio do §6, o do custo da apuração (−13s);
 3. a primeira frase do §5, até "parte difícil" (−7s).
 
-Dá 3min17 — ainda acima de três minutos. Abaixo disso o §4 começa a perder as
+Dá 3min26 — ainda acima de três minutos. Abaixo disso o §4 começa a perder as
 duas colunas, e aí o vídeo não prova mais nada.
 
 ---
@@ -68,8 +68,8 @@ produção" nem "trustless", e nunca promete resultado se a baliza parar.
 | 4 Demonstração | 04 | 1:21–2:06 | **captura de tela** |
 | 5 Por que Stellar | 05 | 2:06–2:26 | slide |
 | 6 Evidência | 06 | 2:26–2:57 | slide |
-| 7 Time | — | 2:57–3:16 | `git log` rolando |
-| 8 Fecho | 07 | 3:16–3:42 | slide |
+| 7 Time | — | 2:57–3:24 | você, ou o Karn |
+| 8 Fecho | 07 | 3:24–3:51 | slide |
 
 O §7 não tem slide no deck — veja a nota no fim desta página.
 
@@ -198,26 +198,48 @@ faz o trabalho sozinho.
 
 ---
 
-## 7. O time — 2:57 a 3:16
+## 7. O time — 2:57 a 3:24
 
-**Tela:** `git log` rolando. Veja a nota no fim.
+**Tela:** o repositório do Karn, ou você. Veja a nota no fim.
 
-> Quem fez isso fui eu. Thais Reis. Sozinha.
+> Eu sou Thais Reis, engenheira de software no Rio de Janeiro. Eu escrevo
+> contrato em Rust, e já subi atualização de contrato em produção, com gente
+> usando, sem derrubar nada.
 >
-> Doze dias. Cento e vinte e dois commits, do protocolo até a tela. Cento e
-> noventa e cinco testes passando. Tudo aberto, licença MIT.
+> Três primeiros lugares em hackathon. E a Stellar me convidou para o Builder
+> Summit, entre uns cem construtores.
 >
-> Eu não tenho um time para te mostrar. Tenho um repositório, e ele está
-> público desde o primeiro commit.
+> Tessera também não é a minha primeira governança. Eu mantenho o Karn, um
+> protocolo de governança aberto. É exatamente onde isto aqui encaixa.
 
-> **Confirme antes de gravar:** o roteiro assume **solo**, porque o histórico
-> do repositório tem um autor só. Se houver mais alguém — design, consultoria,
-> revisão — me diga e eu reescrevo este bloco. Nomear quem ajudou é melhor que
-> parecer solo por omissão.
+**De onde vem cada afirmação** (currículo, 13/10/2026), para o caso de alguém
+perguntar:
+
+- **"já subi atualização de contrato em produção"** — Yalla, engenheira única do
+  produto: dois contratos atualizáveis em Rust, com lista de mintadores e
+  autoridade de admin e de upgrade deliberadamente separadas, e um upgrade
+  executado ao vivo em produção.
+- **"três primeiros lugares"** — Monad Blitz Rio de Janeiro (2026), Hackathon
+  Nola "God Level, Code Your Future" (2025) e Morro Makers (2025). São os três
+  com primeiro lugar; o prêmio da Stellar é financiamento, não disputa, e por
+  isso aparece separado na frase seguinte.
+- **"a Stellar me convidou para o Builder Summit"** — Stellar Instaward via
+  Stellar 37º (2026), programa regional da SDF; convite ao Builder Summit entre
+  cerca de cem construtores.
+- **"eu mantenho o Karn"** — protocolo de governança aberto, fundadora e única
+  contribuidora: três contratos em Rust, 53 testes, 5 achados de segurança
+  documentados e resolvidos, SDK em TypeScript publicado no npm.
+
+> **O que eu deliberadamente não disse:** há quantos anos você escreve Rust. O
+> currículo não dá essa data, e número sem medição não entra — é a mesma regra
+> que vale para os números do contrato.
+
+> **Confirme antes de gravar:** o bloco assume **solo**. Se houver mais alguém
+> em Tessera — design, consultoria, revisão — me diga e eu reescrevo.
 
 ---
 
-## 8. O fecho — 3:16 a 3:42
+## 8. O fecho — 3:24 a 3:51
 
 **Tela:** slide 07.
 
@@ -435,13 +457,15 @@ as contas do zero e confere o resultado.
 ### 7 · time
 
 ```
-Quem fez isso fui eu. [pause] Thais Reis. [pause] Sozinha. [long pause]
+Eu sou Thais Reis, engenheira de software no Rio de Janeiro. [pause] Eu escrevo
+contrato em Rust, e já subi atualização de contrato em produção, com gente
+usando, sem derrubar nada. [pause]
 
-Doze dias. Cento e vinte e dois commits, do protocolo até a tela. Cento e
-noventa e cinco testes passando. Tudo aberto, licença MIT. [pause]
+[proud] Três primeiros lugares em hackathon. E a Stellar me convidou para o
+Builder Summit, entre uns cem construtores. [long pause]
 
-[slowly] Eu não tenho um time para te mostrar. [pause] Tenho um repositório, e
-ele está público desde o primeiro commit.
+Tessera também não é a minha primeira governança. Eu mantenho o Karn, um
+protocolo de governança aberto. [slowly] É exatamente onde isto aqui encaixa.
 ```
 
 ### 8 · fecho
@@ -457,22 +481,27 @@ Mas conferir uma decisão não deveria custar expor a escolha de cada um. [pause
 A decisão é de todos. [pause] A escolha é sua. [long pause] Tessera.
 ```
 
-## O bloco do time, sem rosto
+## O que mostrar no bloco do time
 
-O §7 foi escrito para ser dito olhando para a câmera. "Eu não tenho um time para
-te mostrar" se sustenta no olho, não no texto. Com voz clonada e sem rosto, ela
-fica no vazio.
+O §7 agora é sobre quem você é, e cada frase dele tem uma imagem óbvia por trás.
+A tela deve **mostrar o que a voz afirma**, não ilustrar genericamente.
 
-Três saídas, da que eu faria para a que eu não faria:
+| Enquanto a voz diz | Na tela |
+|---|---|
+| "engenheira de software no Rio de Janeiro" | você — foto ou câmera |
+| "já subi atualização de contrato em produção" | o contrato em Rust, ou o explorer da transação de upgrade |
+| "três primeiros lugares" | os três troféus, logos ou fotos dos eventos |
+| "a Stellar me convidou para o Builder Summit" | o logo da Stellar, ou a foto do Summit |
+| "eu mantenho o Karn" | o repositório do Karn |
 
-1. **O repositório na tela, rolando.** `git log` correndo enquanto a frase é
-   dita. Os cento e vinte e dois commits deixam de ser um número e viram uma
-   imagem — é exatamente o que a frase promete.
-2. **Uma foto sua, estática, com o nome.** Honesto e suficiente.
-3. **O slide 07 com uma linha de assinatura.** Funciona, mas o fecho perde força
-   por dividir a atenção com crédito de autoria.
+Se der para preparar **uma** só, prepare a última. O Karn é a que faz o pitch
+fechar: o deck já diz que a integração prevista de Tessera é o Karn e o Governor
+da OpenZeppelin, então a tela prova que você não está propondo encaixar numa
+coisa de terceiros — você mantém as duas pontas.
 
-Eu recomendo a primeira: é a única em que a tela prova o que a voz afirma.
+Se não der para preparar nenhuma, a sua foto com o nome é honesta e suficiente.
+O que eu evitaria é o slide 07 com uma linha de assinatura: o fecho perde força
+dividindo atenção com crédito de autoria.
 
 > **Nota de honestidade.** Nada obriga você a dizer no vídeo que a narração é
 > sintética — é a sua própria voz, clonada por você, e isso é produção, não
