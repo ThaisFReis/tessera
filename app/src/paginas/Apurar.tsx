@@ -1,3 +1,4 @@
+import { mensagemErro } from "../mensagens";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
@@ -34,7 +35,7 @@ export default function Apurar() {
     (async () => {
       try {
         const [prop, ledger] = await Promise.all([lerProposta(id), ledgerAtual()]);
-        if (!vivo || !prop) return setFalha("esta proposta não existe no contrato");
+        if (!vivo || !prop) return setFalha("This proposal does not exist in the contract");
         const [conf] = await lerComparecimento(id);
         if (!vivo) return;
         setP(prop);
@@ -49,7 +50,7 @@ export default function Apurar() {
         apurou.current = true;
         await apurarSozinho(id, prop, ledger, (f) => vivo && setFase(f), diario);
       } catch (e) {
-        if (vivo) setFalha(String((e as Error).message ?? e));
+        if (vivo) setFalha(mensagemErro(e));
       }
     })();
     return () => {
@@ -59,67 +60,51 @@ export default function Apurar() {
   }, [id]);
 
   if (falha) {
-    return <main className="pagina"><Estado titulo="Não foi possível ler a proposta." curto>
+    return <main className="pagina"><Estado titulo="Could not load the proposal." curto>
       <p className="error-message" role="alert">{falha}</p>
-      <Link className="primary-button" to="/votacoes">Ver votações <Icone nome="arrow" /></Link>
+      <Link className="primary-button" to="/votacoes">View votes <Icone nome="arrow" /></Link>
     </Estado></main>;
   }
-  if (!p) return <main className="pagina"><Carregando titulo="Lendo a proposta." /></main>;
+  if (!p) return <main className="pagina"><Carregando titulo="Loading the proposal." /></main>;
 
   return (
     <main className="pagina">
       <header>
-        <span className="eyebrow">APURAÇÃO · {cedulas} {cedulas === 1 ? "CÉDULA" : "CÉDULAS"}</span>
+        <span className="eyebrow">TALLY ·  {cedulas} {cedulas === 1 ? "BALLOT" : "BALLOTS"}</span>
         <h1>{id.slice(0, 16)}…</h1>
       </header>
 
       {p.rodada !== 0n ? <ComFechadura id={id} p={p} fase={fase} /> : daMesa ? (
         <section>
-          <h2>O PLACAR</h2>
+          <h2>RESULTS</h2>
           <Totais totais={daMesa} />
           <p>
-            Estes números não vieram da mesa: vieram do <strong>contrato</strong>. Ele conferiu a
-            abertura contra o acumulado de todas as cédulas antes de gravá-los, e teria recusado
-            com <code>AberturaNaoFecha</code> qualquer total que não fechasse.
-          </p>
+            These numbers were read from the  <strong>contract </strong>. It verified the opening against the accumulated ballots before recording them, and would reject an inconsistent total with  <code>AberturaNaoFecha</code> .</p>
           <p>
-            A correspondência entre opção e nome está com quem organizou: a proposta na rede só
-            guarda quantidades.
-          </p>
+            Ask the organizer for the option labels: the on-chain proposal stores only their counts.</p>
         </section>
       ) : p.mesa.length === 0 ? (
         <section>
-          <h2>ESTA VOTAÇÃO NÃO APURA, E ISSO É O DESENHO</h2>
+          <h2>THIS CONFIGURATION CANNOT BE TALLIED</h2>
           <div className="painel">
             <p>
-              Ela foi aberta sem mesa e <strong>sem fechadura de tempo</strong>. Ninguém recebeu
-              parcela de abertura, então ninguém reconstrói a soma dos fatores que escondem os
-              votos — e sem ela nenhum total pode ser publicado.
-            </p>
+              This vote was created without a committee and  <strong>without a time lock </strong>. No opening shares were distributed, so no one can reconstruct the sum of the blinding factors needed to publish a total.</p>
             <p>
-              Não é uma promessa: é o contrato. Qualquer total afirmado sem a abertura correta cai
-              em <code>AberturaNaoFecha</code>. Nem quem abriu a votação consegue.
-            </p>
-            <p><strong>O preço é este: o sigilo é absoluto, e o resultado é impossível.</strong></p>
+              The contract enforces this: a total without a valid opening is rejected with  <code>AberturaNaoFecha</code>. Even the organizer cannot bypass this check.</p>
+            <p><strong>In this configuration, ballots remain hidden and no tally can be produced. </strong></p>
             <p>
-              Uma votação aberta com fechadura não tem esse preço: a chave que abre as cédulas
-              nasce sozinha quando a janela fecha, e aí qualquer pessoa apura.
-            </p>
+              With a time lock, the beacon publishes the opening key after the voting window closes, allowing anyone to tally the ballots.</p>
           </div>
         </section>
       ) : (
         <section>
-          <h2>A MESA PRECISA SE REUNIR</h2>
+          <h2>THE COMMITTEE MUST COMBINE ITS SHARES</h2>
           <div className="painel">
             <p>
-              {p.limiar} de {p.mesa.length} membros reconstroem a abertura agregada, afirmam os
-              totais, e o contrato confere contra o acumulado no ledger. Se os números não
-              fecharem, ele recusa — <strong>não é denúncia depois, é recusa na hora</strong>.
-            </p>
+              {p.limiar} of  {p.mesa.length} members reconstruct the aggregate opening and submit the totals. The contract checks them against the accumulated commitments and  <strong>rejects inconsistent totals immediately </strong>.
+</p>
             <p>
-              As parcelas vivem no navegador de cada membro. Esta rota ainda não as junta; por
-              enquanto a apuração é pela CLI:
-            </p>
+              This page does not combine committee shares. Use the CLI to tally:</p>
             <pre className="bloco-codigo">tessera apurar --proposta {id.slice(0, 16)}…</pre>
           </div>
         </section>
@@ -127,10 +112,9 @@ export default function Apurar() {
 
       <p>
         <a href={`${REDE.explorer}/contract/${REDE.contrato}`} target="_blank" rel="noopener">
-          ver no explorer ↗
-        </a>
+          View in explorer ↗ </a>
         {p.rodada !== 0n && <> · <LinkBastidores /></>}
-      </p>
+</p>
     </main>
   );
 }
@@ -141,7 +125,7 @@ function Totais({ totais }: { totais: number[] }) {
       <dl className="fatos">
         {totais.map((n, i) => (
           <div key={i}>
-            <dt>OPÇÃO {i + 1}</dt>
+            <dt>OPTION  {i + 1}</dt>
             <dd className="valor-mono">{n}</dd>
           </div>
         ))}
@@ -152,65 +136,53 @@ function Totais({ totais }: { totais: number[] }) {
 
 /** A apuração pela fechadura de tempo, fase por fase. */
 function ComFechadura({ id, p, fase }: { id: string; p: PropostaRede; fase: FasePlacar | null }) {
-  if (!fase) return <Carregando titulo="Vendo se o relógio já abriu." />;
+  if (!fase) return <Carregando titulo="Checking whether the time lock has opened." />;
 
   switch (fase.tipo) {
     case "janela-aberta":
       return (
         <section>
-          <h2>A VOTAÇÃO AINDA ESTÁ ABERTA</h2>
+          <h2>VOTING IS STILL OPEN</h2>
           <div className="painel">
             <p>
-              Não há placar — e não há <em>nem parcial</em>. Faltam{" "}
-              <span className="valor-mono">{fase.faltam}</span> ledgers para a urna fechar.
-            </p>
+              There are no results,  <em>not even partial results </em>. Remaining: {" "}
+              <span className="valor-mono">{fase.faltam}</span> ledgers until voting closes.</p>
             <p>
-              Isto não é a tela escondendo um número que ela tem. A chave que abre as cédulas é a
-              assinatura da rodada <span className="valor-mono">{String(p.rodada)}</span> da
-              baliza, e a baliza só a publica quando aquele instante chega — nem quem organizou,
-              nem quem votou, nem esta página a tem.
-            </p>
+              This page does not have a hidden tally. The opening key is the signature of beacon round  <span className="valor-mono">{String(p.rodada)}</span> , which is only published when that round arrives. The organizer, voters and this page do not have it beforehand.</p>
             <p>
-              Produzi-la mais cedo não é impossível: exigiria conluio de um limiar dos operadores
-              da baliza — gente que ninguém desta votação escolheu e que não tem interesse nela,
-              mas gente. O que <em>não</em> depende de suposição nenhuma é o placar: o contrato
-              recusa qualquer apuração antes de <code>fecha_em</code>, e isso é o relógio do
-              ledger.
-            </p>
+              Producing it early would require collusion by a threshold of beacon operators. The contract's closing-time rule does  <em>not </em>  depend on that assumption: it rejects any tally before  <code>fecha_em</code>, using the ledger clock.</p>
           </div>
-          <Link className="secondary-button" to={`/votacao/${id}`}>Ver a votação <Icone nome="arrow" /></Link>
+          <Link className="secondary-button" to={`/votacao/${id}`}>View vote <Icone nome="arrow" /></Link>
         </section>
       );
 
     case "esperando-relogio":
       return (
         <section>
-          <h2>A URNA FECHOU. O RELÓGIO AINDA NÃO ABRIU.</h2>
+          <h2>VOTING HAS CLOSED. THE TIME LOCK IS STILL LOCKED.</h2>
           <div className="painel">
             <p>
-              A janela terminou, e a rodada <span className="valor-mono">{String(p.rodada)}</span>{" "}
-              da baliza vence em <span className="valor-mono">{fase.faltam}</span> segundos. Até
-              lá, o contrato recusa qualquer apuração com{" "}
-              <code>RelogioAindaNaoAbriu</code> — inclusive a desta aba.
-            </p>
-            <p>Recarregue quando o tempo passar: o placar aparece sem você fazer mais nada.</p>
+              The voting window has ended. Beacon round  <span className="valor-mono">{String(p.rodada)}</span>{" "}
+              is due in  <span className="valor-mono">{fase.faltam}</span> seconds. Until then, the contract rejects tallying with  {" "}
+              <code>RelogioAindaNaoAbriu</code> , including requests from this page.</p>
+            <p>Reload after the round is published to start tallying automatically.</p>
           </div>
         </section>
       );
 
     case "lendo":
-      return <Carregando titulo="Lendo as cédulas dos eventos do contrato." />;
+      return <Carregando titulo="Reading ballots from contract events." />;
     case "decifrando":
-      return <Carregando titulo={`Decifrando ${fase.cedulas} cédulas neste navegador.`} />;
+      return <Carregando titulo={`Decrypting ${fase.cedulas} ballots in this browser.`} />;
     case "publicando":
-      return <Carregando titulo="Gravando o placar no ledger." />;
+      return <Carregando titulo="Recording the tally on-chain." />;
 
     case "vazia":
       return (
         <section>
-          <h2>A URNA ESTÁ VAZIA</h2>
+          <h2>THE BALLOT BOX IS EMPTY</h2>
           <div className="painel">
-            <p>A janela fechou, o relógio abriu, e nenhuma cédula foi depositada. Não há o que apurar.</p>
+            <p>The window has closed and the time lock has opened, but no ballots were cast. There is nothing to tally.</p>
           </div>
         </section>
       );
@@ -218,22 +190,15 @@ function ComFechadura({ id, p, fase }: { id: string; p: PropostaRede; fase: Fase
     case "multissecao":
       return (
         <section>
-          <h2>ESTA VOTAÇÃO TEM {fase.secoes} SEÇÕES</h2>
+          <h2>THIS VOTE HAS  {fase.secoes} SECTIONS</h2>
           <div className="painel">
             <p>
-              O placar de cada seção é apurável por qualquer pessoa que tenha a lista ordenada das
-              cédulas daquela seção — mas <strong>esta página não consegue montá-la</strong>: o
-              evento que o contrato publica diz a proposta e não a seção, e a assinatura em anel
-              não revela qual anel assinou, que é o ponto dela.
-            </p>
+              Tallying requires the complete ordered ballot list for each section, but  <strong>this page could not reconstruct every section </strong>. No complete aggregate tally is available yet.</p>
             <p>
-              {fase.publicadas} de {fase.secoes} seções já têm placar no ledger. Quando as{" "}
-              {fase.secoes} tiverem, esta página soma e mostra.
-            </p>
+              {fase.publicadas} of  {fase.secoes} sections have been processed on-chain. Once all  {" "}
+              {fase.secoes} are available, the aggregate tally can be displayed.</p>
             <p>
-              Não é limitação do protocolo, é um campo faltando num tópico de evento. Está
-              registrado como §11-N no caderno do projeto, junto do que custa consertá-lo.
-            </p>
+              Check that all required contract events are still available from the RPC provider.</p>
           </div>
         </section>
       );
@@ -241,14 +206,11 @@ function ComFechadura({ id, p, fase }: { id: string; p: PropostaRede; fase: Fase
     case "falha":
       return (
         <section>
-          <h2>A APURAÇÃO NÃO FOI ATÉ O FIM</h2>
+          <h2>TALLYING DID NOT FINISH</h2>
           <div className="painel">
             <p className="error-message" role="alert">{fase.porque}</p>
             <p>
-              O placar não se perdeu: os criptogramas estão no ledger e a chave da rodada é
-              pública. <strong>Qualquer pessoa</strong> refaz esta conta, desta aba ou de outra —
-              é isso que torna a apuração não travável.
-            </p>
+              The encrypted ballots remain on-chain and the round key is public.  <strong>Anyone </strong>  can retry from this browser or another one.</p>
           </div>
         </section>
       );
@@ -256,47 +218,38 @@ function ComFechadura({ id, p, fase }: { id: string; p: PropostaRede; fase: Fase
     case "pronto":
       return (
         <section>
-          <h2>O PLACAR</h2>
+          <h2>RESULTS</h2>
           <Totais totais={fase.totais} />
           <p>
             {fase.cedulas === null ? (
               <>
                 <strong>{fase.abriram}</strong>{" "}
-                {fase.abriram === 1 ? "cédula abriu" : "cédulas abriram"}, segundo o que está
-                gravado no ledger.
-              </>
+                {fase.abriram === 1 ? "ballot opened" : "ballots opened"}, according to the ledger. </>
             ) : (
               <>
-                <strong>{fase.abriram} de {fase.cedulas}</strong>{" "}
-                {fase.cedulas === 1 ? "cédula abriu" : "cédulas abriram"}
+                <strong>{fase.abriram} of  {fase.cedulas}</strong>{" "}
+                {fase.cedulas === 1 ? "ballot opened" : "ballots opened"}
                 {fase.abriram < fase.cedulas && (
-                  <> — {fase.cedulas - fase.abriram} criptograma
-                    {fase.cedulas - fase.abriram === 1 ? " não abriu" : "s não abriram"}, e cada um
-                    custou só o próprio voto</>
+                  <> — {fase.cedulas - fase.abriram} ciphertext {fase.cedulas - fase.abriram === 1 ? " could not be opened" : "s could not be opened"}; each lost only its own vote </>
                 )}
                 .
               </>
             )}
-          </p>
+</p>
           <p>
-            Ninguém afirmou estes números: eles saíram da decifragem das cédulas, neste navegador,
-            com a assinatura da rodada <span className="valor-mono">{String(p.rodada)}</span> da
-            baliza — conferida num pareamento antes de qualquer conta.{" "}
+            These numbers were computed by decrypting ballots in this browser using the signature of beacon round  <span className="valor-mono">{String(p.rodada)}</span> , verified with a pairing before any calculation. {" "}
             {fase.publicado
-              ? "E estão no ledger, onde o contrato conferiu a soma dos compromissos antes de gravá-los."
-              : "Ainda não estão no ledger, e a conta não depende disso: qualquer pessoa a refaz."}
-          </p>
+              ? "They are on-chain: the contract checked the commitment sum before recording them."
+              : "They have not been recorded on-chain yet. Anyone can independently repeat the calculation."}
+</p>
           {fase.tx && (
             <p>
               <a href={`${REDE.explorer}/tx/${fase.tx}`} target="_blank" rel="noopener">
-                ver a transação do placar ↗
-              </a>
-            </p>
+                View tally transaction ↗ </a>
+</p>
           )}
           <p>
-            A correspondência entre opção e nome está com quem organizou: a proposta na rede só
-            guarda quantidades.
-          </p>
+            Ask the organizer for the option labels: the on-chain proposal stores only their counts.</p>
         </section>
       );
 

@@ -20,11 +20,11 @@ const MARCA: Record<Passo["tipo"], string> = {
 };
 
 const ORIGENS: Record<Origem, string> = {
-  abrir: "organizador", comparecer: "caderno", votar: "urna", apurar: "apuração",
+  abrir: "organizer", comparecer: "attendance", votar: "ballot box", apurar: "tally",
 };
 
 const relogio = (t: number) =>
-  new Date(t).toLocaleTimeString("pt-BR", { hour12: false });
+  new Date(t).toLocaleTimeString("en-US", { hour12: false });
 
 export default function Bastidores() {
   const [params] = useSearchParams();
@@ -90,32 +90,30 @@ export default function Bastidores() {
   return <main className="bastidores">
     <header className="bast-topo">
       <div>
-        <span className="eyebrow">BASTIDORES{filtro ? ` · ${ORIGENS[filtro].toUpperCase()}` : ""}</span>
-        <h1>O que acontece do outro lado.</h1>
+        <span className="eyebrow">BEHIND THE SCENES {filtro ? ` · ${ORIGENS[filtro].toUpperCase()}` : ""}</span>
+        <h1>What happens behind the scenes.</h1>
       </div>
       <dl className="bast-meta">
-        <div><dt>contrato</dt><dd><a href={`${REDE.explorer}/contract/${REDE.contrato}`} target="_blank" rel="noopener noreferrer">{REDE.contrato.slice(0, 8)}…{REDE.contrato.slice(-4)} ↗</a></dd></div>
+        <div><dt>contract</dt><dd><a href={`${REDE.explorer}/contract/${REDE.contrato}`} target="_blank" rel="noopener noreferrer">{REDE.contrato.slice(0, 8)}…{REDE.contrato.slice(-4)} ↗</a></dd></div>
         <div><dt>ledger</dt><dd>{ledger || "—"}</dd></div>
-        <div><dt>canal</dt><dd><span className="status-dot" /> ao vivo</dd></div>
+        <div><dt>channel</dt><dd><span className="status-dot" /> live </dd></div>
       </dl>
     </header>
 
     <div className="bast-barra">
-      <span>{linhas.length} {linhas.length === 1 ? "passo" : "passos"}</span>
+      <span>{linhas.length} {linhas.length === 1 ? "step" : "steps"}</span>
       <div>
         <button className="text-button" onClick={() => setPreso(!preso)} aria-pressed={!preso}>
-          {preso ? "soltar a rolagem" : "prender no fim"}
-        </button>
-        <button className="text-button" onClick={zerar}>limpar</button>
+          {preso ? "Stop following" : "Follow latest"}
+</button>
+        <button className="text-button" onClick={zerar}>Clear</button>
       </div>
     </div>
 
-    <div className="bast-term" role="log" aria-live="polite" aria-label="Diário da rodada">
+    <div className="bast-term" role="log" aria-live="polite" aria-label="Activity log">
       {mostradas.length === 0
         ? <p className="bast-vazio">
-            Nada ainda. Abra o dapp em outra janela e comece uma rodada —
-            cada passo aparece aqui, nesta, enquanto acontece lá.
-          </p>
+            Nothing yet. Open the dapp in another window and start a vote. Each step will appear here as it happens.</p>
         : mostradas.map((p, i) => <div className={`bast-linha t-${p.tipo}`} key={`${p.t}-${i}`}>
             <span className="bast-hora">{relogio(p.t)}</span>
             <span className="bast-marca" aria-hidden="true">{MARCA[p.tipo]}</span>

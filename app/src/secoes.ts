@@ -49,18 +49,18 @@ export function secaoNasceuPequena(aptos: number, secoes: number): SecaoPequena 
 export function explicar(aptos: number, secoes: number, p: SecaoPequena): string {
   if (p.eleitoradoPequeno) {
     return (
-      `${aptos} ${aptos === 1 ? "pessoa" : "pessoas"} no eleitorado, e o contrato ` +
-      `exige ${TAU} cédulas numa seção para apurar. Nem com uma seção só esta ` +
-      `votação teria placar — não é a divisão que está errada, é o eleitorado ` +
-      `que é pequeno demais para esconder alguém.`
+      `${aptos} ${aptos === 1 ? "person" : "people"} in the electorate; the contract ` +
+      `requires ${TAU} ballots in a section to tally. Even a single section would not ` +
+      `produce a result — the electorate is too small ` +
+      `to meet the anonymity threshold.`
     );
   }
   return (
-    `${aptos} pessoas em ${secoes} seções dá cerca de ${p.media} por seção, e o ` +
-    `contrato exige ${TAU} para apurar — a votação aconteceria e o placar não ` +
-    `sairia. No máximo ${p.maximo} ${p.maximo === 1 ? "seção" : "seções"}, e ` +
-    `como a divisão é por hash as seções saem desiguais: a menor fica abaixo da ` +
-    `média, então é prudente ficar bem acima do piso.`
+    `${aptos} people in ${secoes} sections gives about ${p.media} per section, while the ` +
+    `contract requires ${TAU} to tally. Voting could proceed but no tally would ` +
+    `be published. Use at most ${p.maximo} ${p.maximo === 1 ? "section" : "sections"}. Since ` +
+    `hash-based allocation creates uneven sections, the smallest can fall below ` +
+    `the average. Leave a comfortable margin above the threshold.`
   );
 }
 
@@ -93,7 +93,7 @@ export function somarSecoes(
 ): { totais: number[]; abriram: number; cedulas: number | null; completo: boolean } {
   const n = parciais[0]?.totais.length ?? 0;
   if (parciais.some((p) => p.totais.length !== n)) {
-    throw new Error("seções com número de opções diferente não somam");
+    throw new Error("Sections with different option counts cannot be combined");
   }
   return {
     totais: Array.from({ length: n }, (_, j) => parciais.reduce((a, p) => a + p.totais[j], 0)),

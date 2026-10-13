@@ -1,3 +1,4 @@
+import { mensagemErro } from "../mensagens";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { CarteiraEfemera } from "../carteira";
@@ -16,9 +17,9 @@ const propostaDemo: PropostaRede = {
   rodada: 0n, rodada_abertura: 0n,
 };
 const opcoesDemo = [
-  { titulo: "Aprovar", descricao: "Sou a favor da proposta." },
-  { titulo: "Rejeitar", descricao: "Sou contra a proposta." },
-  { titulo: "Abster-se", descricao: "Prefiro não me posicionar." },
+  { titulo: "Approve", descricao: "I support the proposal." },
+  { titulo: "Reject", descricao: "I oppose the proposal." },
+  { titulo: "Abstain", descricao: "I prefer not to take a position." },
 ];
 
 export default function Votar({ demo = false }: { demo?: boolean }) {
@@ -59,14 +60,14 @@ function Urna({ id, demo }: { id: string; demo: boolean }) {
     setFalha("");
     (async () => {
       try {
-        if (!/^[a-fA-F0-9]{64}$/.test(id)) throw new Error("O endereço desta votação é inválido. Abra uma votação pela lista.");
+        if (!/^[a-fA-F0-9]{64}$/.test(id)) throw new Error("This vote's address is invalid. Open a vote from the list.");
         const [prop, l] = await Promise.all([lerProposta(id), ledgerAtual()]);
-        if (!prop) throw new Error("Esta votação não foi encontrada.");
+        if (!prop) throw new Error("This vote was not found.");
         // O anel que importa é o da MINHA seção — não o da votação inteira.
         const membros = prop.anel ? await lerAnel(id, guardada?.secao ?? 0) : [];
         if (vivo) { setP(prop); setAnel(membros); setLedger(l); }
       } catch (e) {
-        if (vivo) setFalha(String((e as Error).message ?? e));
+        if (vivo) setFalha(mensagemErro(e));
       } finally { if (vivo) setCarregando(false); }
     })();
     return () => { vivo = false; };
@@ -75,21 +76,21 @@ function Urna({ id, demo }: { id: string; demo: boolean }) {
   const apto = demo || !!guardada && anel.includes(guardada.publica);
   const faseAtual = p && (demo ? "votacao" : fase(p, ledger));
   const suportada = p?.anel && p.perguntas.length === 1 && p.perguntas[0].confidencial && p.perguntas[0].opcoes > 0;
-  const bloqueio = !p ? "" : !suportada ? "Esta cédula ainda não é compatível com a votação pelo app. Consulte o organizador."
-    : faseAtual !== "votacao" ? (faseAtual === "encerrada" ? "Esta votação já foi encerrada." : "A votação ainda não começou. Aguarde o fim do comparecimento.")
-    : !apto ? "Seu comparecimento não foi encontrado neste navegador. Use o navegador em que você confirmou sua presença." : "";
-  const opcoes = demo ? opcoesDemo : Array.from({ length: p?.perguntas[0]?.opcoes ?? 0 }, (_, i) => ({ titulo: `Opção ${i + 1}`, descricao: `Identificador da cédula: ${i}` }));
+  const bloqueio = !p ? "" : !suportada ? "This ballot is not yet supported by the dapp. Contact the organizer."
+    : faseAtual !== "votacao" ? (faseAtual === "encerrada" ? "This vote has already closed." : "Voting has not started. Wait until check-in ends.")
+    : !apto ? "Your check-in was not found in this browser. Use the browser where you confirmed your attendance." : "";
+  const opcoes = demo ? opcoesDemo : Array.from({ length: p?.perguntas[0]?.opcoes ?? 0 }, (_, i) => ({ titulo: `Option ${i + 1}`, descricao: `Ballot option ID: ${i}` }));
   const opcao = escolha === null ? null : opcoes[escolha];
   const concluido = etapa === "concluido";
   const enviando = etapa === "enviando";
   const quantidade = demo ? 7 : anel.length;
-  const passosEnvio = ["Preparando sua cédula", "Criando uma assinatura de uso único", demo ? "Simulando a confirmação" : "Confirmando na Stellar"];
+  const passosEnvio = ["Preparing your ballot", "Creating a one-time signature", demo ? "Simulating confirmation" : "Confirming on Stellar"];
 
   async function enviar() {
     if (trava.current || escolha === null || bloqueio || !p || etapa !== "revisao") return;
     trava.current = true;
     setFalha(""); setProgresso(0); setEtapa("enviando");
-    diario({ tipo: "ato", txt: demo ? "confirmou a cédula na prévia" : "confirmou a cédula" });
+    diario({ tipo: "ato", txt: demo ? "Confirmed the preview ballot" : "Confirmed the ballot" });
     try {
       if (demo) {
         for (let i = 0; i < 3; i++) {
@@ -98,14 +99,14 @@ function Urna({ id, demo }: { id: string; demo: boolean }) {
           await new Promise((resolve) => setTimeout(resolve, 950));
         }
       } else {
-        if (!guardada) throw new Error("Sua chave de participação não está neste navegador.");
+        if (!guardada) throw new Error("Your participation key is not in this browser.");
         const atual = await ledgerAtual();
         setLedger(atual);
-        if (fase(p, atual) !== "votacao") throw new Error("A janela de votação não está aberta. Sua cédula não foi enviada.");
+        if (fase(p, atual) !== "votacao") throw new Error("The voting window is not open. Your ballot was not sent.");
         const w = await carregar();
         const [hp, h] = await Promise.all([lerHp(id), lerGeradorH()]);
         const i = anel.indexOf(guardada.publica);
-        if (i < 0) throw new Error("Sua chave não está no grupo de participantes desta votação.");
+        if (i < 0) throw new Error("Your key is not in this vote's participant group.");
         // A fechadura: `p.rodada` é a rodada da baliza em que a cédula
         // destranca, e `0` é a proposta sem fechadura. O `r` é cifrado aqui
         // dentro, na mesma chamada em que nasce — sai da aba já ilegível, para
@@ -114,7 +115,7 @@ function Urna({ id, demo }: { id: string; demo: boolean }) {
           [{ opcoes: p.perguntas[0].opcoes, confidencial: true }], new Uint32Array([escolha]),
           p.rodada,
         ) as { imagem: string; c0: string; z: string[]; cedula: { compromissos: string[]; provas: never[]; provas_soma: never[]; escolhas: number[]; cripto: string } };
-        diario({ tipo: "nota", txt: "Cédula e prova de participação preparadas neste navegador." });
+        diario({ tipo: "nota", txt: "Ballot and participation proof prepared in this browser." });
         setProgresso(1);
         const efemera = await CarteiraEfemera.nascer();
         setProgresso(2);
@@ -123,55 +124,55 @@ function Urna({ id, demo }: { id: string; demo: boolean }) {
         // A cédula entrou: a chave de anel deixa de ser útil e passa a ser só
         // o vínculo entre você e ela. Morre aqui.
         esquecerChaveDeAnel(id);
-        diario({ tipo: "nota", txt: "a chave de participação foi apagada — nada mais liga você à sua cédula" });
+        diario({ tipo: "nota", txt: "Participation key deleted after the ballot was accepted" });
         setTx(hash);
       }
       if (montada.current) { setEscolha(null); setEtapa("concluido"); }
     } catch (e) {
-      if (montada.current) { setFalha(String((e as Error).message ?? e)); setEtapa("revisao"); }
+      if (montada.current) { setFalha(mensagemErro(e)); setEtapa("revisao"); }
     } finally { trava.current = false; }
   }
 
   return <main className="voting-page">
-    <div className="voting-breadcrumb"><Link to={demo ? "/" : `/votacao/${id}`}><span aria-hidden="true">←</span> Voltar</Link></div>
-    <h1 className="sr-only">Seu voto</h1>
+    <div className="voting-breadcrumb"><Link to={demo ? "/" : `/votacao/${id}`}><span aria-hidden="true">←</span> Back </Link></div>
+    <h1 className="sr-only">Your vote</h1>
     <Trilha etapas={[
-      { label: "Presença", completo: apto, ativo: !apto },
-      { label: "Voto", completo: concluido, ativo: apto && !concluido },
-      { label: "Confirmação", completo: concluido, ativo: concluido },
+      { label: "Check-in", completo: apto, ativo: !apto },
+      { label: "Vote", completo: concluido, ativo: apto && !concluido },
+      { label: "Confirmation", completo: concluido, ativo: concluido },
     ]} />
 
     <div className="voting-layout">
-      <section className="ballot-panel" aria-label="Cédula de votação" aria-busy={carregando || enviando}>
-        <div className="ballot-topline"><span className="eyebrow">{demo ? "PROPOSTA 001" : `VOTAÇÃO · ${id.slice(0, 8) || "—"}`}</span><span className="ballot-status"><span className="status-dot" />{demo ? "Demonstração" : carregando ? "Consultando" : faseAtual === "votacao" ? "Votação aberta" : faseAtual === "encerrada" ? "Encerrada" : "Aguardando"}</span></div>
-        {carregando ? <div className="ballot-state" role="status"><span className="loading-ring" /><h2>Preparando sua votação.</h2><p>Consultando a proposta e os participantes na Stellar.</p></div> : !p ? <div className="ballot-state"><h2>Não foi possível abrir a votação.</h2><p className="error-message" role="alert">{falha}</p><button className="primary-button" onClick={() => setTentativa(tentativa + 1)}>Tentar novamente <Icone nome="arrow" /></button><Link className="text-link" to="/votacoes">Ver votações</Link></div> : <>
+      <section className="ballot-panel" aria-label="Voting ballot" aria-busy={carregando || enviando}>
+        <div className="ballot-topline"><span className="eyebrow">{demo ? "PROPOSAL 001" : `VOTE · ${id.slice(0, 8) || "—"}`}</span><span className="ballot-status"><span className="status-dot" />{demo ? "Demo" : carregando ? "Loading" : faseAtual === "votacao" ? "Voting open" : faseAtual === "encerrada" ? "Closed" : "Waiting"}</span></div>
+        {carregando ? <div className="ballot-state" role="status"><span className="loading-ring" /><h2>Preparing your vote.</h2><p>Loading the proposal and participants from Stellar.</p></div> : !p ? <div className="ballot-state"><h2>Could not open this vote.</h2><p className="error-message" role="alert">{falha}</p><button className="primary-button" onClick={() => setTentativa(tentativa + 1)}>Try again <Icone nome="arrow" /></button><Link className="text-link" to="/votacoes">View votes </Link></div> : <>
           {etapa === "escolha" && <div className="ballot-body stage-enter">
-            <h2>{demo ? "Devemos destinar recursos ao próximo ciclo de projetos?" : "Qual é a sua escolha?"}</h2>
-            {!demo && <p className="ballot-description">Consulte o enunciado e a correspondência das opções fornecidos pelo organizador.</p>}
-            <fieldset className="ballot-options" disabled={!!bloqueio}><legend>Selecione uma opção</legend>{opcoes.map((o, i) => <label className={`ballot-option ${escolha === i ? "selected" : ""}`} key={i}>
-              <input type="radio" name="voto" value={i} checked={escolha === i} onChange={() => { setEscolha(i); diario({ tipo: "ato", txt: "escolheu uma opção — qual, nem o diário sabe" }); }} /><span className="option-radio" aria-hidden="true" /><span className="option-copy"><strong>{o.titulo}</strong>{!demo && <small>{o.descricao}</small>}</span>
+            <h2>{demo ? "Should we fund the next round of projects?" : "What is your choice?"}</h2>
+            {!demo && <p className="ballot-description">Refer to the question and option labels provided by the organizer.</p>}
+            <fieldset className="ballot-options" disabled={!!bloqueio}><legend>Select an option</legend>{opcoes.map((o, i) => <label className={`ballot-option ${escolha === i ? "selected" : ""}`} key={i}>
+              <input type="radio" name="voto" value={i} checked={escolha === i} onChange={() => { setEscolha(i); diario({ tipo: "ato", txt: "Selected an option — the choice is not recorded in the activity log" }); }} /><span className="option-radio" aria-hidden="true" /><span className="option-copy"><strong>{o.titulo}</strong>{!demo && <small>{o.descricao}</small>}</span>
             </label>)}</fieldset>
-            {bloqueio && <p className="notice-message" role="status">{bloqueio} {!apto && faseAtual === "comparecimento" && <Link to={`/comparecer/${id}`}>Confirmar presença →</Link>}</p>}
-            <div className="ballot-action"><button className="primary-button" disabled={escolha === null || !!bloqueio} onClick={() => { setFalha(""); setEtapa("revisao"); diario({ tipo: "ato", txt: "foi revisar a cédula" }); }}>Revisar meu voto <Icone nome="arrow" /></button></div>
+            {bloqueio && <p className="notice-message" role="status">{bloqueio} {!apto && faseAtual === "comparecimento" && <Link to={`/comparecer/${id}`}>Confirm attendance → </Link>}</p>}
+            <div className="ballot-action"><button className="primary-button" disabled={escolha === null || !!bloqueio} onClick={() => { setFalha(""); setEtapa("revisao"); diario({ tipo: "ato", txt: "Opened ballot review" }); }}>Review my vote <Icone nome="arrow" /></button></div>
 
           </div>}
-          {etapa === "revisao" && <div className="ballot-body review-body stage-enter"><span className="eyebrow">ANTES DE CONFIRMAR</span><h2 ref={titulo} tabIndex={-1}>Tudo certo com<br />a sua escolha?</h2><p className="ballot-description">Confira seu voto. Após o envio, ele não poderá ser alterado.</p><div className="review-selection"><span className="eyebrow">SUA ESCOLHA</span><strong>{opcao?.titulo}</strong><span>{opcao?.descricao}</span><Icone nome="lock" /></div><p className="review-note"><Icone nome="shield" /> A cédula será assinada por uma chave de uso único, separada da sua identidade.</p>{falha && <p className="error-message" role="alert">{falha}</p>}{bloqueio && <p className="notice-message" role="status">{bloqueio}</p>}<div className="ballot-action"><button className="text-button" onClick={() => setEtapa("escolha")}>← Alterar escolha</button><button className="primary-button" disabled={!!bloqueio} onClick={enviar}>{demo ? "Confirmar na prévia" : "Confirmar meu voto"}<Icone nome="arrow" /></button></div></div>}
-          {enviando && <div className="ballot-state sending-state stage-enter"><span className="loading-ring" /><span className="eyebrow">{demo ? "SIMULAÇÃO EM ANDAMENTO" : "ENVIO EM ANDAMENTO"}</span><h2 ref={titulo} tabIndex={-1}>Enviando seu voto.</h2><p>Mantenha esta página aberta até a confirmação.</p><Passos passos={passosEnvio} atual={progresso} /></div>}
-          {concluido && <div className="ballot-state success-state stage-enter"><span className="success-symbol"><Icone nome="check" /></span><span className="eyebrow">{demo ? "SIMULAÇÃO CONCLUÍDA" : "REGISTRO CONFIRMADO"}</span><h2 ref={titulo} tabIndex={-1}>{demo ? "Simulação concluída." : "Voto confirmado."}</h2><p>{demo ? "Você percorreu a experiência de votação. Nenhuma transação foi enviada à rede." : "Sua cédula foi registrada na Stellar. Sua escolha não aparece neste comprovante."}</p>{tx && <a className="receipt-link" href={`${REDE.explorer}/tx/${tx}`} target="_blank" rel="noopener noreferrer">Ver comprovante na Stellar ↗<small>{tx.slice(0, 16)}…{tx.slice(-8)}</small></a>}{demo ? <button className="primary-button" onClick={() => { setEscolha(null); setEtapa("escolha"); }}>Explorar novamente <Icone nome="arrow" /></button> : <Link className="primary-button" to={`/votacao/${id}`}>Acompanhar votação <Icone nome="arrow" /></Link>}</div>}
+          {etapa === "revisao" && <div className="ballot-body review-body stage-enter"><span className="eyebrow">BEFORE YOU CONFIRM </span><h2 ref={titulo} tabIndex={-1}>Ready to confirm <br />your choice?</h2><p className="ballot-description">Review your vote. Once submitted, it cannot be changed.</p><div className="review-selection"><span className="eyebrow">YOUR CHOICE </span><strong>{opcao?.titulo}</strong><span>{opcao?.descricao}</span><Icone nome="lock" /></div><p className="review-note"><Icone nome="shield" /> Your ballot will be signed with a one-time key, separate from your identity.</p>{falha && <p className="error-message" role="alert">{falha}</p>}{bloqueio && <p className="notice-message" role="status">{bloqueio}</p>}<div className="ballot-action"><button className="text-button" onClick={() => setEtapa("escolha")}>← Change choice</button><button className="primary-button" disabled={!!bloqueio} onClick={enviar}>{demo ? "Confirm preview" : "Confirm my vote"}<Icone nome="arrow" /></button></div></div>}
+          {enviando && <div className="ballot-state sending-state stage-enter"><span className="loading-ring" /><span className="eyebrow">{demo ? "SIMULATION IN PROGRESS" : "SUBMISSION IN PROGRESS"}</span><h2 ref={titulo} tabIndex={-1}>Submitting your vote.</h2><p>Keep this page open until confirmation.</p><Passos passos={passosEnvio} atual={progresso} /></div>}
+          {concluido && <div className="ballot-state success-state stage-enter"><span className="success-symbol"><Icone nome="check" /></span><span className="eyebrow">{demo ? "SIMULATION COMPLETE" : "SUBMISSION CONFIRMED"}</span><h2 ref={titulo} tabIndex={-1}>{demo ? "Simulation complete." : "Vote confirmed."}</h2><p>{demo ? "You have completed the voting preview. No transaction was sent to the network." : "Your ballot was recorded on Stellar. This confirmation does not reveal your choice."}</p>{tx && <a className="receipt-link" href={`${REDE.explorer}/tx/${tx}`} target="_blank" rel="noopener noreferrer">View confirmation on Stellar ↗ <small>{tx.slice(0, 16)}…{tx.slice(-8)}</small></a>}{demo ? <button className="primary-button" onClick={() => { setEscolha(null); setEtapa("escolha"); }}>Try again <Icone nome="arrow" /></button> : <Link className="primary-button" to={`/votacao/${id}`}>Follow this vote <Icone nome="arrow" /></Link>}</div>}
         </>}
       </section>
     </div>
-    {quantidade === 1 && <p className="notice-message">Com apenas uma pessoa, o grupo não oferece anonimato.</p>}
+    {quantidade === 1 && <p className="notice-message">A group of only one person offers no anonymity.</p>}
     <details className="privacy-details">
-      <summary><Icone nome="lock" /><span>Sobre a privacidade do voto</span><span className="disclosure-plus" aria-hidden="true">+</span></summary>
-      <p>A presença é pública. A cédula usa outra chave para separar sua escolha da sua identidade.</p>
-      {quantidade > 0 && <p>{quantidade} participantes no conjunto{demo ? " · dados ilustrativos" : ""}.</p>}
-      <p>A prova de participação usa o grupo de quem compareceu. Esta cédula não compartilha com mesa nenhuma o segredo que permitiria abri-la individualmente.</p>
-      {p?.rodada ? <p>Em vez de mesa, esta votação tem <strong>fechadura de tempo</strong>: a cédula viaja cifrada para a rodada {String(p.rodada)} da baliza drand. Antes daquele instante a chave que a abre não foi publicada, e nem quem organizou a tem; abrir mais cedo exigiria conluio de um limiar dos operadores da baliza. Depois dela, <strong>qualquer pessoa</strong> abre, e é assim que o placar existe sem depender de ninguém de confiança. O que continua protegido é o vínculo: uma cédula aberta não diz de quem ela é.</p> : <p>A apuração deste modo ainda não está disponível.</p>}
-      <p>Depois de enviar, <strong>nem você consegue voltar ao próprio voto</strong>. Duas coisas morrem no mesmo instante: o número que esconde a escolha, que {p?.rodada ? "sai desta aba cifrado para uma rodada futura e nunca em claro" : "nunca é gravado em lugar nenhum"}, e a chave de participação, que é apagada assim que a cédula entra — com ela, alguém acharia qual das cédulas é a sua. Quem quiser que você prove em quem votou precisa estar olhando a sua tela agora.</p>
-      <p>Na testnet, o serviço que financia a chave de uso único pode ver seu IP. Preserve a chave de participação neste navegador.</p>
+      <summary><Icone nome="lock" /><span>About ballot privacy </span><span className="disclosure-plus" aria-hidden="true">+</span></summary>
+      <p>Attendance is public. Your ballot uses a different key to separate your choice from your identity.</p>
+      {quantidade > 0 && <p>{quantidade} participants in the group {demo ? " · illustrative data" : ""}.</p>}
+      <p>The participation proof uses the group of checked-in voters. This ballot does not share its individual opening secret with a committee.</p>
+      {p?.rodada ? <p>Instead of a committee, this vote uses a  <strong>time lock </strong>: the ballot is encrypted for round  {String(p.rodada)}  of the drand beacon. Before that round, the opening key is not published; early opening would require collusion by a threshold of beacon operators. Afterward,  <strong>anyone </strong>  can open the ballot and tally it without a committee. The ring signature still hides which group member sent it.</p> : <p>Tallying is not available for this mode.</p>}
+      <p>After submission,  <strong>the app cannot retrieve your individual vote </strong>. It does not retain the number that hides your choice, which  {p?.rodada ? "leaves this tab encrypted for a future round, never in plain text" : "is never saved"}. The participation key is deleted once the ballot is accepted; retaining it could identify your ballot. This does not protect against someone watching your screen or a modified client recording your secrets.</p>
+      <p>On testnet, the service funding the one-time key may see your IP address. Keep this browser tab until your ballot is confirmed.</p>
     </details>
-    {demo && <p className="demo-note">Prévia interativa · nenhuma transação real</p>}
+    {demo && <p className="demo-note">Interactive preview · no real transactions</p>}
     {!demo && <p className="bastidores-rodape"><LinkBastidores origem="votar" /></p>}
   </main>;
 }

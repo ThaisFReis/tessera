@@ -27,8 +27,8 @@ export class UmaCedula {
     const m = marca ?? INDETERMINADA;
     if (this.assinou !== null && (marca === null || this.assinou !== m)) {
       throw new Error(
-        "esta chave já assinou outra cédula. Uma chave por cédula é o que " +
-          "mantém as suas cédulas sem relação entre si no ledger.",
+        "This key has already signed another ballot. Using one key per ballot " +
+          "keeps your ballots from being linked together on-chain.",
       );
     }
     this.assinou = m;
