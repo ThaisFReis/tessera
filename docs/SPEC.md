@@ -220,6 +220,7 @@ pergunta.
 | INV-14 | O XDR do endereço tem 44 bytes e bate entre CLI e navegador | `cli` `xdr_bate_com_o_que_o_sdk_produz`; `app/scripts/xdr.test.mjs` |
 | INV-15 | O infinito em G1 é a flag zcash, não 96 zeros | `contrato` `o_infinito_do_host_e_a_flag_zcash_nao_zeros` |
 | INV-16 | Tudo o que a tela da demonstração afirma, o código sustenta | `console/guarda.py` — 8 afirmações, 33 conferências contra a fonte |
+| INV-28 | Tudo o que a **narração do vídeo** afirma, o repositório sustenta — e a citação do roteiro é idêntica ao bloco que vai ao sintetizador | `docs/roteiro-confere.py`. Nasceu de três erros reais: um "modo simples" que apuraria sem ninguém abrir nada (impossível — `assembleia_sem_mesa_abre_e_nao_apura`), "sem organizador" quando `abrir` recebe um endereço de governança, e "se a votação não tem prazo" quando toda votação tem prazo (INV-18) e o que varia é a fechadura |
 | INV-17 | As provas são geradas pelo `core` nativo e verificadas no host Wasm a cada `cargo test` | `contrato/src/test.rs` inteiro — não é vetor congelado |
 
 ---
@@ -381,6 +382,7 @@ cd cli         && cargo test
 cd app         && for t in scripts/*.test.mjs; do node "$t"; done
 cd app         && npm run build          # inclui tsc -b
 python3 console/guarda.py
+python3 docs/roteiro-confere.py
 ```
 
 **Linha de base, medida em 2026-10-03 antes de qualquer mudança:**
@@ -394,6 +396,7 @@ python3 console/guarda.py
 | testes do app | ✅ 3 testes |
 | `npm run build` | ✅ |
 | `console/guarda.py` | ✅ |
+| `docs/roteiro-confere.py` | ✅ |
 | `cargo fmt --check` | ✅ nos 5 crates — era falha de base, resolvida em T-002 |
 | `cargo clippy -D warnings` | ✅ nos 5 crates — eram 65 avisos, resolvidos em T-003 |
 

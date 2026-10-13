@@ -11,7 +11,7 @@ A versão em inglês é `docs/VIDEO-PITCH.en.md`, com os mesmos oito blocos.
 > governança votar em segredo e ainda assim qualquer pessoa reconferir o
 > resultado — e ele está de pé, medido, na testnet.
 
-**Duração real: 4min03** de fala, a 160 palavras por minuto, sem contar as
+**Duração real: 4min11** de fala, a 160 palavras por minuto, sem contar as
 pausas. Eu tentei fazer caber em 3min00 e não cabe sem estragar a demonstração,
 que é o único bloco que convence sozinho. Se o limite for duro em 3 minutos,
 corte nesta ordem — cada corte está marcado no texto:
@@ -20,7 +20,7 @@ corte nesta ordem — cada corte está marcado no texto:
 2. o parágrafo do meio do §6, o do custo da apuração (−13s);
 3. a primeira frase do §5, até "parte difícil" (−7s).
 
-Dá 3min38 — ainda acima de três minutos. Abaixo disso o §4 começa a perder as
+Dá 3min46 — ainda acima de três minutos. Abaixo disso o §4 começa a perder as
 duas colunas, e aí o vídeo não prova mais nada.
 
 ---
@@ -65,11 +65,11 @@ produção" nem "trustless", e nunca promete resultado se a baliza parar.
 | 1 Gancho | 01 capa | 0:00–0:08 | você, ou a capa |
 | 2 Problema | 02 | 0:08–0:32 | slide |
 | 3 Desenho | 03 | 0:32–1:41 | slide |
-| 4 Demonstração | 04 | 1:41–2:26 | **captura de tela** |
-| 5 Por que Stellar | 05 | 2:26–2:46 | slide |
-| 6 Evidência | 06 | 2:46–3:17 | slide |
-| 7 Time | — | 3:17–3:37 | você, ou o Karn |
-| 8 Fecho | 07 | 3:37–4:03 | slide |
+| 4 Demonstração | 04 | 1:41–2:31 | **captura de tela** |
+| 5 Por que Stellar | 05 | 2:31–2:51 | slide |
+| 6 Evidência | 06 | 2:51–3:22 | slide |
+| 7 Time | — | 3:22–3:42 | você, ou o Karn |
+| 8 Fecho | 07 | 3:42–4:11 | slide |
 
 O §7 não tem slide no deck — veja a nota no fim desta página.
 
@@ -136,29 +136,29 @@ paga o trabalho dele." O conselheiro sozinho já faz o trabalho.
 
 ---
 
-## 4. A demonstração — 1:41 a 2:26
+## 4. A demonstração — 1:41 a 2:31
 
 **Tela:** captura do dapp. É o bloco mais longo de propósito, e é o único que
 não pode encolher.
 
 > Chega de falar.
 >
-> Isso aqui é uma votação de verdade, na testnet. Sem organizador, sem
-> servidor, ninguém segurando chave nenhuma.
+> Isso aqui é uma votação de verdade, na testnet. Sem mesa nenhuma, sem
+> servidor, ninguém segurando chave.
 >
 > Primeiro a pessoa se identifica. Prova que tem direito de votar e assina a
 > lista de presença, em público. Todo mundo vê quem apareceu.
 >
 > Depois ela vota. De outro endereço, criado na hora, que não tem nada a ver
-> com o primeiro. A cédula prova que saiu de alguém daquela lista, sem dizer de
-> quem.
+> com o primeiro. A cédula prova que saiu de alguém daquela lista, sem dizer
+> de quem.
 >
-> Olha as duas colunas. Trinta pessoas votaram. Nenhum endereço aparece nas
-> duas. Nenhum.
+> Olha as duas colunas. Nenhum endereço aparece nas duas. E não é sorte desta
+> rodada: numa outra, com trinta votantes, a interseção deu exatamente zero.
 >
 > O prazo vence e o resultado sai. Quem apurou foi uma carteira que nem votou.
-> Uma das sete cédulas estava corrompida de propósito: perdeu o próprio voto, e
-> as outras seis contaram.
+> Uma das sete cédulas estava corrompida de propósito: perdeu o próprio voto,
+> e as outras seis contaram.
 
 **Direção:** se der para mostrar **uma** coisa só, mostre as duas colunas lado
 a lado. É a única imagem do vídeo que prova algo sozinha. Não diga "sem
@@ -167,7 +167,7 @@ verdade.
 
 ---
 
-## 5. Por que Stellar — 2:26 a 2:46
+## 5. Por que Stellar — 2:31 a 2:51
 
 **Tela:** slide 05.
 
@@ -183,7 +183,7 @@ verdade.
 
 ---
 
-## 6. A evidência — 2:46 a 3:17
+## 6. A evidência — 2:51 a 3:22
 
 **Tela:** slide 06, o lima.
 
@@ -204,7 +204,7 @@ faz o trabalho sozinho.
 
 ---
 
-## 7. O time — 3:17 a 3:37
+## 7. O time — 3:22 a 3:42
 
 **Tela:** o repositório do Karn, ou você. Veja a nota no fim.
 
@@ -244,20 +244,18 @@ faz o trabalho sozinho.
 
 ---
 
-## 8. O fecho — 3:37 a 4:03
+## 8. O fecho — 3:42 a 4:11
 
 **Tela:** slide 07.
 
-> Isso aqui não é mágica, e tem letra miúda. Se a votação tem prazo, ela
-> depende daquele sorteio público. Se ele parar, não sai resultado. Se todo
-> mundo votar igual, o resultado entrega todo mundo. E nada disso passou por
-> auditoria. Eu não vou dizer que passou.
+> Isso aqui não é mágica, e tem letra miúda. Se a votação usa fechadura de
+> tempo, ela depende daquele sorteio público. Se o sorteio parar, não sai
+> resultado, e não tem plano B. Se todo mundo votar igual, o resultado entrega
+> todo mundo. E nada disso passou por auditoria. Eu não vou dizer que passou.
 >
 > Mas conferir uma decisão não deveria custar expor a escolha de cada um.
 >
-> A decisão é de todos. A escolha é sua.
->
-> Tessera.
+> A decisão é de todos. A escolha é sua. Tessera.
 
 **Direção:** deixe o slide 07 dois segundos depois da última palavra, com o
 endereço do repositório visível. Não leia a URL em voz alta.
@@ -421,8 +419,8 @@ E abrir uma cédula mostra o que ela votou. [slowly] Nunca de quem ela é.
 ```
 [snappy] Chega de falar. [pause]
 
-Isso aqui é uma votação de verdade, na testnet. Sem organizador, sem servidor,
-ninguém segurando chave nenhuma. [pause]
+Isso aqui é uma votação de verdade, na testnet. Sem mesa nenhuma, sem servidor,
+ninguém segurando chave. [pause]
 
 Primeiro a pessoa se identifica. Prova que tem direito de votar e assina a lista
 de presença, em público. Todo mundo vê quem apareceu. [pause]
@@ -431,8 +429,9 @@ Depois ela vota. De outro endereço, criado na hora, que não tem nada a ver com
 primeiro. A cédula prova que saiu de alguém daquela lista, sem dizer de quem.
 [pause]
 
-Olha as duas colunas. Trinta pessoas votaram. [slowly] Nenhum endereço aparece
-nas duas. [pause] Nenhum. [long pause]
+Olha as duas colunas. [slowly] Nenhum endereço aparece nas duas. [pause] E não é
+sorte desta rodada: numa outra, com trinta votantes, a interseção deu exatamente
+zero. [long pause]
 
 O prazo vence e o resultado sai. Quem apurou foi uma carteira que nem votou.
 [pause] Uma das sete cédulas estava corrompida de propósito: perdeu o próprio
@@ -479,10 +478,11 @@ aberto. [slowly] É exatamente onde ele encaixa.
 ### 8 · fecho
 
 ```
-Isso aqui não é mágica, e tem letra miúda. [pause] Se a votação tem prazo, ela
-depende daquele sorteio público. Se ele parar, não sai resultado. Se todo mundo
-votar igual, o resultado entrega todo mundo. E nada disso passou por auditoria.
-[slowly] Eu não vou dizer que passou. [long pause]
+Isso aqui não é mágica, e tem letra miúda. [pause] Se a votação usa fechadura de
+tempo, ela depende daquele sorteio público. Se o sorteio parar, não sai
+resultado, e não tem plano B. Se todo mundo votar igual, o resultado entrega
+todo mundo. E nada disso passou por auditoria. [slowly] Eu não vou dizer que
+passou. [long pause]
 
 Mas conferir uma decisão não deveria custar expor a escolha de cada um. [pause]
 

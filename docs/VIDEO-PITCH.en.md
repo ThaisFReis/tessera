@@ -11,7 +11,7 @@ The Portuguese version is `docs/VIDEO-PITCH.md`, with the same eight blocks.
 > governance body to vote in secret and still have anyone re-check the result —
 > and it is standing, measured, on testnet.
 
-**Real length: 4min14** of speech at 160 words a minute, pauses not counted. I
+**Real length: 4min22** of speech at 160 words a minute, pauses not counted. I
 tried to make it fit 3min00 and it does not fit without wrecking the demo, which
 is the only block that convinces on its own. If the limit is a hard three
 minutes, cut in this order — each cut is marked in the text:
@@ -20,7 +20,7 @@ minutes, cut in this order — each cut is marked in the text:
 2. the middle paragraph of §6, the one about tally cost (−15s);
 3. the first sentence of §5, through "the hard part" (−7s).
 
-That lands at 3min48 — still over three minutes. Below that §4 starts losing
+That lands at 3min56 — still over three minutes. Below that §4 starts losing
 the two columns, and then the video stops proving anything.
 
 ---
@@ -67,11 +67,11 @@ and never promises a result if the beacon stops.
 | 1 Hook | 01 cover | 0:00–0:09 | you, or the cover |
 | 2 Problem | 02 | 0:09–0:34 | slide |
 | 3 Design | 03 | 0:34–1:44 | slide |
-| 4 Demo | 04 | 1:44–2:31 | **screen capture** |
-| 5 Why Stellar | 05 | 2:31–2:52 | slide |
-| 6 Evidence | 06 | 2:52–3:26 | slide |
-| 7 Team | — | 3:26–3:45 | you, or Karn |
-| 8 Close | 07 | 3:45–4:14 | slide |
+| 4 Demo | 04 | 1:44–2:38 | **screen capture** |
+| 5 Why Stellar | 05 | 2:38–2:59 | slide |
+| 6 Evidence | 06 | 2:59–3:33 | slide |
+| 7 Team | — | 3:33–3:52 | you, or Karn |
+| 8 Close | 07 | 3:52–4:22 | slide |
 
 §7 has no slide in the deck — see the note at the end of this page.
 
@@ -140,15 +140,15 @@ pays for their work." The board member alone does the job.
 
 ---
 
-## 4. The demo — 1:44 to 2:31
+## 4. The demo — 1:44 to 2:38
 
 **Screen:** capture of the dapp. It is the longest block on purpose, and the one
 block that cannot shrink.
 
 > Enough talking.
 >
-> This is a real vote, on testnet. No organiser, no server, nobody holding a
-> key.
+> This is a real vote, on testnet. No board at all, no server, nobody holding
+> a key.
 >
 > First the person signs in. They prove they are entitled to vote and sign the
 > attendance roll, with their address, in public. Everyone sees who turned up.
@@ -157,8 +157,9 @@ block that cannot shrink.
 > to do with the first one. The ballot proves it came from somebody on that
 > roll, without saying who.
 >
-> Look at the two columns. Thirty people voted. Not one address appears in
-> both. Not one.
+> Look at the two columns. Not one address appears in both. And that isn't
+> luck in this round: in another one, with thirty voters, the intersection
+> came out at exactly zero.
 >
 > The deadline passes and the result comes out. The wallet that tallied it
 > never voted. One of the seven ballots was corrupted on purpose: it lost its
@@ -170,7 +171,7 @@ It is the only image in the video that proves something on its own. Don't say
 
 ---
 
-## 5. Why Stellar — 2:31 to 2:52
+## 5. Why Stellar — 2:38 to 2:59
 
 **Screen:** slide 05.
 
@@ -186,7 +187,7 @@ It is the only image in the video that proves something on its own. Don't say
 
 ---
 
-## 6. The evidence — 2:52 to 3:26
+## 6. The evidence — 2:59 to 3:33
 
 **Screen:** slide 06, the lime one.
 
@@ -208,7 +209,7 @@ the work by itself.
 
 ---
 
-## 7. The team — 3:26 to 3:45
+## 7. The team — 3:33 to 3:52
 
 **Screen:** the Karn repository, or you. See the note at the end.
 
@@ -247,20 +248,19 @@ the work by itself.
 
 ---
 
-## 8. The close — 3:45 to 4:14
+## 8. The close — 3:52 to 4:22
 
 **Screen:** slide 07.
 
-> This isn't magic, and there is fine print. If the vote has a deadline, it
-> depends on that public draw. If the draw stops, no result comes out. If
-> everyone votes the same way, the result gives everyone away, same as
-> anywhere. And none of this has been audited. I'm not going to say it has.
+> This isn't magic, and there is fine print. If the vote uses the time lock,
+> it depends on that public draw. If the draw stops, no result comes out, and
+> there is no plan B. If everyone votes the same way, the result gives
+> everyone away. And none of this has been audited. I'm not going to say it
+> has.
 >
 > But checking a decision shouldn't cost exposing everyone's choice.
 >
-> The decision belongs to all of us. The choice is yours.
->
-> Tessera.
+> The decision belongs to all of us. The choice is yours. Tessera.
 
 **Direction:** hold slide 07 for two seconds after the last word, with the
 repository address visible. Do not read the URL out loud.
@@ -421,8 +421,8 @@ And opening a ballot shows what it voted. [slowly] Never whose it is.
 ```
 [snappy] Enough talking. [pause]
 
-This is a real vote, on testnet. No organiser, no server, nobody holding a key.
-[pause]
+This is a real vote, on testnet. No board at all, no server, nobody holding a
+key. [pause]
 
 First the person signs in. They prove they are entitled to vote and sign the
 attendance roll, with their address, in public. Everyone sees who turned up.
@@ -432,8 +432,9 @@ Then they vote. From a different address, created on the spot, with nothing to
 do with the first one. The ballot proves it came from somebody on that roll,
 without saying who. [pause]
 
-Look at the two columns. Thirty people voted. [slowly] Not one address appears
-in both. [pause] Not one. [long pause]
+Look at the two columns. [slowly] Not one address appears in both. [pause] And
+that isn't luck in this round: in another one, with thirty voters, the
+intersection came out at exactly zero. [long pause]
 
 The deadline passes and the result comes out. The wallet that tallied it never
 voted. [pause] One of the seven ballots was corrupted on purpose: it lost its
@@ -482,11 +483,11 @@ governance protocol either. I maintain Karn, an open governance protocol.
 ### 8 · close
 
 ```
-This isn't magic, and there is fine print. [pause] If the vote has a deadline,
-it depends on that public draw. If the draw stops, no result comes out. If
-everyone votes the same way, the result gives everyone away, same as anywhere.
-And none of this has been audited. [slowly] I'm not going to say it has. 
-[long pause]
+This isn't magic, and there is fine print. [pause] If the vote uses the time
+lock, it depends on that public draw. If the draw stops, no result comes out,
+and there is no plan B. If everyone votes the same way, the result gives
+everyone away. And none of this has been audited. [slowly] I'm not going to say
+it has. [long pause]
 
 But checking a decision shouldn't cost exposing everyone's choice. [pause]
 
