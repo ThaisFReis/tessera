@@ -37,7 +37,7 @@ Vale o `CLAUDE.md` da raiz, com estas adições deste projeto:
 ## §1 Objetivos e não-objetivos
 
 **Marco corrente: submissão do hackathon Find Your Way (Meridian), trilha
-General, até 12 out 2026 20:59** ([fonte](SOURCES.md)).
+General, até 13 out 2026** ([fonte](SOURCES.md)).
 
 **O princípio que organiza tudo:** *não é possível ligar uma cédula a quem a
 depositou.* Não é uma propriedade entre outras — é a decisão de onde todo o
@@ -429,7 +429,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 
 ## §9 Marcos e tarefas
 
-**Marco: submissão, 12 out 2026 20:59.** Portão de revisão: todo PR.
+**Marco: submissão, 13 out 2026.** Portão de revisão: todo PR.
 
 | ID | Título | Deps | Lê | Estado | Critérios de aceitação |
 |---|---|---|---|---|---|
