@@ -1,35 +1,57 @@
-# Tessera — roteiro do vídeo de pitch (3 minutos)
+# Tessera — roteiro do vídeo de pitch
 
 Este é o **vídeo de pitch**, o que acompanha a submissão e o deck de sete
 slides. Ele não é o `docs/VIDEO.md`: aquele é a **demonstração de nove
 minutos**, do comparecimento ao placar, em tempo real e sem corte. Os dois
 convivem — o pitch convence a assistir, a demonstração prova.
 
+A versão em inglês é `docs/VIDEO-PITCH.en.md`, com os mesmos oito blocos.
+
 > **O que este vídeo tem a provar, em uma frase:** existe um jeito de uma
 > governança votar em segredo e ainda assim qualquer pessoa reconferir o
 > resultado — e ele está de pé, medido, na testnet.
 
-Duração alvo: **3 minutos**. A narração tem **539 palavras** na versão que vai
-ao sintetizador, o que dá **3min22** a 160 palavras por minuto, sem contar as
-pausas. Se o limite for duro em 3min exatos, corte o §2 para **um** exemplo em
-vez de três (−18s) e tire as pausas do §4 (−6s). Nunca corte o §4 em texto.
+**Duração real: 3min42** de fala, a 160 palavras por minuto, sem contar as
+pausas. Eu tentei fazer caber em 3min00 e não cabe sem estragar a demonstração,
+que é o único bloco que convence sozinho. Se o limite for duro em 3 minutos,
+corte nesta ordem — cada corte está marcado no texto:
+
+1. o segundo exemplo do §2 (−5s);
+2. o parágrafo do meio do §6, o do custo da apuração (−13s);
+3. a primeira frase do §5, até "parte difícil" (−7s).
+
+Dá 3min17 — ainda acima de três minutos. Abaixo disso o §4 começa a perder as
+duas colunas, e aí o vídeo não prova mais nada.
 
 ---
 
-## Regra de ouro
+## Como este texto foi escrito
+
+Texto para ser **ouvido uma vez só**, não lido. Quem escuta não volta atrás,
+não vê a vírgula e não tem o slide decorado. As regras que eu segui:
+
+- **Frase curta, uma ideia por frase.** Onde havia travessão, agora tem ponto.
+- **Sujeito concreto.** Quem age é gente, não conceito. "O sigilo protege a
+  liberdade de discordar" virou "elas só não votam".
+- **Explicar antes de nomear.** Primeiro o que a coisa faz, depois como ela se
+  chama — nunca o contrário. Por isso "compromisso de Pedersen" saiu: o nome
+  não cabia sem roubar o tempo da explicação.
+- **Nada de tríade.** Três itens paralelos seguidos soam a texto gerado. Um
+  exemplo bom vale mais que três resumidos.
+- **Sem a fórmula "não é X, é Y"**, que aparecia cinco vezes na versão anterior.
+- **Segunda pessoa.** "Como você votou" prende mais que "a escolha individual".
+
+### Regra de ouro
 
 **Nenhum número que não tenha sido medido, nenhuma palavra que a `§2` do
-`SPEC.md` proíba.** Em particular, este roteiro nunca diz "seguro", "auditado",
-"pronto para produção" nem "trustless", e nunca promete resultado se a baliza
-parar.
+`SPEC.md` proíba.** Este roteiro nunca diz "seguro", "auditado", "pronto para
+produção" nem "trustless", e nunca promete resultado se a baliza parar.
 
 ### O que conferir na véspera da gravação
 
 - [ ] **O dapp responde.** No dia 13/10 `thaisfreis.github.io/tessera/dapp/`
       devolvia **404** — o PR #23 não foi mergeado, e o Pages serve o `master`.
-      Enquanto estiver 404, o §4 **não pode** dizer "está no ar": troque por
-      "roda local, e o contrato está no explorer". O deck tem o mesmo problema
-      no slide 04.
+      O slide 04 do deck já aponta para esse link.
 - [ ] O contrato responde no explorer.
 - [ ] A rodada que você vai mostrar está na janela de retenção do RPC, se for
       mostrar o verificador.
@@ -40,152 +62,153 @@ parar.
 
 | Bloco | Slide | Tempo | Tela |
 |---|---|---|---|
-| 1 Gancho | 01 capa | 0:00–0:11 | você, ou a capa |
-| 2 Problema | 02 | 0:11–0:35 | slide |
-| 3 Desenho | 03 | 0:35–1:05 | slide |
-| 4 Demonstração | 04 | 1:05–1:52 | **captura de tela** |
-| 5 Por que Stellar | 05 | 1:52–2:10 | slide |
-| 6 Evidência | 06 | 2:10–2:37 | slide |
-| 7 Time | — | 2:37–2:55 | você |
-| 8 Fecho | 07 | 2:55–3:16 | slide |
+| 1 Gancho | 01 capa | 0:00–0:08 | você, ou a capa |
+| 2 Problema | 02 | 0:08–0:32 | slide |
+| 3 Desenho | 03 | 0:32–1:21 | slide |
+| 4 Demonstração | 04 | 1:21–2:06 | **captura de tela** |
+| 5 Por que Stellar | 05 | 2:06–2:26 | slide |
+| 6 Evidência | 06 | 2:26–2:57 | slide |
+| 7 Time | — | 2:57–3:16 | `git log` rolando |
+| 8 Fecho | 07 | 3:16–3:42 | slide |
 
-O §7 não tem slide no deck. Ou você fala em câmera, ou acrescenta uma linha de
-assinatura no slide 07 — veja a nota no fim.
+O §7 não tem slide no deck — veja a nota no fim desta página.
 
 ---
 
-## 1. O gancho — 0:00 a 0:11
+## 1. O gancho — 0:00 a 0:08
 
 **Tela:** você em câmera, ou a capa. Nada mais.
 
-> Uma votação em que ninguém — nem quem a abriu — consegue ligar uma cédula
-> a quem a depositou.
+> Ninguém consegue saber como você votou. Nem quem organizou a votação.
 >
-> Isso é Tessera, e está rodando agora na testnet da Stellar.
+> Isso é Tessera, e está rodando na testnet da Stellar agora.
 
-**Direção:** é a primeira frase e é a única chance. Fale devagar, sem
-preâmbulo, sem "oi, meu nome é". O nome vem no §7.
+**Direção:** é a única chance que o vídeo tem. Fale devagar, sem "oi, meu nome
+é" — o nome vem no §7.
 
 ---
 
-## 2. O problema — 0:11 a 0:35
+## 2. O problema — 0:08 a 0:32
 
 **Tela:** slide 02.
 
-> Em governança on-chain, o voto é público. E o risco é pessoal.
+> Hoje, quando você vota numa DAO ou num conselho, o seu voto fica público. Com
+> o seu nome do lado. Para sempre.
 >
-> O conselheiro que precisa votar contra o orçamento de quem ele depende. O
-> cooperado que discorda da diretoria que decide o crédito dele. O
-> contribuidor que vota contra a baleia que financia o trabalho dele.
+> Pensa no conselheiro que precisa votar contra o orçamento do chefe dele. Ou
+> no contribuidor que vota contra a baleia que paga o trabalho dele.
 >
-> Nome, mais escolha, mais registro permanente, dá exposição permanente. O
-> sigilo protege a liberdade de discordar.
+> Essas pessoas não votam errado. Elas só não votam. E isso não aparece em
+> lugar nenhum.
 
-**Direção:** os três exemplos são o coração do bloco. Se tiver que cortar
-tempo, fique com **um** — o do conselheiro — e não com os três resumidos.
+**Direção:** "Elas só não votam" é a frase do bloco. Pause antes e depois dela.
+
+**Corte 1, se precisar:** tire "Ou no contribuidor que vota contra a baleia que
+paga o trabalho dele." O conselheiro sozinho já faz o trabalho.
 
 ---
 
-## 3. O desenho — 0:35 a 1:05
+## 3. O desenho — 0:32 a 1:21
 
 **Tela:** slide 03.
 
-> A saída não é cifrar o voto e guardar a chave — o texto cifrado fica
-> registrado para sempre, e uma chave que vaze no futuro expõe uma escolha do
-> passado.
+> O jeito óbvio seria cifrar o voto. Só que aí você troca um problema por
+> outro. O voto cifrado fica gravado para sempre, e a chave que abre ele está
+> em algum lugar. Daqui a cinco anos alguém acha essa chave e lê como você
+> votou hoje.
 >
-> Então na rede vai um compromisso de Pedersen: perfeitamente ocultante,
-> isolado não revela nada, e mesmo assim os compromissos somam.
+> Então o Tessera não grava o seu voto. Ele grava um número que prova que você
+> votou, sem dizer o que você votou. Sozinho esse número não serve para nada.
+> Mas dá para somar todos eles e conferir o resultado.
 >
-> Quem abre uma cédula? Sem mesa e sem fechadura, ninguém, nunca. Com
-> fechadura de tempo, qualquer pessoa, depois que a baliza drand publica a
-> rodada. Cifrado até as 20:59, não cifrado para sempre.
+> E quem abre? Se a votação não tem prazo, ninguém. Nunca. Nem eu. Se tem
+> prazo, qualquer pessoa abre depois que ele vence. A chave não fica guardada
+> com ninguém. Ela nasce sozinha na hora marcada, de um sorteio público que não
+> é meu.
 
-**Direção:** "cifrado até as 20:59, não cifrado para sempre" é a frase que
-costuma ser citada de volta. Pause depois dela.
+**Direção:** "Nem eu" é o ponto de virada do pitch inteiro. Não corra nele.
 
 ---
 
-## 4. A demonstração — 1:05 a 1:52
+## 4. A demonstração — 1:21 a 2:06
 
 **Tela:** captura do dapp. É o bloco mais longo de propósito, e é o único que
 não pode encolher.
 
 > Chega de falar.
 >
-> Votação real na testnet, **sem mesa nenhuma** — ninguém tem chave.
+> Isso aqui é uma votação de verdade, na testnet. Sem organizador, sem
+> servidor, ninguém segurando chave nenhuma.
 >
-> Primeiro o comparecimento: a pessoa prova que está na lista e entra no
-> caderno com o endereço dela, identificada, em público.
+> Primeiro a pessoa se identifica. Prova que tem direito de votar e assina a
+> lista de presença, em público. Todo mundo vê quem apareceu.
 >
-> Depois a cédula sai de uma chave de uso único, com uma assinatura em anel —
-> ela prova que quem assinou compareceu, sem dizer qual.
+> Depois ela vota. De outro endereço, criado na hora, que não tem nada a ver
+> com o primeiro. A cédula prova que saiu de alguém daquela lista, sem dizer de
+> quem.
 >
-> Nada no ledger liga as duas colunas. Numa rodada de trinta votantes, a
-> interseção entre o caderno e a urna foi **zero**.
+> Olha as duas colunas. Trinta pessoas votaram. Nenhum endereço aparece nas
+> duas. Nenhum.
 >
-> A janela fecha, a rodada da baliza vence, e o placar aparece. Quem apurou
-> foi uma carteira que nem votou, e não pediu permissão a ninguém. Uma das
-> sete cédulas tinha um byte trocado de propósito: custou um voto, e só o
-> dela.
+> O prazo vence e o resultado sai. Quem apurou foi uma carteira que nem votou.
+> Uma das sete cédulas estava corrompida de propósito: perdeu o próprio voto, e
+> as outras seis contaram.
 
-**Direção:** se houver tempo para mostrar **uma** coisa, mostre o placar
-aparecendo. Mostrar o verificador rodando é melhor ainda, mas só se couber.
-
-**Cuidado:** não diga "sem confiança" nem "trustless". Diga "sem mesa" e
-"ninguém tem chave", que é o que é verdade.
+**Direção:** se der para mostrar **uma** coisa só, mostre as duas colunas lado
+a lado. É a única imagem do vídeo que prova algo sozinha. Não diga "sem
+confiança" nem "trustless" — diga "ninguém segurando chave", que é o que é
+verdade.
 
 ---
 
-## 5. Por que Stellar — 1:52 a 2:10
+## 5. Por que Stellar — 2:06 a 2:26
 
 **Tela:** slide 05.
 
-> Por que Stellar: a BLS12-381 já é nativa no host da Soroban.
+> Por que Stellar. A matemática pesada já vem pronta dentro da Soroban. Eu não
+> precisei programar a parte difícil.
 >
-> Não precisei reimplementar a curva em WebAssembly. São provas sigma com
-> Fiat–Shamir: sem setup confiável, sem circuito, sem cerimônia.
+> Então dá para fazer tudo com prova direta, sem cerimônia de instalação e sem
+> precisar confiar em quem montou o sistema.
 >
-> E o custo cabe no bolso de quem vota — um voto confidencial custou **0,0157
-> XLM** na testnet.
+> E ficou barato. Um voto secreto completo custou um centavo e meio de XLM.
+
+**Corte 3, se precisar:** comece em "Dá para fazer tudo com prova direta".
 
 ---
 
-## 6. A evidência — 2:10 a 2:37
+## 6. A evidência — 2:26 a 2:57
 
 **Tela:** slide 06, o lima.
 
-> Nenhum número aqui é estimativa.
+> Nada disso é estimativa. Tudo foi medido no contrato que está no ar.
 >
-> Um voto confidencial, com duas provas de conhecimento zero verificadas
-> dentro do contrato, usa **9,2% do teto** de uma transação. Dez vezes de
-> folga.
+> Um voto secreto completo usa nove por cento do que cabe numa transação. E
+> apurar não fica mais caro conforme entra gente: de cinco votantes para
+> quarenta, o custo subiu um e meio por cento.
 >
-> A apuração não cresce com o comparecimento: um e meio por cento a mais para
-> oito vezes mais gente.
->
-> E qualquer pessoa reconfere do zero — um verificador independente refaz as
-> assinaturas em anel direto do ledger, sem ler arquivo nenhum da minha
-> máquina.
+> Mas a parte de que eu mais gosto é esta. Você não precisa acreditar em mim.
+> Tem um programa separado que baixa tudo da blockchain, refaz as contas do
+> zero e confere o resultado.
 
-**Direção:** o slide é o único de fundo claro do deck. Deixe-o entrar com um
-corte seco — o contraste faz o trabalho.
+**Direção:** o slide é o único de fundo claro do deck. Corte seco — o contraste
+faz o trabalho sozinho.
+
+**Corte 2, se precisar:** tire o parágrafo do meio inteiro.
 
 ---
 
-## 7. O time — 2:37 a 2:55
+## 7. O time — 2:57 a 3:16
 
-**Tela:** você em câmera.
+**Tela:** `git log` rolando. Veja a nota no fim.
 
-> Quem construiu isso: eu, Thais Reis, sozinha. Doze dias, cento e vinte e
-> dois commits, do protocolo ao dapp. Cento e noventa e cinco testes passando.
-> Licença MIT.
+> Quem fez isso fui eu. Thais Reis. Sozinha.
 >
-> Eu não tenho uma equipe para mostrar. Tenho um repositório inteiro, público
-> desde o primeiro commit.
-
-**Direção:** a última frase transforma a fraqueza aparente em evidência de
-execução. Diga-a olhando para a câmera, sem se desculpar.
+> Doze dias. Cento e vinte e dois commits, do protocolo até a tela. Cento e
+> noventa e cinco testes passando. Tudo aberto, licença MIT.
+>
+> Eu não tenho um time para te mostrar. Tenho um repositório, e ele está
+> público desde o primeiro commit.
 
 > **Confirme antes de gravar:** o roteiro assume **solo**, porque o histórico
 > do repositório tem um autor só. Se houver mais alguém — design, consultoria,
@@ -194,23 +217,23 @@ execução. Diga-a olhando para a câmera, sem se desculpar.
 
 ---
 
-## 8. O fecho — 2:55 a 3:16
+## 8. O fecho — 3:16 a 3:42
 
 **Tela:** slide 07.
 
-> O sigilo tem condições, e elas estão escritas: a baliza, quando há
-> fechadura; e um grupo grande o bastante para esconder alguém. Nada disso foi
-> auditado, e eu não vou dizer que foi.
+> Isso aqui não é mágica, e tem letra miúda. Se a votação tem prazo, ela
+> depende daquele sorteio público. Se ele parar, não sai resultado. Se todo
+> mundo votar igual, o resultado entrega todo mundo. E nada disso passou por
+> auditoria. Eu não vou dizer que passou.
 >
-> Mas conferir uma decisão coletiva não deveria exigir expor a escolha
-> individual.
+> Mas conferir uma decisão não deveria custar expor a escolha de cada um.
 >
 > A decisão é de todos. A escolha é sua.
 >
 > Tessera.
 
-**Direção:** deixe o slide 07 na tela por dois segundos depois da última
-palavra, com o endereço do repositório visível. Não leia a URL em voz alta.
+**Direção:** deixe o slide 07 dois segundos depois da última palavra, com o
+endereço do repositório visível. Não leia a URL em voz alta.
 
 ---
 
@@ -219,8 +242,8 @@ palavra, com o endereço do repositório visível. Não leia a URL em voz alta.
 1. Insira a URL no slide 04 do deck, nos **dois** idiomas — ela está marcada
    como `URL a inserir antes da submissão`.
 2. Insira a URL no README.
-3. Se o §4 teve que ser gravado com o dapp ainda em 404, conserte a linha "dapp
-   no ar" do slide 04 antes de submeter, ou mergeie o PR #23.
+3. Se o §4 foi gravado com o dapp ainda em 404, conserte a linha "dapp no ar"
+   do slide 04 antes de submeter, ou mergeie o PR #23.
 
 ---
 
@@ -229,7 +252,7 @@ palavra, com o endereço do repositório visível. Não leia a URL em voz alta.
 - Que o projeto é seguro, auditado ou pronto para produção.
 - Que abrir o conteúdo antes da hora é impossível — é conluio de um limiar dos
   operadores da baliza.
-- Que a seção de uma pessoa é secreta — ela é **imprevisível até a abertura**,
+- Que a seção de uma pessoa é secreta. Ela é **imprevisível até a abertura**,
   que é coisa diferente.
 - Que existe plano B se a baliza parar. Não existe.
 - Qualquer número que não tenha vindo de uma medição registrada em
@@ -243,13 +266,12 @@ A narração vai ser gerada com um clone da minha voz. Isso muda três coisas, e
 por isso que esta seção existe em vez de você colar os blocos de cima direto no
 sintetizador.
 
-**Um:** o sintetizador lê o que está escrito, não o que está formatado. Negrito,
-travessão duplo e markdown ou são lidos em voz alta ou atrapalham a prosódia.
-Os blocos abaixo são texto puro.
+**Um:** o sintetizador lê o que está escrito, não o que está formatado. Negrito
+e markdown ou são lidos em voz alta ou atrapalham a prosódia. Os blocos abaixo
+são texto puro.
 
-**Dois:** número escrito em algarismo é uma aposta. `0,0157` pode sair como
-"zero vírgula zero cento e cinquenta e sete". Abaixo, **todo número está por
-extenso** — o valor medido é o mesmo, só a grafia mudou.
+**Dois:** número escrito em algarismo é uma aposta. Abaixo, **todo número está
+por extenso** — o valor medido é o mesmo, só a grafia mudou.
 
 **Três:** sem rosto na tela, o bloco do time perdeu o apoio visual que ele
 tinha. Veja a nota no fim desta seção.
@@ -261,62 +283,59 @@ tinha. Veja a nota no fim desta seção.
 
 ## Como cortar
 
-Gere **um arquivo por bloco**, não um único áudio de três minutos. Três razões:
-o corte entre blocos fica no silêncio e não no meio da respiração; você refaz um
-bloco ruim sem regerar o resto; e o §4 precisa esticar ou encolher para casar
-com a captura de tela, o que é impossível num arquivo só.
+Gere **um arquivo por bloco**, não um único áudio de quatro minutos. O corte
+entre blocos cai no silêncio em vez de cair no meio de uma respiração; você
+refaz um bloco ruim sem regerar o resto; e o §4 precisa esticar ou encolher para
+casar com a captura de tela, o que é impossível num arquivo só.
 
 ## Palavras para conferir no primeiro teste
-
-Estas são as que o sintetizador pode errar em português. Se errar, a grafia
-alternativa está ao lado — troque só se precisar.
 
 | No texto | Se sair errado, escreva |
 |---|---|
 | Stellar | Stélar |
 | Soroban | Sorobã |
-| Pedersen | Pedérsen |
-| drand | dê-rand |
 | dapp | déppi |
-| Fiat Shamir | Fíat Shamír |
 | XLM | xis ele eme |
-| WebAssembly | Uébi Assêmbli |
+| DAO | dáu |
 
 ## Os blocos
 
 ### 1 · gancho
 
 ```
-Uma votação em que ninguém, nem quem a abriu, consegue ligar uma cédula a quem
-a depositou. [pause] Isso é Tessera, e está rodando agora na testnet da Stellar.
+Ninguém consegue saber como você votou. [pause] Nem quem organizou a votação.
+[pause] Isso é Tessera, e está rodando na testnet da Stellar agora.
 ```
 
 ### 2 · problema
 
 ```
-Em governança on-chain, o voto é público. E o risco é pessoal. [pause]
+Hoje, quando você vota numa DAO ou num conselho, o seu voto fica público. Com o
+seu nome do lado. Para sempre. [pause]
 
-O conselheiro que precisa votar contra o orçamento de quem ele depende. O
-cooperado que discorda da diretoria que decide o crédito dele. O contribuidor
-que vota contra a baleia que financia o trabalho dele. [pause]
+Pensa no conselheiro que precisa votar contra o orçamento do chefe dele. Ou no
+contribuidor que vota contra a baleia que paga o trabalho dele. [pause]
 
-Nome, mais escolha, mais registro permanente, dá exposição permanente. O sigilo
-protege a liberdade de discordar.
+Essas pessoas não votam errado. [pause] Elas só não votam. [pause] E isso não
+aparece em lugar nenhum.
 ```
 
 ### 3 · desenho
 
 ```
-A saída não é cifrar o voto e guardar a chave. O texto cifrado fica registrado
-para sempre, e uma chave que vaze no futuro expõe uma escolha do passado.
+O jeito óbvio seria cifrar o voto. Só que aí você troca um problema por outro. O
+voto cifrado fica gravado para sempre, e a chave que abre ele está em algum
+lugar. Daqui a cinco anos alguém acha essa chave e lê como você votou hoje.
 [pause]
 
-Então na rede vai um compromisso de Pedersen: perfeitamente ocultante, isolado
-não revela nada, e mesmo assim os compromissos somam. [pause]
+Então o Tessera não grava o seu voto. Ele grava um número que prova que você
+votou, sem dizer o que você votou. Sozinho esse número não serve para nada. Mas
+dá para somar todos eles e conferir o resultado. [pause]
 
-Quem abre uma cédula? Sem mesa e sem fechadura, ninguém, nunca. Com fechadura
-de tempo, qualquer pessoa, depois que a baliza drand publica a rodada. [pause]
-Cifrado até as vinte e cinquenta e nove. Não cifrado para sempre.
+E quem abre? Se a votação não tem prazo, ninguém. Nunca. [pause] Nem eu. [pause]
+Se tem prazo, qualquer pessoa abre depois que ele vence. A chave não fica
+guardada com ninguém. Ela nasce sozinha na hora marcada, de um sorteio público
+que não é meu.
 ```
 
 ### 4 · demonstração
@@ -324,96 +343,95 @@ Cifrado até as vinte e cinquenta e nove. Não cifrado para sempre.
 ```
 Chega de falar. [pause]
 
-Votação real na testnet, sem mesa nenhuma. Ninguém tem chave. [pause]
+Isso aqui é uma votação de verdade, na testnet. Sem organizador, sem servidor,
+ninguém segurando chave nenhuma. [pause]
 
-Primeiro o comparecimento: a pessoa prova que está na lista e entra no caderno
-com o endereço dela, identificada, em público. [pause]
+Primeiro a pessoa se identifica. Prova que tem direito de votar e assina a lista
+de presença, em público. Todo mundo vê quem apareceu. [pause]
 
-Depois a cédula sai de uma chave de uso único, com uma assinatura em anel. Ela
-prova que quem assinou compareceu, sem dizer qual. [pause]
+Depois ela vota. De outro endereço, criado na hora, que não tem nada a ver com o
+primeiro. A cédula prova que saiu de alguém daquela lista, sem dizer de quem.
+[pause]
 
-Nada no ledger liga as duas colunas. Numa rodada de trinta votantes, a
-interseção entre o caderno e a urna foi zero. [pause]
+Olha as duas colunas. Trinta pessoas votaram. Nenhum endereço aparece nas duas.
+Nenhum. [pause]
 
-A janela fecha, a rodada da baliza vence, e o placar aparece. Quem apurou foi
-uma carteira que nem votou, e não pediu permissão a ninguém. [pause] Uma das
-sete cédulas tinha um byte trocado de propósito. Custou um voto, e só o dela.
+O prazo vence e o resultado sai. Quem apurou foi uma carteira que nem votou. Uma
+das sete cédulas estava corrompida de propósito: perdeu o próprio voto, e as
+outras seis contaram.
 ```
 
 ### 5 · por que Stellar
 
 ```
-Por que Stellar: a B L S doze traço trezentos e oitenta e um já é nativa no
-host da Soroban. [pause]
+Por que Stellar. [pause] A matemática pesada já vem pronta dentro da Soroban. Eu
+não precisei programar a parte difícil. [pause]
 
-Não precisei reimplementar a curva em WebAssembly. São provas sigma com Fiat
-Shamir: sem setup confiável, sem circuito, sem cerimônia. [pause]
+Então dá para fazer tudo com prova direta, sem cerimônia de instalação e sem
+precisar confiar em quem montou o sistema. [pause]
 
-E o custo cabe no bolso de quem vota. Um voto confidencial custou zero vírgula
-zero um cinco sete XLM na testnet.
+E ficou barato. Um voto secreto completo custou um centavo e meio de XLM.
 ```
 
 ### 6 · evidência
 
 ```
-Nenhum número aqui é estimativa. [pause]
+Nada disso é estimativa. Tudo foi medido no contrato que está no ar. [pause]
 
-Um voto confidencial, com duas provas de conhecimento zero verificadas dentro
-do contrato, usa nove vírgula dois por cento do teto de uma transação. Dez
-vezes de folga. [pause]
+Um voto secreto completo usa nove por cento do que cabe numa transação. E apurar
+não fica mais caro conforme entra gente: de cinco votantes para quarenta, o
+custo subiu um e meio por cento. [pause]
 
-A apuração não cresce com o comparecimento: um e meio por cento a mais para
-oito vezes mais gente. [pause]
-
-E qualquer pessoa reconfere do zero. Um verificador independente refaz as
-assinaturas em anel direto do ledger, sem ler arquivo nenhum da minha máquina.
+Mas a parte de que eu mais gosto é esta. [pause] Você não precisa acreditar em
+mim. Tem um programa separado que baixa tudo da blockchain, refaz as contas do
+zero e confere o resultado.
 ```
 
 ### 7 · time
 
 ```
-Quem construiu isso: eu, Thais Reis, sozinha. [pause] Doze dias, cento e vinte
-e dois commits, do protocolo ao dapp. Cento e noventa e cinco testes passando.
-Licença MIT. [pause]
+Quem fez isso fui eu. [pause] Thais Reis. Sozinha. [pause]
 
-Eu não tenho uma equipe para mostrar. [pause] Tenho um repositório inteiro,
-público desde o primeiro commit.
+Doze dias. Cento e vinte e dois commits, do protocolo até a tela. Cento e
+noventa e cinco testes passando. Tudo aberto, licença MIT. [pause]
+
+Eu não tenho um time para te mostrar. Tenho um repositório, e ele está público
+desde o primeiro commit.
 ```
 
 ### 8 · fecho
 
 ```
-O sigilo tem condições, e elas estão escritas: a baliza, quando há fechadura, e
-um grupo grande o bastante para esconder alguém. [pause] Nada disso foi
-auditado, e eu não vou dizer que foi. [pause]
+Isso aqui não é mágica, e tem letra miúda. [pause] Se a votação tem prazo, ela
+depende daquele sorteio público. Se ele parar, não sai resultado. Se todo mundo
+votar igual, o resultado entrega todo mundo. E nada disso passou por auditoria.
+Eu não vou dizer que passou. [pause]
 
-Mas conferir uma decisão coletiva não deveria exigir expor a escolha
-individual. [pause]
+Mas conferir uma decisão não deveria custar expor a escolha de cada um. [pause]
 
 A decisão é de todos. A escolha é sua. [pause] Tessera.
 ```
 
 ## O bloco do time, sem rosto
 
-O §7 foi escrito para ser dito olhando para a câmera: "eu não tenho uma equipe
-para mostrar" é uma frase que se sustenta no olho, não no texto. Com voz
-clonada e sem rosto, ela fica no vazio.
+O §7 foi escrito para ser dito olhando para a câmera. "Eu não tenho um time para
+te mostrar" se sustenta no olho, não no texto. Com voz clonada e sem rosto, ela
+fica no vazio.
 
 Três saídas, da que eu faria para a que eu não faria:
 
 1. **O repositório na tela, rolando.** `git log` correndo enquanto a frase é
    dita. Os cento e vinte e dois commits deixam de ser um número e viram uma
    imagem — é exatamente o que a frase promete.
-2. **Uma foto sua, estática, com o nome.** Honesto e suficiente. É o que um
-   deck faria.
-3. **O slide 07 do deck com uma linha de assinatura.** Funciona, mas o fecho
-   perde força por dividir a atenção com crédito de autoria.
+2. **Uma foto sua, estática, com o nome.** Honesto e suficiente.
+3. **O slide 07 com uma linha de assinatura.** Funciona, mas o fecho perde força
+   por dividir a atenção com crédito de autoria.
 
-Eu recomendo a primeira: ela é a única em que a tela prova o que a voz afirma.
+Eu recomendo a primeira: é a única em que a tela prova o que a voz afirma.
 
 > **Nota de honestidade.** Nada obriga você a dizer no vídeo que a narração é
 > sintética — é a sua própria voz, clonada por você, e isso é produção, não
 > representação falsa. Mas a `§2` do `SPEC.md` existe porque este projeto
 > resolveu não ter nenhuma afirmação sem lastro. Uma linha nos créditos finais,
-> "narração gerada com um clone da minha voz", custa dois segundos e combina
-> com o resto.
+> "narração gerada com um clone da minha voz", custa dois segundos e combina com
+> o resto.
