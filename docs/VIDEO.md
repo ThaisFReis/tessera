@@ -10,7 +10,7 @@ dois não se misturam: o console é o ambiente controlado e o plano B; este é o
 produto.
 
 > **O que este vídeo tem a provar, em uma frase:** uma assembleia sem mesa
-> nenhuma — sem ninguém de confiança — fecha com placar, ninguém consegue
+> nenhuma — sem ninguém segurando chave — fecha com placar, ninguém consegue
 > travá-lo, e qualquer pessoa reconfere tudo do zero.
 
 Duração alvo: **9 minutos** com `LEDGERS_URNA=90`, ou **7** com `65`. O §6 é a
@@ -268,7 +268,7 @@ Se alguma assinatura ficar fora da janela de retenção do RPC, ele diz quantas 
 
 Mostre a transação no explorer e termine:
 
-> Não teve mesa. Não teve ninguém de confiança. Se alguém tivesse tentado travar
+> Não teve mesa. Ninguém segurou chave nenhuma. Se alguém tivesse tentado travar
 > o placar omitindo cédulas, qualquer pessoa — inclusive quem não votou — o
 > sobreporia incluindo as que faltam. Isso rodou na testnet, os hashes estão no
 > repositório, e o verificador que acabou de rodar está lá também.

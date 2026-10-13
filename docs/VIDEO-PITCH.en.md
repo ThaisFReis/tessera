@@ -11,7 +11,7 @@ The Portuguese version is `docs/VIDEO-PITCH.md`, with the same eight blocks.
 > governance body to vote in secret and still have anyone re-check the result —
 > and it is standing, measured, on testnet.
 
-**Real length: 4min22** of speech at 160 words a minute, pauses not counted. I
+**Real length: 4min13** of speech at 160 words a minute, pauses not counted. I
 tried to make it fit 3min00 and it does not fit without wrecking the demo, which
 is the only block that convinces on its own. If the limit is a hard three
 minutes, cut in this order — each cut is marked in the text:
@@ -20,7 +20,7 @@ minutes, cut in this order — each cut is marked in the text:
 2. the middle paragraph of §6, the one about tally cost (−15s);
 3. the first sentence of §5, through "the hard part" (−7s).
 
-That lands at 3min56 — still over three minutes. Below that §4 starts losing
+That lands at 3min42 — still over three minutes. Below that §4 starts losing
 the two columns, and then the video stops proving anything.
 
 ---
@@ -67,11 +67,11 @@ and never promises a result if the beacon stops.
 | 1 Hook | 01 cover | 0:00–0:09 | you, or the cover |
 | 2 Problem | 02 | 0:09–0:34 | slide |
 | 3 Design | 03 | 0:34–1:44 | slide |
-| 4 Demo | 04 | 1:44–2:38 | **screen capture** |
-| 5 Why Stellar | 05 | 2:38–2:59 | slide |
-| 6 Evidence | 06 | 2:59–3:33 | slide |
-| 7 Team | — | 3:33–3:52 | you, or Karn |
-| 8 Close | 07 | 3:52–4:22 | slide |
+| 4 Demo | 04 | 1:44–2:37 | **screen capture** |
+| 5 Why Stellar | 05 | 2:37–2:58 | slide |
+| 6 Evidence | 06 | 2:58–3:32 | slide |
+| 7 Team | — | 3:32–3:51 | you, or Karn |
+| 8 Close | 07 | 3:51–4:13 | slide |
 
 §7 has no slide in the deck — see the note at the end of this page.
 
@@ -140,13 +140,11 @@ pays for their work." The board member alone does the job.
 
 ---
 
-## 4. The demo — 1:44 to 2:38
+## 4. The demo — 1:44 to 2:37
 
 **Screen:** capture of the dapp. It is the longest block on purpose, and the one
 block that cannot shrink.
 
-> Enough talking.
->
 > This is a real vote, on testnet. No board at all, no server, nobody holding
 > a key.
 >
@@ -171,11 +169,11 @@ It is the only image in the video that proves something on its own. Don't say
 
 ---
 
-## 5. Why Stellar — 2:38 to 2:59
+## 5. Why Stellar — 2:37 to 2:58
 
 **Screen:** slide 05.
 
-> Why Stellar. The heavy maths Tessera needs already ships inside Soroban. I
+> And why Stellar? The heavy maths Tessera needs already ships inside Soroban. I
 > didn't have to write the hard part.
 >
 > So everything can run on direct proofs, with no setup ceremony and no need to
@@ -187,7 +185,7 @@ It is the only image in the video that proves something on its own. Don't say
 
 ---
 
-## 6. The evidence — 2:59 to 3:33
+## 6. The evidence — 2:58 to 3:32
 
 **Screen:** slide 06, the lime one.
 
@@ -209,7 +207,7 @@ the work by itself.
 
 ---
 
-## 7. The team — 3:33 to 3:52
+## 7. The team — 3:32 to 3:51
 
 **Screen:** the Karn repository, or you. See the note at the end.
 
@@ -248,22 +246,23 @@ the work by itself.
 
 ---
 
-## 8. The close — 3:52 to 4:22
+## 8. The close — 3:51 to 4:13
 
 **Screen:** slide 07.
 
-> This isn't magic, and there is fine print. If the vote uses the time lock,
-> it depends on that public draw. If the draw stops, no result comes out, and
-> there is no plan B. If everyone votes the same way, the result gives
-> everyone away. And none of this has been audited. I'm not going to say it
-> has.
+> Checking a decision shouldn't cost exposing everyone's choice. That can be
+> built. It is built, it is running, and the code is open.
 >
-> But checking a decision shouldn't cost exposing everyone's choice.
+> If you govern anything, Tessera plugs into what you already use. And if you
+> work with cryptography, the repository is there for you to break.
 >
 > The decision belongs to all of us. The choice is yours. Tessera.
 
-**Direction:** hold slide 07 for two seconds after the last word, with the
-repository address visible. Do not read the URL out loud.
+**Direction:** this is an invitation, not a disclaimer — the voice doesn't talk
+about limits because they are **on screen**: the slide 07 footer carries the
+conditions for secrecy, and it stays visible through the whole block. Lift the
+tone on "it is built, it is running". Hold the slide for two seconds after the
+last word, with the repository address visible, and do not read the URL aloud.
 
 ---
 
@@ -419,8 +418,6 @@ And opening a ballot shows what it voted. [slowly] Never whose it is.
 ### 4 · demo
 
 ```
-[snappy] Enough talking. [pause]
-
 This is a real vote, on testnet. No board at all, no server, nobody holding a
 key. [pause]
 
@@ -444,7 +441,7 @@ own vote, and the other six counted.
 ### 5 · why Stellar
 
 ```
-Why Stellar. [pause] The heavy maths Tessera needs already ships inside Soroban.
+And why Stellar? [pause] The heavy maths Tessera needs already ships inside Soroban.
 I didn't have to write the hard part. [pause]
 
 So everything can run on direct proofs, with no setup ceremony and no need to
@@ -483,13 +480,13 @@ governance protocol either. I maintain Karn, an open governance protocol.
 ### 8 · close
 
 ```
-This isn't magic, and there is fine print. [pause] If the vote uses the time
-lock, it depends on that public draw. If the draw stops, no result comes out,
-and there is no plan B. If everyone votes the same way, the result gives
-everyone away. And none of this has been audited. [slowly] I'm not going to say
-it has. [long pause]
+Checking a decision shouldn't cost exposing everyone's choice. [pause] That can
+be built. [slowly] It is built, it is running, and the code is open.
+[long pause]
 
-But checking a decision shouldn't cost exposing everyone's choice. [pause]
+[proud] If you govern anything, Tessera plugs into what you already use. And if
+you work with cryptography, the repository is there for you to break.
+[long pause]
 
 The decision belongs to all of us. [pause] The choice is yours. [long pause]
 Tessera.

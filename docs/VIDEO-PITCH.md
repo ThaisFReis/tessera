@@ -11,7 +11,7 @@ A versão em inglês é `docs/VIDEO-PITCH.en.md`, com os mesmos oito blocos.
 > governança votar em segredo e ainda assim qualquer pessoa reconferir o
 > resultado — e ele está de pé, medido, na testnet.
 
-**Duração real: 4min11** de fala, a 160 palavras por minuto, sem contar as
+**Duração real: 4min04** de fala, a 160 palavras por minuto, sem contar as
 pausas. Eu tentei fazer caber em 3min00 e não cabe sem estragar a demonstração,
 que é o único bloco que convence sozinho. Se o limite for duro em 3 minutos,
 corte nesta ordem — cada corte está marcado no texto:
@@ -20,7 +20,7 @@ corte nesta ordem — cada corte está marcado no texto:
 2. o parágrafo do meio do §6, o do custo da apuração (−13s);
 3. a primeira frase do §5, até "parte difícil" (−7s).
 
-Dá 3min46 — ainda acima de três minutos. Abaixo disso o §4 começa a perder as
+Dá 3min39 — ainda acima de três minutos. Abaixo disso o §4 começa a perder as
 duas colunas, e aí o vídeo não prova mais nada.
 
 ---
@@ -69,7 +69,7 @@ produção" nem "trustless", e nunca promete resultado se a baliza parar.
 | 5 Por que Stellar | 05 | 2:31–2:51 | slide |
 | 6 Evidência | 06 | 2:51–3:22 | slide |
 | 7 Time | — | 3:22–3:42 | você, ou o Karn |
-| 8 Fecho | 07 | 3:42–4:11 | slide |
+| 8 Fecho | 07 | 3:42–4:04 | slide |
 
 O §7 não tem slide no deck — veja a nota no fim desta página.
 
@@ -244,21 +244,23 @@ faz o trabalho sozinho.
 
 ---
 
-## 8. O fecho — 3:42 a 4:11
+## 8. O fecho — 3:42 a 4:04
 
 **Tela:** slide 07.
 
-> Isso aqui não é mágica, e tem letra miúda. Se a votação usa fechadura de
-> tempo, ela depende daquele sorteio público. Se o sorteio parar, não sai
-> resultado, e não tem plano B. Se todo mundo votar igual, o resultado entrega
-> todo mundo. E nada disso passou por auditoria. Eu não vou dizer que passou.
+> Conferir uma decisão não deveria custar expor a escolha de cada um. Dá para
+> construir isso. Está construído, está rodando, e o código é aberto.
 >
-> Mas conferir uma decisão não deveria custar expor a escolha de cada um.
+> Se você governa alguma coisa, Tessera encaixa no que você já usa. E se você
+> mexe com criptografia, o repositório está lá para você quebrar.
 >
 > A decisão é de todos. A escolha é sua. Tessera.
 
-**Direção:** deixe o slide 07 dois segundos depois da última palavra, com o
-endereço do repositório visível. Não leia a URL em voz alta.
+**Direção:** é um convite, não uma ressalva — a voz não fala de limites porque
+eles estão **na tela**: o rodapé do slide 07 traz as condições do sigilo, e ele
+fica visível durante o bloco inteiro. Suba o tom em "está construído, está
+rodando". Segure o slide dois segundos depois da última palavra, com o endereço
+do repositório visível, e não leia a URL em voz alta.
 
 ---
 
@@ -478,13 +480,13 @@ aberto. [slowly] É exatamente onde ele encaixa.
 ### 8 · fecho
 
 ```
-Isso aqui não é mágica, e tem letra miúda. [pause] Se a votação usa fechadura de
-tempo, ela depende daquele sorteio público. Se o sorteio parar, não sai
-resultado, e não tem plano B. Se todo mundo votar igual, o resultado entrega
-todo mundo. E nada disso passou por auditoria. [slowly] Eu não vou dizer que
-passou. [long pause]
+Conferir uma decisão não deveria custar expor a escolha de cada um. [pause] Dá
+para construir isso. [slowly] Está construído, está rodando, e o código é
+aberto. [long pause]
 
-Mas conferir uma decisão não deveria custar expor a escolha de cada um. [pause]
+[proud] Se você governa alguma coisa, Tessera encaixa no que você já usa. E se
+você mexe com criptografia, o repositório está lá para você quebrar.
+[long pause]
 
 A decisão é de todos. [pause] A escolha é sua. [long pause] Tessera.
 ```
