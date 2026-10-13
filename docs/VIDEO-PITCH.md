@@ -276,10 +276,52 @@ por extenso** — o valor medido é o mesmo, só a grafia mudou.
 **Três:** sem rosto na tela, o bloco do time perdeu o apoio visual que ele
 tinha. Veja a nota no fim desta seção.
 
-> As etiquetas entre colchetes são do v4 e o seu print as confirma, mas eu não
-> testei nenhuma delas com a sua voz. Gere um bloco curto primeiro — sugiro o
-> §1 — e só depois os sete restantes. Se alguma etiqueta vazar como palavra
-> falada, tire todas: o texto funciona sem elas.
+## As etiquetas
+
+Conferidas na [lista oficial do v4](https://elevenlabs.io/blog/elevenlabs-audio-tags-list)
+em 13/10/2026. São **46 marcações de oito tipos**, e 42 delas são só de ritmo:
+
+| Etiqueta | Onde, e por quê |
+|---|---|
+| `[pause]` `[long pause]` | respiração entre ideias; a longa só nos quatro silêncios que o texto pede |
+| `[slowly]` | nas sete frases que o roteiro manda não correr — a abertura, "Para sempre", "Daqui a cinco anos", "Nem eu", "Nenhum endereço aparece nas duas", "Eu não tenho um time" e "Eu não vou dizer que passou" |
+| `[snappy]` | uma vez só, no "Chega de falar" que abre a demonstração |
+| `[thoughtful]` | ao entrar nos exemplos do §2 |
+| `[let down]` | em "Elas só não votam" — é a frase do bloco |
+| `[curious]` | em "E quem abre?", que é uma pergunta de verdade |
+| `[proud]` | em "a parte de que eu mais gosto", a única vez que a narração se permite gostar de algo |
+
+**Quatro etiquetas de emoção no roteiro inteiro.** A documentação recomenda
+**uma por oração**, e eu fiquei bem abaixo disso de propósito: o seu problema
+com a versão anterior era soar artificial, e deck de etiqueta emotiva é
+exatamente como se volta a soar. Narração de pitch convence por conter, não por
+atuar.
+
+### Três coisas que eu não sei
+
+**Um:** a documentação do v4 **não diz nada sobre português**. Toda a lista está
+em inglês e nenhum exemplo é em outra língua. As etiquetas podem funcionar
+igual, podem funcionar pela metade, ou podem sair faladas.
+
+**Dois:** não testei nenhuma delas com a sua voz.
+
+**Três:** `[let down]`, `[snappy]` e `[long pause]` são as mais incomuns da
+lista, e são as primeiras candidatas a vazar.
+
+### Como testar antes de gastar crédito
+
+1. Gere só o **§2**, que é curto e tem três etiquetas diferentes.
+2. Ouça procurando **palavra inglesa falada**. Se "pause" ou "let down" aparecer
+   como som, as etiquetas não estão pegando em português.
+3. Se vazar: **tire todas**. O texto foi escrito para funcionar sem elas — a
+   pontuação já carrega o ritmo, e a documentação diz que pontuação também
+   controla performance.
+4. Se funcionar mas soar teatral, tire primeiro as quatro de emoção e mantenha
+   as de ritmo. É o ajuste mais provável.
+
+> **Observação sobre o modelo.** O painel do v4 oferece modos de geração, e a
+> documentação do v3 diz que o modo **Robust** reduz a resposta às etiquetas.
+> Se você escolher Robust, espere que elas façam pouco ou nada.
 
 ## Como cortar
 
@@ -303,45 +345,48 @@ casar com a captura de tela, o que é impossível num arquivo só.
 ### 1 · gancho
 
 ```
-Ninguém consegue saber como você votou. [pause] Nem quem organizou a votação.
-[pause] Isso é Tessera, e está rodando na testnet da Stellar agora.
+[slowly] Ninguém consegue saber como você votou. [pause] Nem quem organizou a
+votação. [pause]
+
+Isso é Tessera, e está rodando na testnet da Stellar agora.
 ```
 
 ### 2 · problema
 
 ```
 Hoje, quando você vota numa DAO ou num conselho, o seu voto fica público. Com o
-seu nome do lado. Para sempre. [pause]
+seu nome do lado. [slowly] Para sempre. [pause]
 
-Pensa no conselheiro que precisa votar contra o orçamento do chefe dele. Ou no
-contribuidor que vota contra a baleia que paga o trabalho dele. [pause]
+[thoughtful] Pensa no conselheiro que precisa votar contra o orçamento do chefe
+dele. Ou no contribuidor que vota contra a baleia que paga o trabalho dele.
+[pause]
 
-Essas pessoas não votam errado. [pause] Elas só não votam. [pause] E isso não
-aparece em lugar nenhum.
+Essas pessoas não votam errado. [pause] [let down] Elas só não votam. [long
+pause] E isso não aparece em lugar nenhum.
 ```
 
 ### 3 · desenho
 
 ```
-O jeito óbvio seria cifrar o voto. Só que aí você troca um problema por outro. O
-voto cifrado fica gravado para sempre, e a chave que abre ele está em algum
-lugar. Daqui a cinco anos alguém acha essa chave e lê como você votou hoje.
-[pause]
+O jeito óbvio seria cifrar o voto. [pause] Só que aí você troca um problema por
+outro. O voto cifrado fica gravado para sempre, e a chave que abre ele está em
+algum lugar. [slowly] Daqui a cinco anos alguém acha essa chave e lê como você
+votou hoje. [long pause]
 
 Então o Tessera não grava o seu voto. Ele grava um número que prova que você
 votou, sem dizer o que você votou. Sozinho esse número não serve para nada. Mas
 dá para somar todos eles e conferir o resultado. [pause]
 
-E quem abre? Se a votação não tem prazo, ninguém. Nunca. [pause] Nem eu. [pause]
-Se tem prazo, qualquer pessoa abre depois que ele vence. A chave não fica
-guardada com ninguém. Ela nasce sozinha na hora marcada, de um sorteio público
-que não é meu.
+[curious] E quem abre? [pause] Se a votação não tem prazo, ninguém. Nunca.
+[pause] [slowly] Nem eu. [long pause] Se tem prazo, qualquer pessoa abre depois
+que ele vence. A chave não fica guardada com ninguém. Ela nasce sozinha na hora
+marcada, de um sorteio público que não é meu.
 ```
 
 ### 4 · demonstração
 
 ```
-Chega de falar. [pause]
+[snappy] Chega de falar. [pause]
 
 Isso aqui é uma votação de verdade, na testnet. Sem organizador, sem servidor,
 ninguém segurando chave nenhuma. [pause]
@@ -353,12 +398,12 @@ Depois ela vota. De outro endereço, criado na hora, que não tem nada a ver com
 primeiro. A cédula prova que saiu de alguém daquela lista, sem dizer de quem.
 [pause]
 
-Olha as duas colunas. Trinta pessoas votaram. Nenhum endereço aparece nas duas.
-Nenhum. [pause]
+Olha as duas colunas. Trinta pessoas votaram. [slowly] Nenhum endereço aparece
+nas duas. [pause] Nenhum. [long pause]
 
-O prazo vence e o resultado sai. Quem apurou foi uma carteira que nem votou. Uma
-das sete cédulas estava corrompida de propósito: perdeu o próprio voto, e as
-outras seis contaram.
+O prazo vence e o resultado sai. Quem apurou foi uma carteira que nem votou.
+[pause] Uma das sete cédulas estava corrompida de propósito: perdeu o próprio
+voto, e as outras seis contaram.
 ```
 
 ### 5 · por que Stellar
@@ -382,21 +427,21 @@ Um voto secreto completo usa nove por cento do que cabe numa transação. E apur
 não fica mais caro conforme entra gente: de cinco votantes para quarenta, o
 custo subiu um e meio por cento. [pause]
 
-Mas a parte de que eu mais gosto é esta. [pause] Você não precisa acreditar em
-mim. Tem um programa separado que baixa tudo da blockchain, refaz as contas do
-zero e confere o resultado.
+[proud] Mas a parte de que eu mais gosto é esta. [pause] Você não precisa
+acreditar em mim. Tem um programa separado que baixa tudo da blockchain, refaz
+as contas do zero e confere o resultado.
 ```
 
 ### 7 · time
 
 ```
-Quem fez isso fui eu. [pause] Thais Reis. Sozinha. [pause]
+Quem fez isso fui eu. [pause] Thais Reis. [pause] Sozinha. [long pause]
 
 Doze dias. Cento e vinte e dois commits, do protocolo até a tela. Cento e
 noventa e cinco testes passando. Tudo aberto, licença MIT. [pause]
 
-Eu não tenho um time para te mostrar. Tenho um repositório, e ele está público
-desde o primeiro commit.
+[slowly] Eu não tenho um time para te mostrar. [pause] Tenho um repositório, e
+ele está público desde o primeiro commit.
 ```
 
 ### 8 · fecho
@@ -405,11 +450,11 @@ desde o primeiro commit.
 Isso aqui não é mágica, e tem letra miúda. [pause] Se a votação tem prazo, ela
 depende daquele sorteio público. Se ele parar, não sai resultado. Se todo mundo
 votar igual, o resultado entrega todo mundo. E nada disso passou por auditoria.
-Eu não vou dizer que passou. [pause]
+[slowly] Eu não vou dizer que passou. [long pause]
 
 Mas conferir uma decisão não deveria custar expor a escolha de cada um. [pause]
 
-A decisão é de todos. A escolha é sua. [pause] Tessera.
+A decisão é de todos. [pause] A escolha é sua. [long pause] Tessera.
 ```
 
 ## O bloco do time, sem rosto

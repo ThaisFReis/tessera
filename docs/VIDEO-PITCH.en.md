@@ -280,10 +280,50 @@ out** — the measured value is the same, only the spelling changed.
 **Three:** with no face on screen, the team block lost the visual support it had.
 See the note at the end of this section.
 
-> The bracketed tags are v4's and your screenshot confirms them, but I have not
-> tested a single one with your voice. Generate one short block first — §1 is
-> the one I'd pick — and only then the other seven. If a tag leaks out as a
-> spoken word, drop all of them: the text works without them.
+## The tags
+
+Checked against the [official v4 list](https://elevenlabs.io/blog/elevenlabs-audio-tags-list)
+on 13 Oct 2026. **45 marks of eight kinds**, and 41 of them are pacing only:
+
+| Tag | Where, and why |
+|---|---|
+| `[pause]` `[long pause]` | breath between ideas; the long one only at the four silences the text asks for |
+| `[slowly]` | on the seven lines the script says not to rush — the opening, "Forever", "Five years from now", "Not even me", "Not one address appears in both", "I don't have a team" and "I'm not going to say it has" |
+| `[snappy]` | once only, on the "Enough talking" that opens the demo |
+| `[thoughtful]` | going into the §2 examples |
+| `[let down]` | on "They just don't vote" — the line of the block |
+| `[curious]` | on "And who can open it?", which is a real question |
+| `[proud]` | on "the part I like most", the one time the narration lets itself enjoy something |
+
+**Four emotion tags in the whole script.** The documentation recommends **one tag
+per clause**, and I stayed well under that on purpose: a stack of emotion tags is
+exactly how narration starts sounding performed. A pitch convinces by holding
+back, not by acting.
+
+### Three things I don't know
+
+**One:** the v4 documentation **says nothing about non-English languages**. The
+whole list is in English and no example is in another language. This matters for
+the Portuguese script, not this one.
+
+**Two:** I have not tested a single tag with your voice.
+
+**Three:** `[let down]`, `[snappy]` and `[long pause]` are the least common on
+the list, and the first candidates to leak.
+
+### How to test before spending credits
+
+1. Generate **§2** only — it is short and carries three different tags.
+2. Listen for a **tag spoken as a word**.
+3. If one leaks: **drop them all**. The text was written to work without them —
+   punctuation already carries the rhythm, and the documentation says punctuation
+   controls performance too.
+4. If they work but sound theatrical, drop the four emotion tags first and keep
+   the pacing ones. That is the likeliest adjustment.
+
+> **A note on the model.** The v4 panel offers generation modes, and the v3
+> documentation says **Robust** reduces responsiveness to tags. If you pick
+> Robust, expect them to do little or nothing.
 
 ## How to cut
 
@@ -306,46 +346,48 @@ capture, which is impossible in one file.
 ### 1 · hook
 
 ```
-Nobody can find out how you voted. [pause] Not even whoever ran the vote.
-[pause] This is Tessera, and it is running on Stellar testnet right now.
+[slowly] Nobody can find out how you voted. [pause] Not even whoever ran the
+vote. [pause]
+
+This is Tessera, and it is running on Stellar testnet right now.
 ```
 
 ### 2 · problem
 
 ```
 Today, when you vote in a DAO or on a board, your vote is public. With your name
-next to it. Forever. [pause]
+next to it. [slowly] Forever. [pause]
 
-Think of the board member who has to vote against the budget of the person they
-report to. Or the contributor voting against the whale who pays for their work.
-[pause]
+[thoughtful] Think of the board member who has to vote against the budget of the
+person they report to. Or the contributor voting against the whale who pays for
+their work. [pause]
 
-These people don't vote wrong. [pause] They just don't vote. [pause] And that
-never shows up anywhere.
+These people don't vote wrong. [pause] [let down] They just don't vote. [long
+pause] And that never shows up anywhere.
 ```
 
 ### 3 · design
 
 ```
-The obvious fix would be to encrypt the vote. Except then you trade one problem
-for another. The encrypted vote stays recorded forever, and the key that opens
-it is somewhere. Five years from now somebody finds that key and reads how you
-voted today. [pause]
+The obvious fix would be to encrypt the vote. [pause] Except then you trade one
+problem for another. The encrypted vote stays recorded forever, and the key that
+opens it is somewhere. [slowly] Five years from now somebody finds that key and
+reads how you voted today. [long pause]
 
 So Tessera doesn't record your vote. It records a number that proves you voted,
 without saying what you voted. On its own that number is useless. But you can
 add all of them up and check the result. [pause]
 
-And who can open it? If the vote has no deadline, nobody. Ever. [pause] Not even
-me. [pause] If it has a deadline, anyone can open it once the deadline passes.
-The key isn't held by anyone. It is born on its own at the appointed time, out
-of a public draw that isn't mine.
+[curious] And who can open it? [pause] If the vote has no deadline, nobody.
+Ever. [pause] [slowly] Not even me. [long pause] If it has a deadline, anyone
+can open it once the deadline passes. The key isn't held by anyone. It is born
+on its own at the appointed time, out of a public draw that isn't mine.
 ```
 
 ### 4 · demo
 
 ```
-Enough talking. [pause]
+[snappy] Enough talking. [pause]
 
 This is a real vote, on testnet. No organiser, no server, nobody holding a key.
 [pause]
@@ -358,12 +400,12 @@ Then they vote. From a different address, created on the spot, with nothing to
 do with the first one. The ballot proves it came from somebody on that roll,
 without saying who. [pause]
 
-Look at the two columns. Thirty people voted. Not one address appears in both.
-Not one. [pause]
+Look at the two columns. Thirty people voted. [slowly] Not one address appears
+in both. [pause] Not one. [long pause]
 
 The deadline passes and the result comes out. The wallet that tallied it never
-voted. One of the seven ballots was corrupted on purpose: it lost its own vote,
-and the other six counted.
+voted. [pause] One of the seven ballots was corrupted on purpose: it lost its
+own vote, and the other six counted.
 ```
 
 ### 5 · why Stellar
@@ -388,21 +430,21 @@ A full secret vote uses nine per cent of what fits in one transaction. And
 tallying doesn't get more expensive as more people join: from five voters to
 forty, the cost went up one and a half per cent. [pause]
 
-But here's the part I like most. [pause] You don't have to take my word for it.
-There is a separate program that pulls everything off the blockchain, redoes the
-maths from scratch and checks the result.
+[proud] But here's the part I like most. [pause] You don't have to take my word
+for it. There is a separate program that pulls everything off the blockchain,
+redoes the maths from scratch and checks the result.
 ```
 
 ### 7 · team
 
 ```
-I built this. [pause] Thais Reis. On my own. [pause]
+I built this. [pause] Thais Reis. [pause] On my own. [long pause]
 
 Twelve days. A hundred and twenty-two commits, from the protocol to the screen.
 A hundred and ninety-five tests passing. All open, MIT licence. [pause]
 
-I don't have a team to show you. I have a repository, and it has been public
-since the first commit.
+[slowly] I don't have a team to show you. [pause] I have a repository, and it
+has been public since the first commit.
 ```
 
 ### 8 · close
@@ -411,11 +453,13 @@ since the first commit.
 This isn't magic, and there is fine print. [pause] If the vote has a deadline,
 it depends on that public draw. If the draw stops, no result comes out. If
 everyone votes the same way, the result gives everyone away, same as anywhere.
-And none of this has been audited. I'm not going to say it has. [pause]
+And none of this has been audited. [slowly] I'm not going to say it has. [long
+pause]
 
 But checking a decision shouldn't cost exposing everyone's choice. [pause]
 
-The decision belongs to all of us. The choice is yours. [pause] Tessera.
+The decision belongs to all of us. [pause] The choice is yours. [long pause]
+Tessera.
 ```
 
 ## The team block, with no face
