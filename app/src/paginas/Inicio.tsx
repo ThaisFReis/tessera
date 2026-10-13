@@ -3,238 +3,78 @@ import { REDE } from "../rede";
 import { Icone } from "../ui";
 import "./inicio.css";
 
-/**
- * A porta de entrada.
- *
- * O texto daqui não pode prometer mais do que o contrato cumpre — é a mesma
- * regra que `console/guarda.py` impõe ao deck. Por isso os números vêm de
- * medição (`contrato/src/test.rs::orcamento_do_anel` e as sondas do README), e
- * os limites estão numa seção própria em vez de ficarem de fora.
- */
-
-const RISCOS = [
-  { n: "01", onde: "CONSELHO", titulo: "Quem aprova\nseu orçamento.", txt: "Você precisa votar contra quem assina o orçamento de que depende.", rotulo: "Retaliação" },
-  { n: "02", onde: "COOPERATIVA", titulo: "Quem controla\nseu crédito.", txt: "Você discorda da diretoria que decide sua próxima linha de crédito.", rotulo: "Coação" },
-  { n: "03", onde: "DAO", titulo: "Quem financia\nseu trabalho.", txt: "Você vota contra a baleia que financia o grant de que vive.", rotulo: "Conformidade" },
-];
-
-const TEMPO = [
-  { quando: "HOJE", titulo: "A cédula é cifrada.", txt: "O voto parece protegido, mas o texto cifrado continua na rede." },
-  { quando: "NA APURAÇÃO", titulo: "Alguém tem a chave.", txt: "Quem conta pode ser justamente de quem o votante precisa se proteger." },
-  { quando: "ANOS DEPOIS", titulo: "O vazamento volta no tempo.", txt: "Uma chave comprometida abre votos que já pareciam história." },
-];
-
-/* `contrato/src/test.rs::ate_quantas_pessoas_cabe_um_anel`: a chamada inteira,
-   não a assinatura sozinha. Somar o anel medido num teste com a cédula medida
-   noutro é a aritmética que o SPEC errou em 9,8%. */
-const CUSTOS = [
-  { o: "5 pessoas", i: "94.517.040", p: "23,6%" },
-  { o: "10 pessoas", i: "148.747.642", p: "37,2%" },
-  { o: "20 pessoas", i: "257.211.151", p: "64,3%" },
-  { o: "30 pessoas", i: "365.680.568", p: "91,4%" },
+const ETAPAS = [
+  { titulo: "Compareça.", texto: "Registre sua presença. Em uma votação com lista de aptos, o caderno permite conferir quem compareceu e quem faltou." },
+  { titulo: "Vote.", texto: "No modo anônimo, uma assinatura em anel prova sua participação no grupo sem identificar qual integrante enviou a cédula." },
+  { titulo: "Confira.", texto: "Com fechadura de tempo, qualquer pessoa pode apurar após o encerramento e a publicação da rodada da baliza. O dapp faz essa apuração ao abrir o resultado." },
 ];
 
 export default function Inicio() {
   return (
     <main className="landing">
-      <section className="hero">
-        <span className="eyebrow">TESSERA · STELLAR TESTNET</span>
-        <h1>Voto secreto.<br />Decisão coletiva.</h1>
-        <p className="hero-sub">
-          Um módulo de votação para contratos Soroban. Sabe-se que uma pessoa votou, e isso é
-          público e auditável. Não se sabe em que ela votou — e isso não depende de ninguém
-          cumprir uma promessa.
+      <section className="landing-hero" aria-labelledby="inicio-titulo">
+        <span className="eyebrow">VOTAÇÃO EM SOROBAN · STELLAR TESTNET</span>
+        <h1 id="inicio-titulo">Sua presença é pública.<br /><span>Sua cédula é anônima.</span></h1>
+        <p className="landing-intro">
+          Um caderno para quem participa. Uma urna para as escolhas.
+          No modo anônimo do Tessera, a prova de participação não identifica
+          quem enviou cada cédula.
         </p>
-        <div className="hero-acoes">
-          <Link className="primary-button" to="/votacoes">Ver votações abertas <Icone nome="arrow" /></Link>
-          <Link className="secondary-button" to="/demo/votar">Experimentar a cédula</Link>
+        <div className="landing-actions">
+          <Link className="primary-button" to="/demo/votar">Experimentar a cédula <Icone nome="arrow" /></Link>
+          <Link className="secondary-button" to="/votacoes">Ver votações</Link>
         </div>
-        <p className="hero-nota">
-          A prévia não escreve na rede. As votações da lista são reais, na testnet.
-        </p>
+        <p className="landing-note">Prévia sem enviar transações. Votações na rede de testes.</p>
       </section>
 
-      <section className="faixa">
-        <span className="eyebrow">01 / O PRINCÍPIO</span>
-        <h2>Uma peça guarda o segredo.<br />O conjunto revela a imagem.</h2>
-        <div className="duas">
-          <div className="painel">
-            <span className="eyebrow">COMPROMISSO INDIVIDUAL</span>
-            <p>Isolada, nenhuma escolha é legível. Um compromisso de Pedersen oculta o voto.</p>
-          </div>
-          <div className="painel">
-            <span className="eyebrow">Σ / RESULTADO COLETIVO</span>
-            <p>Somadas, uma decisão verificável. O agregado permite conferir o total declarado.</p>
-          </div>
+      <section className="landing-flow" aria-labelledby="fluxo-titulo">
+        <div className="landing-section-heading">
+          <span className="eyebrow">COMO FUNCIONA</span>
+          <h2 id="fluxo-titulo">Três passos.<br />Uma decisão coletiva.</h2>
         </div>
-        <p className="nota-faixa">
-          <em>Tessera</em>, a pastilha de um mosaico — e, no latim, também a ficha de acesso.
-          A elegibilidade faz parte do nome.
-        </p>
-      </section>
-
-      <section className="faixa">
-        <span className="eyebrow">02 / O PROBLEMA</span>
-        <h2>O voto é público.<br />O risco é pessoal.</h2>
-        <p className="faixa-sub">
-          Quando nome e escolha ficam juntos na blockchain, a exposição não termina na apuração.
-        </p>
-        <div className="tres">
-          {RISCOS.map((r) => (
-            <div className="painel" key={r.n}>
-              <span className="eyebrow">{r.n} / {r.onde}</span>
-              <h3>{r.titulo}</h3>
-              <p>{r.txt}</p>
-              <span className="selo">{r.rotulo}</span>
-            </div>
+        <ol className="landing-steps">
+          {ETAPAS.map((etapa, i) => (
+            <li key={etapa.titulo}>
+              <span className="landing-step-number" aria-hidden="true">0{i + 1}</span>
+              <div><h3>{etapa.titulo}</h3><p>{etapa.texto}</p></div>
+            </li>
           ))}
+        </ol>
+      </section>
+
+      <section className="landing-limits" aria-labelledby="limites-titulo">
+        <div className="landing-section-heading">
+          <span className="eyebrow">ANTES DE PARTICIPAR</span>
+          <h2 id="limites-titulo">O que fica público.</h2>
+          <p>A presença e o placar agregado são públicos. Um resultado unânime pode revelar as escolhas de todos.</p>
         </div>
-        <p className="equacao">NOME + ESCOLHA + REGISTRO PERMANENTE → EXPOSIÇÃO PERMANENTE</p>
-      </section>
-
-      <section className="faixa">
-        <span className="eyebrow">03 / O TEMPO É PARTE DA AMEAÇA</span>
-        <h2>O registro é permanente.<br />A chave pode vazar.</h2>
-        <div className="tres">
-          {TEMPO.map((t) => (
-            <div className="painel" key={t.quando}>
-              <span className="eyebrow">{t.quando}</span>
-              <h3>{t.titulo}</h3>
-              <p>{t.txt}</p>
-            </div>
-          ))}
-        </div>
-        <p className="destaque">Cédula de papel queima. Blockchain, não.</p>
-        <p className="faixa-sub">
-          Por isso o ledger <strong>nunca recebe um texto cifrado do voto</strong>. Ele recebe um
-          compromisso de Pedersen, <code>C = v·G + r·H</code>, que é perfeitamente ocultante:
-          matematicamente vazio de informação, contra qualquer poder computacional. Não há chave
-          que possa vazar depois, porque não existe chave.
-        </p>
-        <p className="faixa-sub">
-          Uma votação com <strong>fechadura de tempo</strong> abre uma exceção, e ela é
-          deliberada: ali o fator que esconde o voto viaja cifrado para uma rodada futura de uma
-          baliza pública. A diferença com o quadro acima é a inteira: não existe segredo durável,
-          porque a chave é <strong>publicada de propósito</strong> num instante conhecido. O que
-          está acima é "cifrado para sempre, na esperança de que a chave nunca escape". Isto é
-          cifrado <strong>até as 20:59</strong> — e é o que permite a uma assembleia sem mesa
-          nenhuma ter resultado.
-        </p>
-      </section>
-
-      <section className="faixa">
-        <span className="eyebrow">04 / O CADERNO E A URNA</span>
-        <h2>Quem faltou é público.<br />De quem é cada cédula, não.</h2>
-        <p className="faixa-sub">
-          Esconder a escolha não basta quando o remetente da cédula é o seu endereço. O voto
-          secreto resolve isso sem criptografia nenhuma: o caderno diz quem compareceu, a urna
-          diz o que foi votado, e <strong>nada liga os dois</strong>. Tessera faz o mesmo em
-          dois atos.
-        </p>
-        <div className="duas">
-          <div className="painel">
-            <span className="eyebrow">01 · COMPARECER</span>
-            <h3>Identificado, e de propósito.</h3>
-            <p>
-              Você prova que está na lista de aptos e entra no caderno com o seu endereço. É
-              público — e é exatamente isso que permite voto obrigatório, porque
-              <em> aptos − compareceram</em> é a lista de quem faltou.
-            </p>
-          </div>
-          <div className="painel">
-            <span className="eyebrow">02 · VOTAR</span>
-            <h3>De uma chave que não é a sua.</h3>
-            <p>
-              A cédula sai de uma chave de uso único, com uma assinatura em anel que prova que
-              quem assinou está entre os que compareceram — sem dizer qual deles. Uma imagem de
-              chave impede a segunda cédula da mesma pessoa.
-            </p>
-          </div>
-        </div>
-        <p className="nota-faixa">
-          O anel é a prova disjuntiva que o projeto já tinha, generalizada de 2 para <em>n</em>
-          ramos. Sem SNARK, sem cerimônia de setup, sem circuito.
-        </p>
-      </section>
-
-      <section className="faixa">
-        <span className="eyebrow">05 / MEDIDO, NÃO ESTIMADO</span>
-        <h2>Os números vêm da rede.</h2>
-        <p className="faixa-sub">
-          O teto de CPU por transação na Stellar, achado por bissecção na testnet, é de
-          400.000.000 de instruções. Um voto confidencial completo custa 36.781.170 — 9,2% de
-          uma transação. Uma cédula pública custa 350.372: <strong>o sigilo custa 105×</strong>,
-          e esse é o preço, medido.
-        </p>
-        <table className="tabela">
-          <thead><tr><th>cédula em anel, inteira</th><th>instruções</th><th>do teto</th></tr></thead>
-          <tbody>
-            {CUSTOS.map((c) => (
-              <tr key={c.o}><td>{c.o}</td><td className="num">{c.i}</td><td className="num">{c.p}</td></tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="nota-faixa">
-          A reta é <strong>40,3 M fixos + 10,85 M por pessoa</strong>. A parede aritmética fica
-          em 32 — em 33 a conta estoura. Mas 30 já consome 91,4%, e 8,6% de folga não é folga:
-          basta a pergunta ter mais opções. <strong>Vinte é a margem, não o limite</strong> — ali
-          ainda sobra um terço da transação, e é esse terço que paga uma cédula maior.
-        </p>
-      </section>
-
-      <section className="faixa">
-        <span className="eyebrow">06 / O QUE ISTO NÃO FAZ</span>
-        <h2>Confiança começa com<br />limites explícitos.</h2>
-        <div className="duas">
-          <div className="painel">
-            <span className="eyebrow">DUAS GARANTIAS DIFERENTES</span>
-            <p>
-              O compromisso é <strong>perfeitamente</strong> ocultante — não há suposição a
-              quebrar. O anonimato do anel não: ele repousa sobre um problema que se acredita
-              difícil. São garantias de naturezas distintas, e achatar as duas numa só seria
-              vender o que não existe.
-            </p>
-          </div>
-          <div className="painel">
-            <span className="eyebrow">A LISTA FICA PÚBLICA</span>
-            <p>
-              Um anel só é verificável por quem tem as chaves de todos os ramos: anonimato de
-              anel é anonimato <em>dentro de um conjunto conhecido</em>. É coerente com o voto
-              secreto, onde o eleitorado e a lista de presença são públicos e só o vínculo é
-              secreto — mas é uma troca.
-            </p>
-          </div>
-          <div className="painel">
-            <span className="eyebrow">UM ANEL DE UM NÃO ESCONDE NINGUÉM</span>
-            <p>
-              O sigilo é uma propriedade do grupo, não da matemática sozinha. Com uma pessoa só,
-              não há de quem se esconder — e a tela diz isso antes de você votar.
-            </p>
-          </div>
-          <div className="painel">
-            <span className="eyebrow">SEM MESA, NÃO HÁ APURAÇÃO</span>
-            <p>
-              Uma votação em anel não reparte com ninguém o fator que esconde o voto. Ninguém
-              pode abrir uma cédula — e, pelo mesmo motivo, ninguém pode publicar um total. O
-              sigilo é absoluto e o resultado é impossível: é o desenho, não um defeito.
-            </p>
-          </div>
+        <div className="landing-disclosures">
+          <details open>
+            <summary>O sigilo depende do modo escolhido.</summary>
+            <p>O compromisso de Pedersen oculta a escolha. Com fechadura de tempo, o conteúdo das cédulas pode ser aberto depois da rodada; o anonimato de quem as enviou depende da assinatura em anel e do tamanho do grupo. Um anel de uma pessoa não oferece anonimato.</p>
+          </details>
+          <details>
+            <summary>Como a votação é apurada?</summary>
+            <p>Com fechadura de tempo, a apuração depende da baliza drand: se ela parar, não há alternativa prevista; um conluio de um limiar dos operadores pode abrir o conteúdo antes da hora. O contrato só aceita o resultado após o fechamento. Sem fechadura, a apuração com mesa é feita pela CLI. Uma votação em anel sem mesa e sem fechadura não apura.</p>
+          </details>
+          <details>
+            <summary>Quem pode participar?</summary>
+            <p>Na votação fechada, quem organiza define a lista de aptos. Na aberta, uma pessoa pode criar várias carteiras: esse modo demonstra o sigilo, mas não garante um voto por pessoa. Os participantes do anel são públicos.</p>
+          </details>
+          <details>
+            <summary>Quais são os outros limites?</summary>
+            <p>O anonimato do anel é computacional, não perfeito. O protocolo não impede que alguém observe sua tela enquanto você vota, nem que um cliente adulterado guarde sua escolha. O projeto não foi auditado por terceiros e está na testnet.</p>
+          </details>
         </div>
       </section>
 
-      <section className="fecho">
-        <h2>O sigilo não é<br />uma promessa.</h2>
-        <p className="fecho-sub">É o desenho. Quem organiza a votação não tem como abrir a sua cédula, e nós também não.</p>
-        <div className="hero-acoes">
-          <Link className="primary-button" to="/votacoes">Ver votações <Icone nome="arrow" /></Link>
-          <Link className="secondary-button" to="/abrir">Abrir a sua</Link>
-        </div>
-        <p className="hero-nota">
-          <a href={`${REDE.explorer}/contract/${REDE.contrato}`} target="_blank" rel="noopener noreferrer">
-            contrato {REDE.contrato.slice(0, 8)}…{REDE.contrato.slice(-4)} no explorer ↗
-          </a>
-        </p>
+      <section className="landing-end" aria-labelledby="organizar-titulo">
+        <div><span className="eyebrow">PARA QUEM ORGANIZA</span><h2 id="organizar-titulo">Abra a próxima votação.</h2></div>
+        <Link className="secondary-button" to="/abrir">Organizar votação <Icone nome="arrow" /></Link>
       </section>
+      <a className="landing-contract" href={`${REDE.explorer}/contract/${REDE.contrato}`} target="_blank" rel="noopener noreferrer">
+        Conferir contrato na testnet <span>{REDE.contrato.slice(0, 8)}…{REDE.contrato.slice(-4)} ↗</span>
+      </a>
     </main>
   );
 }

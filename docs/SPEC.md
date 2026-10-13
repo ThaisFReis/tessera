@@ -433,6 +433,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 
 | ID | Título | Deps | Lê | Estado | Critérios de aceitação |
 |---|---|---|---|---|---|
+| T-029 | Corrigir e simplificar a landing do dapp | T-020 | §2, §4, §5 | review | Pedido direto de atualização da landing em 2026-10-13; texto alinhado à apuração com fechadura, limites explícitos, layout responsivo e artefato dapp regenerado. Build, testes do app, Rust, fmt, clippy e guardas passam. |
 | T-000 | Spec de trabalho e mudança do protocolo | — | — | done | `docs/SPEC.md` no formato do `CLAUDE.md`; protocolo em `PROTOCOLO.md`; 19 citações no código repontadas; portões passam |
 | T-001 | README volta a dizer a verdade | — | — | done | PR #1 |
 | T-002 | `cargo fmt` passa | T-000 | §8 | done | `cargo fmt --check` passa nos 5 crates; nenhum teste muda de resultado |
@@ -1021,6 +1022,14 @@ Hoje a landing cita "30 votantes em 3 seções" como prova de escala **sem dizer
 que a configuração recomendada para 30 pessoas é outra. Isso precisa aparecer nos
 dois lugares, e é §2: a frase que falta é que seções compram vazão pagando com
 tamanho do conjunto de anonimato. Entra em T-022 ou vira tarefa própria?
+
+---
+
+### DEC-021: Landing concisa, com limites por modo (2026-10-13, T-029)
+
+Contexto: pedido explícito de corrigir e atualizar a landing, podendo simplificá-la. A página ainda negava apuração sem mesa e trazia custos anteriores à fechadura.
+Decisão: apresentar o fluxo em três etapas, remover os custos desatualizados e explicar a apuração e os limites em divulgações nativas. CSS restrito à landing; manter as rotas e regenerar o artefato estático em `dapp/`.
+Consequências: conteúdo distingue abertura da cédula e anonimato, registra a dependência da baliza e os limites da votação aberta. Nenhuma interface do protocolo mudou.
 
 ---
 
