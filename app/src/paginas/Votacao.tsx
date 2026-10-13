@@ -8,7 +8,6 @@ import {
   ledgerAtual,
   REDE,
   lerResultado,
-  lerResultadoSecao,
   type PropostaRede,
 } from "../rede";
 import { Carregando, Estado, Icone } from "../ui";
@@ -50,11 +49,11 @@ export default function Votacao() {
           if (vivo) setAnel(por.map((a) => a.length));
         }
         const [conf] = await lerComparecimento(id);
-        // Com fechadura de tempo o placar mora por seção, e não há total
-        // agregado no contrato: `resultado()` é o caminho da mesa.
-        const r = prop?.rodada
-          ? (await lerResultadoSecao(id, 0))?.totais ?? null
-          : await lerResultado(id);
+        // Desde T-026 o placar é um só nos dois caminhos: a mesa grava
+        // `resultado()` quando o limiar fecha, e a apuração sem mesa grava a
+        // mesma chave em `publicar_resultado`. O que a seção guarda é uma
+        // contagem e um ponto — nada que se possa mostrar como placar.
+        const r = await lerResultado(id);
         if (vivo) {
           setCedulas(conf);
           setPlacar(r);

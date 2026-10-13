@@ -40,3 +40,60 @@ const q = secaoNasceuPequena(3, 1);
 assert.match(explicar(3, 1, q), /Nem com uma seção só/);
 
 console.log("seções: a divisão que nasce abaixo do piso é recusada na hora de abrir");
+
+/* ---------- §11-N: somar as seções ---------- */
+
+const { somarSecoes } = await import("../src/secoes.ts");
+
+/* Duas seções, as duas lidas agora: soma opção a opção. */
+assert.deepEqual(
+  somarSecoes(
+    [
+      { secao: 0, totais: [3, 5], abriram: 8, cedulas: 8 },
+      { secao: 1, totais: [3, 3], abriram: 6, cedulas: 6 },
+    ],
+    2,
+  ),
+  { totais: [6, 8], abriram: 14, cedulas: 14, completo: true },
+);
+
+/* Falta uma: `completo` é falso, e o que há não é apresentado como o placar. */
+assert.deepEqual(
+  somarSecoes([{ secao: 0, totais: [3, 5], abriram: 8, cedulas: 8 }], 2),
+  { totais: [3, 5], abriram: 8, cedulas: 8, completo: false },
+);
+
+/* Uma parcela veio do ledger, que não guarda o denominador: o total de cédulas
+   do conjunto some, em vez de somar 8 + 0 e mentir. */
+assert.deepEqual(
+  somarSecoes(
+    [
+      { secao: 0, totais: [3, 5], abriram: 8, cedulas: null },
+      { secao: 1, totais: [3, 3], abriram: 6, cedulas: 6 },
+    ],
+    2,
+  ),
+  { totais: [6, 8], abriram: 14, cedulas: null, completo: true },
+);
+
+/* Nenhuma seção: nada a somar, e não é um placar de zeros. */
+assert.deepEqual(somarSecoes([], 3), {
+  totais: [],
+  abriram: 0,
+  cedulas: 0,
+  completo: false,
+});
+
+/* Seções com número de opções diferente é bug de quem chamou, não um placar
+   para apresentar. */
+assert.throws(() =>
+  somarSecoes(
+    [
+      { secao: 0, totais: [1, 2], abriram: 3, cedulas: 3 },
+      { secao: 1, totais: [1, 2, 3], abriram: 6, cedulas: 6 },
+    ],
+    2,
+  ),
+);
+
+console.log("§11-N: o placar de várias seções é a soma das parcelas, e falta uma é visível");

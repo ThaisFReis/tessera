@@ -13,7 +13,7 @@ extern crate std;
 
 use super::*;
 use soroban_sdk::{
-    testutils::{Address as _, Ledger},
+    testutils::{Address as _, Events as _, Ledger},
     xdr::ToXdr,
     Bytes, BytesN, Env, Vec,
 };
@@ -3348,6 +3348,71 @@ impl Urna {
         }
         (abertas, t, a)
     }
+
+    /// **O que a seção guarda, conferido por fora.**
+    ///
+    /// Desde T-026 a seção não publica total nenhum: ela guarda `Σ Cᵢ` por
+    /// opção. Esta é a conferência que substitui a antiga leitura do placar — e
+    /// é mais forte, porque é exatamente a igualdade de que a solidez do
+    /// agregado depende: o ponto guardado tem de ser `T_j·G + R_j·H` para o
+    /// subconjunto apurado. Que um ponto de Pedersen **não** revele `T_j` a
+    /// quem não tem `R_j` é o ponto da mudança.
+    fn ponto_da_secao_e(&self, quais: &[bool], totais_esperados: &[u32]) {
+        let g = pedersen::gerador();
+        let h = ponto::desserializar(&self.cliente.gerador_h().to_array()).unwrap();
+        let mut somas = [ArkFr::from(0u64); 2];
+        let mut totais = [0u32; 2];
+        for (i, (_, rs, escolha)) in self.cedulas.iter().enumerate() {
+            if quais[i] {
+                totais[*escolha as usize] += 1;
+                for j in 0..2 {
+                    somas[j] += rs[j];
+                }
+            }
+        }
+        assert_eq!(
+            totais,
+            [totais_esperados[0], totais_esperados[1]],
+            "o cenario do teste nao e o que ele afirma"
+        );
+        let (_, pontos) = self
+            .cliente
+            .resultado_secao(&self.proposta, &0u32)
+            .expect("a secao nao foi apurada");
+        for j in 0..2 {
+            let esperado =
+                pedersen::comprometer(&g, &h, &pedersen::escalar(totais[j] as u64), &somas[j]);
+            assert_eq!(
+                pontos.get(j as u32).unwrap(),
+                g1(&self.env, &esperado),
+                "o ponto guardado da opcao {} nao e T·G + R·H",
+                j
+            );
+        }
+    }
+
+    /// `publicar_resultado`: o placar da votação, onde o número em claro mora.
+    fn publicar(
+        &self,
+        secoes: &[u32],
+        totais: &Vec<u32>,
+        aberturas: &Vec<Bls12381Fr>,
+    ) -> Result<Vec<u32>, Erro> {
+        let mut ss = Vec::new(&self.env);
+        for s in secoes {
+            ss.push_back(*s);
+        }
+        self.cliente
+            .try_publicar_resultado(
+                &self.proposta,
+                &Address::generate(&self.env),
+                &ss,
+                totais,
+                aberturas,
+            )
+            .map_err(|e| e.unwrap())
+            .map(|r| r.unwrap())
+    }
 }
 
 /// A aritmética da rodada é repetida no contrato para não arrastar o `core`
@@ -3363,18 +3428,11 @@ impl Urna {
 fn a_rodada_do_contrato_bate_com_a_do_core() {
     let u = urna_com_fechadura(&[0]);
     u.env.ledger().set_sequence_number(FECHA);
-    let (abertas, totais, aberturas) = u.apuracao(&[true]);
+    let (abertas, _, _) = u.apuracao(&[true]);
     let quem = Address::generate(&u.env);
     let tentar = || {
-        u.cliente.try_apurar_secao(
-            &u.proposta,
-            &quem,
-            &0u32,
-            &u.lista(),
-            &abertas,
-            &totais,
-            &aberturas,
-        )
+        u.cliente
+            .try_apurar_secao(&u.proposta, &quem, &0u32, &u.lista(), &abertas)
     };
 
     u.env.ledger().set_timestamp(instante(RODADA_FIM) - 1);
@@ -3458,19 +3516,12 @@ fn a_rodada_tem_de_estar_no_futuro() {
 #[test]
 fn antes_do_fechamento_nao_existe_placar() {
     let u = urna_com_fechadura(&[0, 1, 0]);
-    let (abertas, totais, aberturas) = u.apuracao(&[true, true, true]);
+    let (abertas, _, _) = u.apuracao(&[true, true, true]);
     let quem = Address::generate(&u.env);
 
     assert_eq!(
-        u.cliente.try_apurar_secao(
-            &u.proposta,
-            &quem,
-            &0u32,
-            &u.lista(),
-            &abertas,
-            &totais,
-            &aberturas
-        ),
+        u.cliente
+            .try_apurar_secao(&u.proposta, &quem, &0u32, &u.lista(), &abertas),
         Err(Ok(Erro::VotacaoAindaAberta)),
         "apurou com a janela aberta"
     );
@@ -3481,30 +3532,16 @@ fn antes_do_fechamento_nao_existe_placar() {
     u.env.ledger().set_sequence_number(FECHA);
     u.env.ledger().set_timestamp(instante(RODADA_FIM) - 1);
     assert_eq!(
-        u.cliente.try_apurar_secao(
-            &u.proposta,
-            &quem,
-            &0u32,
-            &u.lista(),
-            &abertas,
-            &totais,
-            &aberturas
-        ),
+        u.cliente
+            .try_apurar_secao(&u.proposta, &quem, &0u32, &u.lista(), &abertas),
         Err(Ok(Erro::RelogioAindaNaoAbriu))
     );
     assert_eq!(u.cliente.resultado_secao(&u.proposta, &0u32), None);
 
     u.fim();
     assert_eq!(
-        u.cliente.apurar_secao(
-            &u.proposta,
-            &quem,
-            &0u32,
-            &u.lista(),
-            &abertas,
-            &totais,
-            &aberturas
-        ),
+        u.cliente
+            .apurar_secao(&u.proposta, &quem, &0u32, &u.lista(), &abertas),
         3
     );
 }
@@ -3522,7 +3559,7 @@ fn a_cadeia_recusa_omissao_e_invencao() {
     let u = urna_com_fechadura(&[0, 1, 0]);
     u.fim();
     let quem = Address::generate(&u.env);
-    let (abertas, totais, aberturas) = u.apuracao(&[true, true, true]);
+    let (abertas, _, _) = u.apuracao(&[true, true, true]);
 
     // Omissão: a lista sai com duas cédulas em vez de três, e a contagem
     // guardada a recusa antes de qualquer hash.
@@ -3536,15 +3573,8 @@ fn a_cadeia_recusa_omissao_e_invencao() {
     duas.push_back(true);
     duas.push_back(true);
     assert_eq!(
-        u.cliente.try_apurar_secao(
-            &u.proposta,
-            &quem,
-            &0u32,
-            &curta,
-            &duas,
-            &totais,
-            &aberturas
-        ),
+        u.cliente
+            .try_apurar_secao(&u.proposta, &quem, &0u32, &curta, &duas),
         Err(Ok(Erro::ArgumentoMalFormado)),
         "contou uma seção com uma cédula omitida"
     );
@@ -3553,15 +3583,8 @@ fn a_cadeia_recusa_omissao_e_invencao() {
     let mut falsa = u.lista();
     falsa.set(0, u.lista().get(2).unwrap());
     assert_eq!(
-        u.cliente.try_apurar_secao(
-            &u.proposta,
-            &quem,
-            &0u32,
-            &falsa,
-            &abertas,
-            &totais,
-            &aberturas
-        ),
+        u.cliente
+            .try_apurar_secao(&u.proposta, &quem, &0u32, &falsa, &abertas),
         Err(Ok(Erro::CadeiaNaoFecha)),
         "aceitou um compromisso que nenhuma cédula escreveu"
     );
@@ -3576,15 +3599,8 @@ fn a_cadeia_recusa_omissao_e_invencao() {
     trocada.set(2, l.get(0).unwrap());
     trocada.set(3, l.get(1).unwrap());
     assert_eq!(
-        u.cliente.try_apurar_secao(
-            &u.proposta,
-            &quem,
-            &0u32,
-            &trocada,
-            &abertas,
-            &totais,
-            &aberturas
-        ),
+        u.cliente
+            .try_apurar_secao(&u.proposta, &quem, &0u32, &trocada, &abertas),
         Err(Ok(Erro::CadeiaNaoFecha)),
         "aceitou a lista fora da ordem em que as cédulas chegaram"
     );
@@ -3601,23 +3617,16 @@ fn a_cedula_que_nao_abre_perde_so_o_proprio_voto() {
     let quem = Address::generate(&u.env);
 
     // A primeira cédula não abre. As outras duas apuram.
-    let (abertas, totais, aberturas) = u.apuracao(&[false, true, true]);
+    let (abertas, _, _) = u.apuracao(&[false, true, true]);
     assert_eq!(
-        u.cliente.apurar_secao(
-            &u.proposta,
-            &quem,
-            &0u32,
-            &u.lista(),
-            &abertas,
-            &totais,
-            &aberturas
-        ),
+        u.cliente
+            .apurar_secao(&u.proposta, &quem, &0u32, &u.lista(), &abertas),
         2
     );
-    let (quantas, placar) = u.cliente.resultado_secao(&u.proposta, &0u32).unwrap();
-    assert_eq!(quantas, 2);
-    assert_eq!(placar.get(0).unwrap(), 0, "contou o voto que não abriu");
-    assert_eq!(placar.get(1).unwrap(), 2);
+    assert_eq!(u.cliente.resultado_secao(&u.proposta, &0u32).unwrap().0, 2);
+    // O ponto guardado é o do subconjunto que abriu — zero na opção 0, que é a
+    // da cédula que não abriu, e dois na opção 1.
+    u.ponto_da_secao_e(&[false, true, true], &[0, 2]);
 }
 
 /// **INV-21.** Omitir não gruda: só um conjunto estritamente maior substitui o
@@ -3632,29 +3641,28 @@ fn omitir_nao_gruda_e_quem_inclui_sobrepoe() {
     let qualquer = Address::generate(&u.env);
 
     // Alguém apura de propósito sem a cédula que não lhe convém.
-    let (a1, t1, ab1) = u.apuracao(&[true, true, false]);
+    let (a1, _, _) = u.apuracao(&[true, true, false]);
     assert_eq!(
         u.cliente
-            .apurar_secao(&u.proposta, &malicioso, &0u32, &u.lista(), &a1, &t1, &ab1),
+            .apurar_secao(&u.proposta, &malicioso, &0u32, &u.lista(), &a1),
         2
     );
     assert_eq!(u.cliente.resultado_secao(&u.proposta, &0u32).unwrap().0, 2);
 
     // Qualquer observador honesto sobrepõe incluindo-a.
-    let (a2, t2, ab2) = u.apuracao(&[true, true, true]);
+    let (a2, _, _) = u.apuracao(&[true, true, true]);
     assert_eq!(
         u.cliente
-            .apurar_secao(&u.proposta, &qualquer, &0u32, &u.lista(), &a2, &t2, &ab2),
+            .apurar_secao(&u.proposta, &qualquer, &0u32, &u.lista(), &a2),
         3
     );
-    let (quantas, placar) = u.cliente.resultado_secao(&u.proposta, &0u32).unwrap();
-    assert_eq!(quantas, 3);
-    assert_eq!(placar.get(1).unwrap(), 2);
+    assert_eq!(u.cliente.resultado_secao(&u.proposta, &0u32).unwrap().0, 3);
+    u.ponto_da_secao_e(&[true, true, true], &[1, 2]);
 
     // E a apuração menor não volta a colar.
     assert_eq!(
         u.cliente
-            .try_apurar_secao(&u.proposta, &malicioso, &0u32, &u.lista(), &a1, &t1, &ab1),
+            .try_apurar_secao(&u.proposta, &malicioso, &0u32, &u.lista(), &a1),
         Err(Ok(Erro::NaoMelhora))
     );
 }
@@ -3670,16 +3678,14 @@ fn sabotar_o_proprio_criptograma_nao_derruba_o_piso() {
     // criptograma; uma abre.
     let u = urna_com_fechadura(&[0, 1, 1, 0, 1, 0]);
     u.fim();
-    let (abertas, totais, aberturas) = u.apuracao(&[true, false, false, false, false, false]);
+    let (abertas, _, _) = u.apuracao(&[true, false, false, false, false, false]);
     assert_eq!(
         u.cliente.apurar_secao(
             &u.proposta,
             &Address::generate(&u.env),
             &0u32,
             &u.lista(),
-            &abertas,
-            &totais,
-            &aberturas
+            &abertas
         ),
         1,
         "uma coligação travou o placar sabotando o próprio voto"
@@ -3687,28 +3693,45 @@ fn sabotar_o_proprio_criptograma_nao_derruba_o_piso() {
     assert_eq!(u.cliente.resultado_secao(&u.proposta, &0u32).unwrap().0, 1);
 }
 
-/// Um total que não abre o subconjunto apresentado é recusado na hora, como
-/// sempre foi. A solidez não mudou: a prova CDS já garantiu `v ∈ {0,1}` em cada
-/// compromisso, então a equação sobre o subconjunto força `T = Σvᵢ`.
+/// Um total que não abre o subconjunto apresentado é recusado — e desde T-026
+/// isso acontece em `publicar_resultado`, não em `apurar_secao`.
+///
+/// A seção não afirma mais número nenhum: ela guarda `Σ Cᵢ`. Então não há mais
+/// nada ali para mentir, e a conferência passou inteira para a transação que
+/// publica o placar. A solidez não mudou: a prova CDS já garantiu `v ∈ {0,1}`
+/// em cada compromisso na hora do voto, então a equação sobre o agregado força
+/// `T_j = Σvᵢ`.
 #[test]
 fn o_total_que_mente_sobre_o_subconjunto_e_recusado() {
-    let u = urna_com_fechadura(&[0, 1, 1]);
+    // Seis cédulas, que é o mínimo para passar do piso agregado de τ = 5 e o
+    // teste chegar à conta em vez de parar no quórum.
+    let u = urna_com_fechadura(&[0, 1, 1, 0, 1, 1]);
     u.fim();
-    let (abertas, _, aberturas) = u.apuracao(&[true, true, true]);
-    let mut mentira = Vec::new(&u.env);
-    mentira.push_back(3u32);
-    mentira.push_back(0u32);
+    let (abertas, totais, aberturas) = u.apuracao(&[true; 6]);
     assert_eq!(
-        u.cliente.try_apurar_secao(
+        u.cliente.apurar_secao(
             &u.proposta,
             &Address::generate(&u.env),
             &0u32,
             &u.lista(),
-            &abertas,
-            &mentira,
-            &aberturas
+            &abertas
         ),
-        Err(Ok(Erro::AberturaNaoFecha))
+        6,
+        "a secao recusou a apuracao honesta"
+    );
+
+    // O total verdadeiro é (2, 4). Mentir mantendo a soma não abre.
+    let mut mentira = Vec::new(&u.env);
+    mentira.push_back(6u32);
+    mentira.push_back(0u32);
+    assert_eq!(
+        u.publicar(&[0], &mentira, &aberturas),
+        Err(Erro::AberturaNaoFecha)
+    );
+    // E o verdadeiro abre.
+    assert_eq!(
+        u.publicar(&[0], &totais, &aberturas),
+        Ok(Vec::from_array(&u.env, [2, 4]))
     );
 }
 
@@ -3746,9 +3769,14 @@ fn o_criptograma_tem_de_ter_a_forma_declarada() {
 /// **O custo da apuração por seção, medido.** Ela é O(n) em cédulas: `n`
 /// hashes e `n` somas em G1, mais **um** MSM de dois termos por opção.
 ///
-/// Medido: **12.550.031 para 6 cédulas e 14.066.366 para 12** — ou seja
-/// 11.033.699 fixos mais **252.722 por cédula**. Uma seção de 30 custaria
-/// 18,6 milhões, 4,6% do teto de 400.000.000.
+/// Medido, com os números deste teste impressos a cada `cargo test`: ver a
+/// linha `apurar_secao:` na saída. A fórmula fica em `docs/SOURCES.md` com a
+/// data — aqui o teste prende a **ordem de grandeza**, o crescimento linear e a
+/// inclinação por cédula, que é o que extrapola para a seção cheia.
+///
+/// Desde T-026 a seção não faz mais MSM: ela soma os compromissos abertos e
+/// guarda o ponto. O MSM passou para `publicar_resultado`, medido no fim deste
+/// mesmo teste.
 ///
 /// É três ordens de grandeza abaixo do voto, que gasta 10.822.850 por membro do
 /// anel. Então a apuração **não** é o que limita o tamanho da seção: quem limita
@@ -3760,6 +3788,8 @@ fn orcamento_da_apuracao_por_secao() {
     let seis = urna_com_fechadura(&[0, 1, 1, 0, 1, 0]);
     seis.fim();
     let (a6, t6, ab6) = seis.apuracao(&[true; 6]);
+    let _ = (&t6, &ab6);
+
     let l6 = seis.lista();
     let c6 = cpu(&seis.env, || {
         seis.cliente.apurar_secao(
@@ -3768,8 +3798,6 @@ fn orcamento_da_apuracao_por_secao() {
             &0u32,
             &l6,
             &a6,
-            &t6,
-            &ab6,
         )
     });
 
@@ -3784,8 +3812,6 @@ fn orcamento_da_apuracao_por_secao() {
             &0u32,
             &l12,
             &a12,
-            &t12,
-            &ab12,
         )
     });
 
@@ -3808,6 +3834,24 @@ fn orcamento_da_apuracao_por_secao() {
     assert!(
         por_cedula < 400_000,
         "cada cédula passou a custar {por_cedula} na apuração"
+    );
+
+    // **E a transação a mais, que é o que T-026 acrescentou.** Ela não depende
+    // do número de cédulas: lê um ponto por seção nomeada, soma-os e faz um MSM
+    // de dois termos por opção. O que a faz crescer é o número de **seções**.
+    let cp = cpu(&doze.env, || {
+        doze.cliente.publicar_resultado(
+            &doze.proposta,
+            &Address::generate(&doze.env),
+            &Vec::from_array(&doze.env, [0u32]),
+            &t12,
+            &ab12,
+        )
+    });
+    std::println!("publicar_resultado: 1 seção {cp}");
+    assert!(
+        cp < 100_000_000,
+        "publicar o placar custou {cp}, perto demais do teto"
     );
 }
 
@@ -4028,12 +4072,24 @@ struct UrnaDoNavegador {
     cliente: TesseraClient<'static>,
     proposta: BytesN<32>,
     h_hex: std::string::String,
-    /// Por cédula, na ordem da cadeia: os compromissos em hexadecimal e o
-    /// criptograma concatenado. É exatamente o que o evento carrega.
-    cedulas: Vetor<(Vetor<std::string::String>, std::string::String)>,
+    secoes: u32,
+    /// Por cédula, na ordem da cadeia **dentro da seção**: a seção **lida do
+    /// tópico do evento**, os compromissos em hexadecimal e o criptograma
+    /// concatenado. É exatamente o que quem apura tem, e nada mais.
+    cedulas: Vetor<(u32, Vetor<std::string::String>, std::string::String)>,
 }
 
 fn urna_do_navegador(escolhas: &[u32]) -> UrnaDoNavegador {
+    urna_em_secoes(escolhas, 1)
+}
+
+/// O mesmo cenário da fechadura, em `secoes` seções.
+///
+/// Com mais de uma seção a divisão vem da baliza (DEC-012), então a proposta
+/// nasce com `rodada_abertura` e alguém registra a assinatura antes de o
+/// caderno abrir — é a ordem que o contrato exige. Cada seção tem o seu anel, e
+/// a cédula é assinada contra o anel da seção de quem a monta.
+fn urna_em_secoes(escolhas: &[u32], secoes: u32) -> UrnaDoNavegador {
     use tessera_cliente::{anonima, PerguntaJs};
     use tessera_core::anel;
 
@@ -4071,11 +4127,15 @@ fn urna_do_navegador(escolhas: &[u32]) -> UrnaDoNavegador {
         &ABRE,
         &FECHA,
         &true,
-        &1u32,
+        &secoes,
         &0u32,
         &RODADA_FIM,
-        &0u64,
+        &if secoes == 1 { 0 } else { RODADA_ABERTURA },
     );
+    if secoes > 1 {
+        env.ledger().set_timestamp(instante(RODADA_ABERTURA));
+        cliente.registrar_abertura(&proposta, &assinatura_host(&env));
+    }
 
     let g = pedersen::gerador();
     let h_hex = ponto::para_hex(&ponto::desserializar(&cliente.gerador_h().to_array()).unwrap());
@@ -4083,6 +4143,19 @@ fn urna_do_navegador(escolhas: &[u32]) -> UrnaDoNavegador {
 
     let xs: Vetor<ArkFr> = (0..n).map(|_| pedersen::acaso_fr().unwrap()).collect();
     let anel_ark: Vetor<ArkG1> = xs.iter().map(|x| anel::chave_publica(&g, x)).collect();
+    // A seção de cada um sai da baliza, não da nossa escolha — e o contrato
+    // confere: declarar outra leva `SecaoInvalida`. Com uma seção só, é zero
+    // para todos.
+    let minha_secao: Vetor<u32> = if secoes == 1 {
+        std::vec![0; n]
+    } else {
+        let xdrs: Vetor<Vetor<u8>> = aptos
+            .iter()
+            .map(|a| bytes_de(&a.clone().to_xdr(&env)))
+            .collect();
+        merkle::dividir(&assinatura_em_bytes(), &xdrs, secoes)
+    };
+    let mut aneis: Vetor<Vetor<ArkG1>> = (0..secoes).map(|_| Vetor::new()).collect();
     for (i, pk) in anel_ark.iter().enumerate() {
         let c = arvore.caminho(i).unwrap();
         let mut irmaos = Vec::new(&env);
@@ -4095,16 +4168,26 @@ fn urna_do_navegador(escolhas: &[u32]) -> UrnaDoNavegador {
             &g1(&env, pk),
             &irmaos,
             &c.indice,
-            &0u32,
+            &minha_secao[i],
         );
+        aneis[minha_secao[i] as usize].push(*pk);
     }
     env.ledger().set_sequence_number(ABRE + 10);
 
-    let anel_hex: Vetor<std::string::String> = anel_ark.iter().map(ponto::para_hex).collect();
-    let mut anel_sdk: Vec<Bls12381G1Affine> = Vec::new(&env);
-    for p in &anel_ark {
-        anel_sdk.push_back(g1(&env, p));
-    }
+    let aneis_hex: Vetor<Vetor<std::string::String>> = aneis
+        .iter()
+        .map(|a| a.iter().map(ponto::para_hex).collect())
+        .collect();
+    let aneis_sdk: Vetor<Vec<Bls12381G1Affine>> = aneis
+        .iter()
+        .map(|a| {
+            let mut v: Vec<Bls12381G1Affine> = Vec::new(&env);
+            for p in a {
+                v.push_back(g1(&env, p));
+            }
+            v
+        })
+        .collect();
     let perguntas_js = [PerguntaJs {
         opcoes: 2,
         confidencial: true,
@@ -4116,12 +4199,17 @@ fn urna_do_navegador(escolhas: &[u32]) -> UrnaDoNavegador {
             .iter()
             .map(|b| std::format!("{:02x}", b))
             .collect();
+        let secao = minha_secao[i];
+        let dentro = aneis[secao as usize]
+            .iter()
+            .position(|p| *p == anel_ark[i])
+            .expect("a chave do anel nao esta no anel da propria secao");
         let a = anonima(
             &ponto_hex(&proposta.to_array()),
             &ponto::para_hex(&hp),
             &h_hex,
-            &anel_hex,
-            i,
+            &aneis_hex[secao as usize],
+            dentro,
             &segredo,
             &perguntas_js,
             &[escolha],
@@ -4167,8 +4255,8 @@ fn urna_do_navegador(escolhas: &[u32]) -> UrnaDoNavegador {
         }
         cliente.votar_anonimo(
             &proposta,
-            &0u32,
-            &anel_sdk,
+            &secao,
+            &aneis_sdk[secao as usize],
             &g1(&env, &ponto::de_hex(&a.imagem).unwrap()),
             &escalar(&env, &pedersen::fr_de_bytes_be(&hex_bytes(&a.c0))),
             &z_sdk,
@@ -4178,7 +4266,15 @@ fn urna_do_navegador(escolhas: &[u32]) -> UrnaDoNavegador {
             &Vec::new(&env),
             &cripto_sdk,
         );
-        cedulas.push((c.compromissos.clone(), c.cripto.clone()));
+        // **A seção sai do evento, não da nossa variável.** É o §11-N: quem
+        // apura só tem os eventos, e se o tópico não disser a seção, não há de
+        // onde tirá-la. Ler aqui é o que faz o teste falhar antes da mudança.
+        let (topicos, _) = ultimo(&env);
+        let do_evento = match topicos.get(2) {
+            Some(soroban_sdk::xdr::ScVal::U32(x)) => *x,
+            _ => std::panic!("o topico do anonimo nao diz a secao: {:?}", topicos),
+        };
+        cedulas.push((do_evento, c.compromissos.clone(), c.cripto.clone()));
     }
 
     UrnaDoNavegador {
@@ -4186,6 +4282,7 @@ fn urna_do_navegador(escolhas: &[u32]) -> UrnaDoNavegador {
         cliente,
         proposta,
         h_hex,
+        secoes,
         cedulas,
     }
 }
@@ -4199,43 +4296,50 @@ impl UrnaDoNavegador {
     /// Os compromissos de todas as cédulas, achatados na ordem da cadeia — o
     /// que quem apura junta lendo os eventos.
     fn compromissos(&self) -> Vetor<std::string::String> {
-        self.cedulas
-            .iter()
-            .flat_map(|(cs, _)| cs.iter().cloned())
-            .collect()
+        self.compromissos_de(0)
     }
 
     fn criptos(&self) -> Vetor<std::string::String> {
-        self.cedulas.iter().map(|(_, c)| c.clone()).collect()
+        self.criptos_de(0)
+    }
+
+    fn compromissos_de(&self, secao: u32) -> Vetor<std::string::String> {
+        self.cedulas
+            .iter()
+            .filter(|(s, _, _)| *s == secao)
+            .flat_map(|(_, cs, _)| cs.iter().cloned())
+            .collect()
+    }
+
+    fn criptos_de(&self, secao: u32) -> Vetor<std::string::String> {
+        self.cedulas
+            .iter()
+            .filter(|(s, _, _)| *s == secao)
+            .map(|(_, _, c)| c.clone())
+            .collect()
     }
 
     /// Entrega ao contrato o que a decifragem reconstruiu.
     fn apurar(&self, a: &tessera_cliente::AberturaJs) -> Result<u32, Erro> {
+        self.apurar_secao(0, a)
+    }
+
+    fn apurar_secao(&self, secao: u32, a: &tessera_cliente::AberturaJs) -> Result<u32, Erro> {
         let mut abertas = Vec::new(&self.env);
         for b in &a.abertas {
             abertas.push_back(*b);
         }
         let mut compr = Vec::new(&self.env);
-        for c in self.compromissos() {
+        for c in self.compromissos_de(secao) {
             compr.push_back(g1(&self.env, &ponto::de_hex(&c).unwrap()));
-        }
-        let mut totais = Vec::new(&self.env);
-        for t in &a.totais {
-            totais.push_back(*t);
-        }
-        let mut aberturas = Vec::new(&self.env);
-        for x in &a.aberturas {
-            aberturas.push_back(escalar(&self.env, &pedersen::fr_de_bytes_be(&hex_bytes(x))));
         }
         self.cliente
             .try_apurar_secao(
                 &self.proposta,
                 &Address::generate(&self.env),
-                &0u32,
+                &secao,
                 &compr,
                 &abertas,
-                &totais,
-                &aberturas,
             )
             .map_err(|e| e.unwrap())
             .map(|r| r.unwrap())
@@ -4252,7 +4356,9 @@ impl UrnaDoNavegador {
 /// `anonima()`, sai cifrado, e volta pela assinatura da baliza.
 #[test]
 fn o_navegador_cifra_a_cedula_e_qualquer_pessoa_apura() {
-    let u = urna_do_navegador(&[0, 1, 1, 1]);
+    // Seis cédulas: o piso agregado de τ = 5 é parte do ciclo desde T-026, e
+    // um ciclo que para no quórum não prova que ele fecha.
+    let u = urna_do_navegador(&[0, 1, 1, 1, 0, 1]);
     u.fim();
 
     let a = tessera_cliente::abertura(
@@ -4265,18 +4371,32 @@ fn o_navegador_cifra_a_cedula_e_qualquer_pessoa_apura() {
     )
     .expect("a abertura da secao falhou");
 
-    assert_eq!(a.abriram, 4, "todas as quatro cedulas tinham de abrir");
-    assert_eq!(a.cedulas, 4);
+    assert_eq!(a.abriram, 6, "todas as seis cedulas tinham de abrir");
+    assert_eq!(a.cedulas, 6);
     assert_eq!(
         a.totais,
-        std::vec![1, 3],
-        "a decifragem leu um voto na primeira opcao e tres na segunda"
+        std::vec![2, 4],
+        "a decifragem leu dois votos na primeira opcao e quatro na segunda"
     );
 
-    assert_eq!(u.apurar(&a), Ok(4), "o contrato recusou o placar decifrado");
+    // A seção aceita a lista e o bitmap, e guarda uma contagem e um ponto.
     assert_eq!(
-        u.cliente.resultado_secao(&u.proposta, &0u32),
-        Some((4, Vec::from_array(&u.env, [1, 3])))
+        u.apurar(&a),
+        Ok(6),
+        "o contrato recusou a apuracao da secao"
+    );
+    assert_eq!(u.cliente.resultado_secao(&u.proposta, &0u32).unwrap().0, 6);
+
+    // E o placar sai da transação que soma — o único lugar em que um número de
+    // voto aparece no ledger (T-026, DEC-017).
+    let (totais, rs) = u.agregado(std::slice::from_ref(&a));
+    assert_eq!(
+        u.publicar(&[0], &totais, &rs),
+        Ok(Vec::from_array(&u.env, [2, 4]))
+    );
+    assert_eq!(
+        u.cliente.resultado(&u.proposta),
+        Some(Vec::from_array(&u.env, [2, 4]))
     );
 
     std::println!("\n== T-019: O CICLO DA FECHADURA ==");
@@ -4353,5 +4473,612 @@ fn a_assinatura_de_outra_rodada_nao_abre_a_secao() {
         )
         .map(|a| a.abriram),
         Ok(2)
+    );
+}
+
+// ===================== T-012: o formato dos eventos =====================
+//
+// Antes desta seção o formato do evento era interface congelada (§5) **sem um
+// único teste**. O dapp lê `topic[0]` como o nome e `topic[1]` como a proposta,
+// e `rede.ts` desempacota o dado posicionalmente — então a migração para
+// `#[contractevent]`, que muda a forma dos tópicos por omissão, podia apagar a
+// lista de votações sem quebrar nenhum `cargo test`.
+//
+// Estes testes gravam os bytes de hoje. A migração é correta se eles passarem
+// sem mudar uma linha.
+
+/// Os eventos da última invocação, em ScVal cru: tópicos e dado.
+fn eventos_crus(env: &Env) -> Vetor<(Vetor<soroban_sdk::xdr::ScVal>, soroban_sdk::xdr::ScVal)> {
+    use soroban_sdk::xdr::ContractEventBody;
+    env.events()
+        .all()
+        .events()
+        .iter()
+        .map(|e| {
+            let ContractEventBody::V0(c) = &e.body;
+            (c.topics.to_vec(), c.data.clone())
+        })
+        .collect()
+}
+
+/// Um `ScVal` a partir de qualquer valor do SDK, para comparar byte a byte.
+fn scv<V: soroban_sdk::IntoVal<Env, soroban_sdk::Val>>(env: &Env, v: V) -> soroban_sdk::xdr::ScVal {
+    use soroban_sdk::TryFromVal;
+    soroban_sdk::xdr::ScVal::try_from_val(env, &v.into_val(env))
+        .expect("o valor nao converte para ScVal")
+}
+
+fn sim(s: &str) -> soroban_sdk::Symbol {
+    soroban_sdk::Symbol::new(&Env::default(), s)
+}
+
+/// O último evento da invocação que acabou de rodar.
+fn ultimo(env: &Env) -> (Vetor<soroban_sdk::xdr::ScVal>, soroban_sdk::xdr::ScVal) {
+    eventos_crus(env)
+        .pop()
+        .expect("a invocacao nao publicou evento nenhum")
+}
+
+/// **`votar`, `endosso` e `apurar`: tópicos e dado, byte a byte.**
+#[test]
+fn o_formato_dos_eventos_do_caminho_identificado_esta_congelado() {
+    let c = montar(16);
+    let e = &c.env;
+
+    // --- votar ---
+    let mut soma = [ArkFr::from(0u64); OPCOES as usize];
+    let escolhas = [0u32, 0, 1, 0, 1, 0];
+    for (i, x) in escolhas.iter().enumerate() {
+        let rs = c.votar(i, *x);
+        for j in 0..OPCOES as usize {
+            soma[j] += rs[j];
+        }
+    }
+    let (t, d) = ultimo(e);
+    assert_eq!(
+        t,
+        std::vec![
+            scv(e, sim("votar")),
+            scv(e, c.proposta.clone()),
+            scv(e, c.aptos[5].clone())
+        ],
+        "o dapp le topic[0] como o nome e topic[1] como a proposta"
+    );
+    match &d {
+        soroban_sdk::xdr::ScVal::Vec(Some(v)) => {
+            assert_eq!(v.len(), 2, "votar carrega compromissos e escolhas");
+            assert!(matches!(v[0], soroban_sdk::xdr::ScVal::Vec(_)));
+            assert!(matches!(v[1], soroban_sdk::xdr::ScVal::Vec(_)));
+        }
+        outro => std::panic!("votar tinha de publicar um Vec, veio {:?}", outro),
+    }
+
+    // --- endosso, abaixo do limiar ---
+    let mut totais = Vec::new(e);
+    let mut aberturas = Vec::new(e);
+    for j in 0..OPCOES as usize {
+        totais.push_back(if j == 0 { 4u32 } else { 2u32 });
+        aberturas.push_back(escalar(e, &soma[j]));
+    }
+    e.ledger().set_sequence_number(FECHA_EM + 1);
+
+    assert_eq!(c.endossar_um(0, &totais, &aberturas).unwrap(), None);
+    let (t, d) = ultimo(e);
+    assert_eq!(
+        t,
+        std::vec![
+            scv(e, sim("endosso")),
+            scv(e, c.proposta.clone()),
+            scv(e, c.mesa[0].clone())
+        ]
+    );
+    match &d {
+        soroban_sdk::xdr::ScVal::Vec(Some(v)) => {
+            assert_eq!(v.len(), 3, "endosso carrega digest, quantos e limiar")
+        }
+        outro => std::panic!("endosso tinha de publicar um Vec, veio {:?}", outro),
+    }
+
+    // --- apurar, quando o limiar fecha ---
+    c.endossar_um(1, &totais, &aberturas).unwrap();
+    c.endossar_um(2, &totais, &aberturas).unwrap().unwrap();
+    let evs = eventos_crus(e);
+    let (t, d) = evs.last().unwrap().clone();
+    assert_eq!(
+        t,
+        std::vec![scv(e, sim("apurar")), scv(e, c.proposta.clone())],
+        "o apurar da mesa nao carrega endereco no topico"
+    );
+    match &d {
+        soroban_sdk::xdr::ScVal::Vec(Some(v)) => {
+            assert_eq!(v.len(), 3, "apurar carrega totais, aberturas e o resultado")
+        }
+        outro => std::panic!("apurar tinha de publicar um Vec, veio {:?}", outro),
+    }
+}
+
+/// **`abrir`, `comparec`, `anonimo`, `apursec` e `abertura`.**
+///
+/// São os cinco que o dapp e o verificador leem. O `anonimo` é o mais
+/// sensível: `rede.ts` desempacota o dado **por posição**
+/// (`[imagem, compromissos, escolhas, cripto]`), então a ordem dos campos é
+/// interface congelada tanto quanto o nome.
+#[test]
+fn o_formato_dos_eventos_do_caminho_anonimo_esta_congelado() {
+    let u = urna_do_navegador(&[0, 1]);
+    let e = &u.env;
+
+    // --- anonimo: o último evento é a última cédula ---
+    let (t, d) = ultimo(e);
+    assert_eq!(
+        t,
+        std::vec![
+            scv(e, sim("anonimo")),
+            scv(e, u.proposta.clone()),
+            scv(e, 0u32)
+        ],
+        "o anonimo carrega a secao e NENHUM endereco — §11-N"
+    );
+    match &d {
+        soroban_sdk::xdr::ScVal::Vec(Some(v)) => {
+            assert_eq!(v.len(), 4, "imagem, compromissos, escolhas, cripto");
+            assert!(
+                matches!(v[0], soroban_sdk::xdr::ScVal::Bytes(_)),
+                "a imagem de chave e o primeiro campo"
+            );
+            assert!(matches!(v[1], soroban_sdk::xdr::ScVal::Vec(_)));
+            assert!(matches!(v[2], soroban_sdk::xdr::ScVal::Vec(_)));
+            assert!(
+                matches!(v[3], soroban_sdk::xdr::ScVal::Bytes(_)),
+                "o criptograma e o ultimo campo"
+            );
+        }
+        outro => std::panic!("anonimo tinha de publicar um Vec, veio {:?}", outro),
+    }
+
+    // --- apursec ---
+    u.fim();
+    let a = tessera_cliente::abertura(
+        &u.compromissos(),
+        &u.criptos(),
+        2,
+        &u.h_hex,
+        RODADA_FIM,
+        ASSINATURA_FIM,
+    )
+    .expect("a abertura da secao falhou");
+    assert_eq!(u.apurar(&a), Ok(2));
+    let (t, d) = ultimo(e);
+    assert_eq!(
+        t,
+        std::vec![
+            scv(e, sim("apursec")),
+            scv(e, u.proposta.clone()),
+            scv(e, 0u32)
+        ],
+        "o apursec diz a secao no topico — e o unico que diz"
+    );
+    match &d {
+        soroban_sdk::xdr::ScVal::Vec(Some(v)) => assert_eq!(
+            v.len(),
+            2,
+            "quantas_abertas e quantas — e **nenhum placar**, desde T-026"
+        ),
+        outro => std::panic!("apursec tinha de publicar um Vec, veio {:?}", outro),
+    }
+}
+
+/// **`abrir`, `abertura` e `comparec`.** O primeiro é o que monta a lista de
+/// votações no dapp; os outros dois são o caderno.
+#[test]
+fn o_formato_dos_eventos_do_caderno_esta_congelado() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(4_989_900);
+    env.ledger().set_timestamp(t0());
+    let id = env.register(Tessera, ());
+    let cliente = TesseraClient::new(&env, &id);
+    let e = &env;
+
+    let apto = Address::generate(e);
+    let folhas: Vetor<merkle::Apto> = std::vec![merkle::Apto {
+        endereco: bytes_de(&apto.clone().to_xdr(e)),
+        peso: 1,
+    }];
+    let arvore = merkle::Arvore::montar(&folhas).unwrap();
+    let proposta: BytesN<32> = BytesN::from_array(e, &[9u8; 32]);
+    let mut perg = Vec::new(e);
+    perg.push_back(Pergunta {
+        opcoes: 2,
+        confidencial: true,
+    });
+
+    // --- abrir ---
+    cliente.abrir(
+        &Address::generate(e),
+        &proposta,
+        &perg,
+        &BytesN::from_array(e, &arvore.raiz()),
+        &Vec::new(e),
+        &0u32,
+        &4_989_990u32,
+        &4_990_190u32,
+        &true,
+        &1u32,
+        &0u32,
+        &0u64,
+        &RODADA_ABERTURA,
+    );
+    let (t, d) = ultimo(e);
+    assert_eq!(
+        t,
+        std::vec![scv(e, sim("abrir")), scv(e, proposta.clone())],
+        "e por este topico que o dapp lista as votacoes"
+    );
+    match &d {
+        soroban_sdk::xdr::ScVal::Vec(Some(v)) => assert_eq!(
+            v.len(),
+            7,
+            "n_perguntas, conf_opcoes, abre_em, fecha_em, limiar, anel, secoes"
+        ),
+        outro => std::panic!("abrir tinha de publicar um Vec, veio {:?}", outro),
+    }
+
+    // --- abertura: dado de valor único, não Vec ---
+    env.ledger().set_timestamp(instante(RODADA_ABERTURA));
+    cliente.registrar_abertura(&proposta, &assinatura_host(e));
+    let (t, d) = ultimo(e);
+    assert_eq!(
+        t,
+        std::vec![scv(e, sim("abertura")), scv(e, proposta.clone())]
+    );
+    assert_eq!(
+        d,
+        scv(e, RODADA_ABERTURA),
+        "o abertura carrega a rodada crua, sem Vec em volta"
+    );
+
+    // --- comparec ---
+    let caminho = {
+        let c = arvore.caminho(0).unwrap();
+        let mut v = Vec::new(e);
+        for irmao in &c.irmaos {
+            v.push_back(BytesN::from_array(e, irmao));
+        }
+        v
+    };
+    cliente.comparecer(
+        &proposta,
+        &apto,
+        &g1(e, &pedersen::gerador()),
+        &caminho,
+        &0u32,
+        &0u32,
+    );
+    let (t, d) = ultimo(e);
+    assert_eq!(
+        t,
+        std::vec![
+            scv(e, sim("comparec")),
+            scv(e, proposta.clone()),
+            scv(e, apto.clone())
+        ]
+    );
+    match &d {
+        soroban_sdk::xdr::ScVal::Vec(Some(v)) => {
+            assert_eq!(v.len(), 2, "comparec carrega secao e tamanho")
+        }
+        outro => std::panic!("comparec tinha de publicar um Vec, veio {:?}", outro),
+    }
+}
+
+/// **§11-N: quem apura separa as seções lendo só o ledger.**
+///
+/// Antes desta mudança o tópico do `anonimo` era `(anonimo, proposta)`, e com
+/// várias seções quem lia os eventos não tinha como dizer de que seção era cada
+/// cédula — nem por tentativa e erro, que são 3³⁰ partições numa rodada de 30
+/// em 3. A informação não estava no ledger em lugar nenhum: o criptograma não
+/// diz, a assinatura em anel não diz (é o ponto dela), e a cadeia é sequencial.
+///
+/// Agora o tópico é `(anonimo, proposta, secao)`, e isto é o teste de que a
+/// apuração de várias seções fecha com o que o ledger publica. **Não revela
+/// nada novo:** `secao_de` já é um getter, o anel de cada seção já é público, e
+/// votar já exige declarar a seção na própria chamada.
+#[test]
+fn a_apuracao_de_varias_secoes_separa_as_cedulas_pelo_evento() {
+    let u = urna_em_secoes(&[0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1], 2);
+    let e = &u.env;
+    assert_eq!(u.secoes, 2);
+
+    // Cada seção tem anel acima de τ — senão o contrato teria recusado a
+    // cédula, e o teste estaria passando por outro motivo.
+    let mut quantas: Vetor<u32> = std::vec![0; u.secoes as usize];
+    for (s, _, _) in &u.cedulas {
+        quantas[*s as usize] += 1;
+    }
+    std::println!(
+        "\n== §11-N: {} cedulas em {:?} ==",
+        u.cedulas.len(),
+        quantas
+    );
+    for s in 0..u.secoes {
+        assert!(
+            u.cliente.anel(&u.proposta, &s).len() >= TAU,
+            "a secao {} nasceu abaixo de τ e o teste nao prova nada",
+            s
+        );
+        // O getter novo: quantas cédulas a cadeia daquela seção registrou.
+        // Sem ele, quem lê os eventos não sabe se achou todas.
+        let (_, n) = u.cliente.cadeia(&u.proposta, &s);
+        assert_eq!(
+            n, quantas[s as usize],
+            "a cadeia da secao {} nao bate com o que os eventos mostraram",
+            s
+        );
+    }
+
+    // E agora o que §11-N bloqueava: apurar **cada** seção, com a lista
+    // ordenada que saiu dos eventos daquela seção.
+    u.fim();
+    let mut placar = [0u32; 2];
+    for s in 0..u.secoes {
+        let a = tessera_cliente::abertura(
+            &u.compromissos_de(s),
+            &u.criptos_de(s),
+            2,
+            &u.h_hex,
+            RODADA_FIM,
+            ASSINATURA_FIM,
+        )
+        .expect("a abertura da secao falhou");
+        assert_eq!(a.cedulas, quantas[s as usize]);
+        assert_eq!(a.abriram, quantas[s as usize], "todas tinham de abrir");
+        assert_eq!(
+            u.apurar_secao(s, &a),
+            Ok(quantas[s as usize]),
+            "o contrato recusou o placar da secao {}",
+            s
+        );
+        for j in 0..2 {
+            placar[j] += a.totais[j];
+        }
+        std::println!("secao {} .......... {:?}", s, a.totais);
+    }
+
+    // 6 zeros e 8 uns na lista acima.
+    assert_eq!(
+        placar,
+        [6, 8],
+        "a soma das secoes nao e o placar da votacao"
+    );
+    let _ = e;
+}
+
+// ===================== T-026: o texto claro sai da seção =====================
+//
+// A DEC-017 declarou o vazamento: `apurar_secao` publicava o total **daquela
+// seção** em claro, e numa seção unânime isso é o voto de cada membro dela. A
+// resposta foi declarar agora e consertar na estrutura — é este bloco.
+//
+// Agora a seção guarda `(quantas abriram, Σ compromissos abertos)`: uma
+// contagem e um ponto por opção, e ponto de Pedersen é perfeitamente ocultante.
+// O placar sai de uma transação a mais, `publicar_resultado`, que soma os
+// pontos das seções nomeadas e faz **um** MSM — com um piso sobre a contagem
+// **agregada**, que, ao contrário do piso por seção que a DEC-011 rejeitou, não
+// é travável: quem sabota retém só a própria cédula, e o agregado se alimenta
+// do eleitorado inteiro.
+
+impl UrnaDoNavegador {
+    /// O agregado que a decifragem de **todas** as seções produz: os totais
+    /// somados e a soma dos fatores. É o que quem apura calcula no navegador.
+    fn agregado(&self, por_secao: &[tessera_cliente::AberturaJs]) -> (Vetor<u32>, Vetor<ArkFr>) {
+        let n = por_secao[0].totais.len();
+        let mut totais = std::vec![0u32; n];
+        let mut rs = std::vec![ArkFr::from(0u64); n];
+        for a in por_secao {
+            for j in 0..n {
+                totais[j] += a.totais[j];
+                rs[j] += pedersen::fr_de_bytes_be(&hex_bytes(&a.aberturas[j]));
+            }
+        }
+        (totais, rs)
+    }
+
+    /// `publicar_resultado`, com as seções nomeadas e o agregado em claro.
+    fn publicar(
+        &self,
+        secoes: &[u32],
+        totais: &[u32],
+        aberturas: &[ArkFr],
+    ) -> Result<Vec<u32>, Erro> {
+        let mut ss = Vec::new(&self.env);
+        for s in secoes {
+            ss.push_back(*s);
+        }
+        let mut ts = Vec::new(&self.env);
+        for t in totais {
+            ts.push_back(*t);
+        }
+        let mut rs = Vec::new(&self.env);
+        for r in aberturas {
+            rs.push_back(escalar(&self.env, r));
+        }
+        self.cliente
+            .try_publicar_resultado(&self.proposta, &Address::generate(&self.env), &ss, &ts, &rs)
+            .map_err(|e| e.unwrap())
+            .map(|r| r.unwrap())
+    }
+
+    /// Decifra uma seção e a apura, devolvendo a abertura para o agregado.
+    fn decifrar_e_apurar(&self, secao: u32) -> tessera_cliente::AberturaJs {
+        let a = tessera_cliente::abertura(
+            &self.compromissos_de(secao),
+            &self.criptos_de(secao),
+            2,
+            &self.h_hex,
+            RODADA_FIM,
+            ASSINATURA_FIM,
+        )
+        .expect("a abertura da secao falhou");
+        assert!(
+            self.apurar_secao(secao, &a).is_ok(),
+            "o contrato recusou a apuracao da secao {}",
+            secao
+        );
+        a
+    }
+}
+
+/// **A seção não guarda mais total em claro.** É o conserto da DEC-017.
+#[test]
+fn a_apuracao_de_secao_nao_guarda_total_em_claro() {
+    let u = urna_em_secoes(&[0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1], 2);
+    u.fim();
+    let a0 = u.decifrar_e_apurar(0);
+
+    // O que a seção guarda: a contagem e **um ponto por opção**. Nenhum número
+    // de voto, nem para quem lê o ledger inteiro.
+    let (abriram, pontos) = u
+        .cliente
+        .resultado_secao(&u.proposta, &0u32)
+        .expect("a secao nao foi apurada");
+    assert_eq!(abriram, a0.cedulas, "a contagem continua pública, e deve");
+    assert_eq!(pontos.len(), 2, "um ponto por opção confidencial");
+
+    // E o ponto é a soma dos compromissos abertos, que é o que a conferência
+    // do agregado vai usar. Que ele **não** é o total em claro é o ponto: um
+    // ponto de Pedersen é perfeitamente ocultante.
+    assert_ne!(
+        pontos.get(0).unwrap(),
+        pontos.get(1).unwrap(),
+        "dois pontos iguais indicariam que nada foi somado"
+    );
+
+    // O placar da votação não existe: falta a segunda seção e falta a
+    // transação que soma.
+    assert_eq!(u.cliente.resultado(&u.proposta), None);
+}
+
+/// **O placar sai de uma transação a mais, somando as seções nomeadas.**
+#[test]
+fn publicar_resultado_soma_as_secoes_e_e_o_placar_da_votacao() {
+    let u = urna_em_secoes(&[0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1], 2);
+    u.fim();
+    let a0 = u.decifrar_e_apurar(0);
+    let a1 = u.decifrar_e_apurar(1);
+    let (totais, rs) = u.agregado(&[a0, a1]);
+
+    assert_eq!(
+        totais,
+        std::vec![6, 8],
+        "6 zeros e 8 uns na lista de escolhas"
+    );
+    assert_eq!(
+        u.publicar(&[0, 1], &totais, &rs),
+        Ok(Vec::from_array(&u.env, [6, 8]))
+    );
+    assert_eq!(
+        u.cliente.resultado(&u.proposta),
+        Some(Vec::from_array(&u.env, [6, 8]))
+    );
+}
+
+/// **Um agregado que mente é recusado** — e a solidez inteira passou a morar
+/// aqui, que é o preço de a seção não abrir mais nada.
+#[test]
+fn o_placar_agregado_que_mente_e_recusado() {
+    let u = urna_em_secoes(&[0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1], 2);
+    u.fim();
+    let a0 = u.decifrar_e_apurar(0);
+    let a1 = u.decifrar_e_apurar(1);
+    let (totais, rs) = u.agregado(&[a0, a1]);
+
+    // Mover um voto de uma opção para a outra mantém a soma e não abre.
+    assert_eq!(
+        u.publicar(&[0, 1], &[totais[0] + 1, totais[1] - 1], &rs),
+        Err(Erro::AberturaNaoFecha)
+    );
+    // Nomear uma seção que ninguém apurou.
+    assert_eq!(
+        u.publicar(&[0, 1, 1], &totais, &rs),
+        Err(Erro::ArgumentoMalFormado),
+        "a mesma secao duas vezes contaria as cedulas dela duas vezes"
+    );
+    assert_eq!(u.cliente.resultado(&u.proposta), None);
+}
+
+/// **Monotônico em (quantas seções, quantas cédulas).** Uma seção só publica,
+/// as duas sobrepõem, e voltar para uma é recusado.
+#[test]
+fn o_placar_agregado_nao_volta_atras() {
+    let u = urna_em_secoes(&[0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1], 2);
+    u.fim();
+    let a0 = u.decifrar_e_apurar(0);
+    let a1 = u.decifrar_e_apurar(1);
+    let (t0_, r0) = u.agregado(std::slice::from_ref(&a0));
+    let (t01, r01) = u.agregado(&[a0.clone(), a1]);
+
+    // Uma seção só: é um placar honesto de uma seção, e entra.
+    assert!(u.publicar(&[0], &t0_, &r0).is_ok());
+    // As duas: estritamente mais seções e mais cédulas, sobrepõe.
+    assert_eq!(
+        u.publicar(&[0, 1], &t01, &r01),
+        Ok(Vec::from_array(&u.env, [6, 8]))
+    );
+    // E voltar para uma só é recusado, ainda que a conta feche.
+    assert_eq!(u.publicar(&[0], &t0_, &r0), Err(Erro::NaoMelhora));
+}
+
+/// **O piso agregado.** Abaixo de `τ` cédulas abertas no total, nenhum placar
+/// em claro sai — e isto **não** é travável, porque quem sabota retém só a
+/// própria cédula e o agregado se alimenta do eleitorado inteiro.
+#[test]
+fn abaixo_de_tau_no_agregado_o_placar_nao_sai() {
+    let u = urna_do_navegador(&[0, 1, 1, 0]);
+    u.fim();
+    let a = u.decifrar_e_apurar(0);
+    let (totais, rs) = u.agregado(std::slice::from_ref(&a));
+
+    // A seção apurou: a contagem e o ponto estão no ledger, e revelam nada.
+    assert_eq!(u.cliente.resultado_secao(&u.proposta, &0u32).unwrap().0, 4);
+    // O placar em claro, não: 4 abaixo de τ = 5.
+    assert_eq!(
+        u.publicar(&[0], &totais, &rs),
+        Err(Erro::AnonimatoInsuficiente)
+    );
+    assert_eq!(u.cliente.resultado(&u.proposta), None);
+}
+
+/// **O `Hp` do host e o `Hp` do `core` são o mesmo ponto.** T-025.
+///
+/// A imagem de chave — `I = x·Hp` — é o que impede a segunda cédula. Ela é
+/// formada contra o `Hp` que o **contrato** calcula, com o `hash_to_g1` do
+/// host. Um verificador independente que lesse `Hp` do contrato estaria
+/// confiando no contrato para dizer qual é o gerador contra o qual o voto duplo
+/// é detectado — e é exatamente o que um verificador não pode fazer.
+///
+/// Então o `core` recalcula, com a mesma curva e o mesmo mapa do RFC 9380, e
+/// este teste é o cruzamento: se o host e o arkworks divergirem, aqui quebra, e
+/// não numa auditoria que recusa cédulas boas sem dizer por quê.
+#[test]
+fn o_hp_do_host_bate_com_o_do_core() {
+    let env = Env::default();
+    for id in [[0u8; 32], [7u8; 32], [0xffu8; 32]] {
+        let proposta: BytesN<32> = BytesN::from_array(&env, &id);
+        let do_host = cripto::calcular_hp(&env, &proposta);
+        let do_core = tessera_core::anel::hp_do_contrato(&id);
+        assert_eq!(
+            ponto_hex(&do_host.to_array()),
+            ponto::para_hex(&do_core),
+            "o hash_to_g1 do host divergiu do RFC 9380 do arkworks"
+        );
+    }
+
+    // E não é o try-and-increment do `core`, que é outro gerador — confundir os
+    // dois recusaria toda assinatura em anel do ledger.
+    let sete = [7u8; 32];
+    assert_ne!(
+        ponto::para_hex(&tessera_core::anel::hp_do_contrato(&sete)),
+        ponto::para_hex(&tessera_core::anel::hp(&sete)),
     );
 }

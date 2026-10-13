@@ -1627,6 +1627,471 @@ pub fn verificar(proposta: &str) -> R {
     Ok(())
 }
 
+// ===================== verificar, caminho anônimo =====================
+
+/// **O verificador do caminho anônimo.** T-025.
+///
+/// O `verificar` de cima relê o caminho identificado — e relê a partir de
+/// `estado/<proposta>.json`, um arquivo que **só a própria CLI grava**. Isso
+/// deixava o modo que o projeto lidera, o anônimo, sem verificação
+/// independente nenhuma: uma rodada do dapp não tem arquivo local, e a cédula
+/// anônima tem três coisas que o outro caminho não tem — anel, imagem de chave
+/// e fechadura de tempo.
+///
+/// Este não lê arquivo nenhum. Precisa do identificador da proposta e do
+/// endereço do contrato, e tudo o mais sai do ledger e da baliza:
+///
+/// 1. **a cadeia.** Os compromissos vêm dos eventos, na ordem em que o ledger
+///    os fechou, e são re-encadeados contra `cadeia(proposta, secao)`. É a
+///    mesma conta que `apurar_secao` faz por dentro — refeita por fora, e com
+///    o getter dizendo quantas cédulas deveriam estar lá;
+/// 2. **a imagem de chave.** Todas distintas, dentro da seção e entre seções.
+///    É o voto duplo, conferido sem saber de quem é nenhuma cédula;
+/// 3. **o anel.** A assinatura não está no evento — o evento não carrega
+///    remetente, e é o ponto dele. Então a transação de cada cédula é buscada
+///    no RPC e a assinatura refeita contra o anel que o comparecimento
+///    registrou. Isto depende da janela de retenção do RPC, e quando a janela
+///    passou o verificador **diz** que não conferiu, em vez de omitir a linha;
+/// 4. **a fechadura.** A assinatura da rodada é conferida no pareamento contra
+///    a chave pública congelada da cadeia, e aí cada criptograma é decifrado:
+///    o fator `r` que sai tem de abrir o compromisso em `v·G + r·H` com
+///    `v ∈ {0,1}`. É a conferência que nem o contrato pode fazer, porque o host
+///    não tem pareamento com valor;
+/// 5. **o placar.** A soma dos votos decifrados tem de ser o que
+///    `resultado()` publica.
+pub fn verificar_anonima(proposta: &str, contrato: &str, rede: &str) -> R {
+    use crate::rpc::Rpc;
+    use tessera_core::{anel, relogio};
+
+    // **O identificador, como ele está no ledger.** O caminho identificado
+    // deriva o id de um *nome* (`id32`, com DST). Uma votação do dapp não tem
+    // nome nenhum: o id são os 32 bytes, e é o que a pessoa copia da URL. Aqui
+    // os dois valem, e confundi-los faria o verificador ler uma proposta que
+    // não existe e dizer "sem fechadura de tempo".
+    let id = id_do_ledger(proposta);
+    let c = Cadeia::nova(contrato, rede);
+    let r = Rpc::nova(rede);
+    let g = pedersen::gerador();
+
+    tela::titulo("verificador independente · caminho anônimo");
+    tela::branco();
+    tela::campo(
+        "Fonte",
+        &format!("contrato {} na {}", tela::abreviar(contrato, 8, 4), rede),
+    );
+    tela::campo("Arquivo local", "nenhum — tudo sai do ledger e da baliza");
+    // A janela de retenção do RPC é o que separa "não achei" de "não existe",
+    // e dizê-la antes de qualquer veredito é a diferença entre um verificador
+    // e um carimbo.
+    match r.faixa() {
+        Ok((velho, novo)) => tela::campo(
+            "Janela do RPC",
+            &format!("ledgers {} a {} — fora dela eu não leio", velho, novo),
+        ),
+        Err(e) => tela::campo("Janela do RPC", &format!("desconhecida: {}", e)),
+    }
+    tela::branco();
+
+    // ---- a proposta, lida do contrato ----
+    let p = c
+        .invocar("urna-smoke", false, "proposta", &[("proposta", hex(&id))])
+        .map_err(|e| e.to_string())?;
+    let campo_u64 = |nome: &str| -> u64 {
+        p.valor
+            .split(&format!("\"{}\":", nome))
+            .nth(1)
+            .and_then(|s| {
+                s.split(|ch: char| !ch.is_ascii_digit())
+                    .find(|x| !x.is_empty())
+            })
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0)
+    };
+    let rodada = campo_u64("rodada");
+    let abre_em = campo_u64("abre_em");
+    let secoes = campo_u64("secoes").max(1) as u32;
+    if rodada == 0 {
+        return Err(
+            "esta proposta não tem fechadura de tempo: quem apura é a mesa, e o \
+             verificador dela é `tessera verificar`"
+                .into(),
+        );
+    }
+
+    let h = ponto::de_hex(&um_hex(&c, "gerador_h", &[])?)
+        .map_err(|x| format!("H do contrato ilegível: {:?}", x))?;
+    let hp_cadeia = ponto::de_hex(&um_hex(&c, "hp", &[("proposta", hex(&id))])?)
+        .map_err(|x| format!("Hp do contrato ilegível: {:?}", x))?;
+    // **Hp recalculado, não lido.** Ler e usar seria confiar no contrato para
+    // dizer qual é o gerador contra o qual a imagem de chave é formada.
+    let hp = anel::hp_do_contrato(&id);
+    tela::campo_veredito(
+        "Hp da proposta",
+        &format!(
+            "{} recalculado do identificador",
+            tela::abreviar(&ponto::para_hex(&hp), 4, 4)
+        ),
+        hp == hp_cadeia,
+    );
+
+    // ---- a chave da rodada, conferida no pareamento ----
+    let assinatura = baliza(rodada)?;
+    let chave = relogio::conferir(rodada, &assinatura)
+        .map_err(|e| format!("a assinatura da rodada {} não confere: {:?}", rodada, e))?;
+    tela::campo_veredito(
+        "Fechadura",
+        &format!("rodada {} conferida no pareamento", rodada),
+        true,
+    );
+    tela::branco();
+
+    // ---- seção por seção ----
+    let todas = r.cedulas(contrato, &hex(&id), abre_em)?;
+    let (mut cadeias, mut imagens_ok, mut aneis_ok, mut abriu) = (true, true, true, true);
+    let mut vistas: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut n_conf = 0usize;
+    let mut totais: Vec<u32> = Vec::new();
+    let mut aneis_conferidos = 0usize;
+    let mut aneis_fora_da_janela = 0usize;
+    let mut abertas = 0usize;
+    let mut cedulas = 0usize;
+
+    for s in 0..secoes {
+        let minhas: Vec<_> = todas.iter().filter(|x| x.secao == s).collect();
+        let (elo_cadeia, quantas) = cadeia_da_secao(&c, &id, s)?;
+        cedulas += quantas as usize;
+
+        // 1. a cadeia, re-encadeada do zero
+        let completa = minhas.len() as u32 == quantas;
+        let mut acc = [0u8; 32];
+        for m in &minhas {
+            let mut h2 = Sha256::new();
+            h2.update(acc);
+            for x in &m.compromissos {
+                h2.update(de_hex(x)?);
+            }
+            acc = h2.finalize().into();
+        }
+        let fecha = completa && hex(&acc) == elo_cadeia;
+        cadeias &= fecha;
+        tela::campo_veredito(
+            &format!("Seção {} · cadeia", s),
+            &if completa {
+                format!("{} de {} cédulas re-encadeiam", minhas.len(), quantas)
+            } else {
+                format!(
+                    "li {} dos eventos e a cadeia registrou {} — janela do RPC",
+                    minhas.len(),
+                    quantas
+                )
+            },
+            fecha,
+        );
+        if !completa {
+            continue;
+        }
+
+        // 2. a imagem de chave: todas distintas
+        for m in &minhas {
+            if !vistas.insert(m.imagem.clone()) {
+                imagens_ok = false;
+            }
+            if ponto::de_hex(&m.imagem).is_err() {
+                imagens_ok = false;
+            }
+        }
+
+        // 3. o anel, refeito da transação de cada cédula
+        let anel_secao: Vec<G1Affine> = anel_da_secao(&c, &id, s)?;
+        for m in &minhas {
+            match r.argumentos(&m.tx) {
+                Err(_) => aneis_fora_da_janela += 1,
+                Ok(args) => match assinatura_da_tx(&args, &anel_secao) {
+                    None => aneis_ok = false,
+                    Some((sig, anel_na_tx)) => {
+                        let msg = mensagem_da_cedula(&id, &m.compromissos, &m.escolhas)?;
+                        let bate = anel_na_tx == anel_secao
+                            && anel::verificar(&msg, &g, &hp, &anel_secao, &sig)
+                            && ponto::para_hex(&sig.imagem) == m.imagem;
+                        if bate {
+                            aneis_conferidos += 1;
+                        } else {
+                            aneis_ok = false;
+                        }
+                    }
+                },
+            }
+        }
+
+        // 4. a fechadura: decifrar e abrir cada compromisso
+        if n_conf == 0 && !minhas.is_empty() {
+            n_conf = minhas[0].compromissos.len();
+            totais = std::vec![0u32; n_conf];
+        }
+        for m in &minhas {
+            let cs = de_hex(&m.cripto)?;
+            if m.compromissos.len() != n_conf || cs.len() != n_conf * relogio::TAMANHO {
+                abriu = false;
+                continue;
+            }
+            let mut votos = std::vec![0u32; n_conf];
+            let mut todos = true;
+            for j in 0..n_conf {
+                let fatia = &cs[j * relogio::TAMANHO..(j + 1) * relogio::TAMANHO];
+                let cj = ponto::de_hex(&m.compromissos[j])
+                    .map_err(|e| format!("compromisso ilegível: {:?}", e))?;
+                match relogio::decifrar(fatia, &chave) {
+                    Err(_) => todos = false,
+                    Ok(rf) => match (0..=1u64)
+                        .find(|v| pedersen::comprometer(&g, &h, &pedersen::escalar(*v), &rf) == cj)
+                    {
+                        // **A conferência que o contrato não pode fazer.** O
+                        // host não tem pareamento com valor, então ele nunca
+                        // decifra — confere a forma do criptograma e confia na
+                        // prova CDS para `v ∈ {0,1}`. Aqui o `v` é lido.
+                        Some(v) => votos[j] = v as u32,
+                        None => todos = false,
+                    },
+                }
+            }
+            // Uma cédula que não abre perde só o próprio voto (INV-25): ela
+            // não entra no total e não derruba a verificação.
+            if todos && votos.iter().sum::<u32>() == 1 {
+                abertas += 1;
+                for j in 0..n_conf {
+                    totais[j] += votos[j];
+                }
+            }
+        }
+    }
+
+    tela::branco();
+    tela::campo_veredito(
+        "Imagem de chave",
+        &format!("{} distintas em {} cédulas", vistas.len(), cedulas),
+        imagens_ok && vistas.len() == cedulas,
+    );
+    tela::campo_veredito(
+        "Anel",
+        &if aneis_fora_da_janela > 0 {
+            format!(
+                "{} refeitas · {} fora da janela do RPC, não conferidas",
+                aneis_conferidos, aneis_fora_da_janela
+            )
+        } else {
+            format!("{} assinaturas refeitas do zero", aneis_conferidos)
+        },
+        aneis_ok,
+    );
+    tela::campo_veredito(
+        "Decifragem",
+        &format!("{} de {} cédulas abriram em v ∈ {{0,1}}", abertas, cedulas),
+        abriu && abertas > 0,
+    );
+
+    // 5. o placar publicado
+    let publicado = publicado_na_cadeia(&c, &id)?;
+    let bate = publicado.as_ref().is_some_and(|x| *x == totais);
+    tela::campo_veredito(
+        "Placar",
+        &match &publicado {
+            Some(v) => format!(
+                "ledger diz {} · eu recontei {}",
+                v.iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" · "),
+                totais
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" · ")
+            ),
+            None => format!(
+                "nada publicado · eu recontei {}",
+                totais
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" · ")
+            ),
+        },
+        publicado.is_none() || bate,
+    );
+
+    tela::branco();
+    tela::regua();
+    let integro = cadeias && imagens_ok && aneis_ok && abriu;
+    if integro && bate {
+        tela::confere("o placar publicado é o que as cédulas do ledger dizem");
+    } else if integro && publicado.is_none() {
+        tela::confere("as cédulas conferem · nenhum placar publicado ainda");
+    } else {
+        tela::recusa("alguma coisa não fecha · veja as linhas acima");
+    }
+
+    tela::branco();
+    tela::linha("E o que este verificador NÃO conseguiu descobrir:");
+    tela::linha(&format!(
+        "  de quem é cada uma das {} cédulas, nem em que alguém votou.",
+        cedulas
+    ));
+    if aneis_fora_da_janela > 0 {
+        tela::branco();
+        tela::linha(&format!(
+            "  {} assinaturas em anel ficaram fora da janela de retenção do RPC.",
+            aneis_fora_da_janela
+        ));
+        tela::linha("  O contrato as conferiu quando a cédula entrou; eu não pude refazer.");
+    }
+    tela::branco();
+    Ok(())
+}
+
+/// 64 dígitos hexadecimais são o identificador cru; qualquer outra coisa é um
+/// nome, e passa pelo `id32` de sempre.
+fn id_do_ledger(proposta: &str) -> [u8; 32] {
+    if proposta.len() == 64 && proposta.chars().all(|c| c.is_ascii_hexdigit()) {
+        if let Ok(b) = de_hex(proposta) {
+            let mut v = [0u8; 32];
+            v.copy_from_slice(&b);
+            return v;
+        }
+    }
+    id32(proposta)
+}
+
+/// A assinatura da rodada, pedida ao relé — e **conferida** pelo chamador antes
+/// de encostar em qualquer conta.
+fn baliza(rodada: u64) -> Result<Vec<u8>, String> {
+    const CADEIA: &str = "52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971";
+    let url = format!(
+        "https://api.drand.sh/v2/chains/{}/rounds/{}",
+        CADEIA, rodada
+    );
+    let s = std::process::Command::new("curl")
+        .args(["-s", "--max-time", "20", &url])
+        .output()
+        .map_err(|e| format!("curl não rodou: {}", e))?;
+    let v: serde_json::Value = serde_json::from_slice(&s.stdout).map_err(|_| {
+        format!(
+            "o relé da baliza não devolveu JSON para a rodada {}",
+            rodada
+        )
+    })?;
+    let hex_sig = v["signature"]
+        .as_str()
+        .ok_or_else(|| format!("a baliza ainda não publicou a rodada {}", rodada))?;
+    de_hex(hex_sig)
+}
+
+/// Uma leitura do contrato que devolve um hexadecimal entre aspas.
+fn um_hex(c: &Cadeia, metodo: &str, args: &[(&str, String)]) -> Result<String, String> {
+    let r = c
+        .invocar("urna-smoke", false, metodo, args)
+        .map_err(|e| e.to_string())?;
+    Ok(r.valor.trim().trim_matches('"').to_string())
+}
+
+fn cadeia_da_secao(c: &Cadeia, id: &[u8; 32], secao: u32) -> Result<(String, u32), String> {
+    let r = c
+        .invocar(
+            "urna-smoke",
+            false,
+            "cadeia",
+            &[("proposta", hex(id)), ("secao", secao.to_string())],
+        )
+        .map_err(|e| e.to_string())?;
+    let v: (String, u32) = serde_json::from_str(&r.valor).map_err(|e| {
+        format!(
+            "não entendi a cadeia da seção {}: {} ({})",
+            secao, e, r.valor
+        )
+    })?;
+    Ok(v)
+}
+
+fn anel_da_secao(c: &Cadeia, id: &[u8; 32], secao: u32) -> Result<Vec<G1Affine>, String> {
+    let r = c
+        .invocar(
+            "urna-smoke",
+            false,
+            "anel",
+            &[("proposta", hex(id)), ("secao", secao.to_string())],
+        )
+        .map_err(|e| e.to_string())?;
+    let v: Vec<String> = serde_json::from_str(&r.valor)
+        .map_err(|e| format!("não entendi o anel da seção {}: {}", secao, e))?;
+    v.iter()
+        .map(|s| ponto::de_hex(s).map_err(|e| format!("chave de anel ilegível: {:?}", e)))
+        .collect()
+}
+
+fn publicado_na_cadeia(c: &Cadeia, id: &[u8; 32]) -> Result<Option<Vec<u32>>, String> {
+    let r = c
+        .invocar("urna-smoke", false, "resultado", &[("proposta", hex(id))])
+        .map_err(|e| e.to_string())?;
+    if r.valor.trim() == "null" {
+        return Ok(None);
+    }
+    serde_json::from_str(&r.valor)
+        .map(Some)
+        .map_err(|e| format!("não entendi o resultado: {} ({})", e, r.valor))
+}
+
+/// `(c0, z, imagem)` e o anel, de dentro dos argumentos de `votar_anonimo`.
+///
+/// A ordem é a da ABI: `proposta, secao, anel, imagem, c0, z, …`. Ela é
+/// interface congelada (§5), e ler fora de ordem aqui faria o verificador
+/// recusar cédulas boas.
+fn assinatura_da_tx(
+    args: &[serde_json::Value],
+    anel_esperado: &[G1Affine],
+) -> Option<(tessera_core::anel::Assinatura, Vec<G1Affine>)> {
+    use crate::rpc::{bytes_de, u256_de, vetor_de};
+    if args.len() < 6 {
+        return None;
+    }
+    let anel: Vec<G1Affine> = vetor_de(&args[2])?
+        .iter()
+        .filter_map(|x| ponto::de_hex(&bytes_de(x)?).ok())
+        .collect();
+    if anel.len() != anel_esperado.len() {
+        return None;
+    }
+    let imagem = ponto::de_hex(&bytes_de(&args[3])?).ok()?;
+    // **`Bls12381Fr` viaja como `u256` decimal**, não como bytes. Medido
+    // contra a testnet; lido como bytes, isto devolvia `None` e o verificador
+    // recusava todas as assinaturas dizendo que o anel não fechava.
+    let c0 = decimal_para_fr(&u256_de(&args[4])?).ok()?;
+    let z: Vec<Fr> = vetor_de(&args[5])?
+        .iter()
+        .filter_map(|x| decimal_para_fr(&u256_de(x)?).ok())
+        .collect();
+    if z.len() != anel.len() {
+        return None;
+    }
+    Some((tessera_core::anel::Assinatura { c0, z, imagem }, anel))
+}
+
+/// **Byte a byte igual a `cripto::mensagem_cedula` do contrato.**
+fn mensagem_da_cedula(
+    id: &[u8; 32],
+    compromissos: &[String],
+    escolhas: &[u32],
+) -> Result<Vec<u8>, String> {
+    let mut b = id.to_vec();
+    b.extend_from_slice(&(compromissos.len() as u32).to_be_bytes());
+    for x in compromissos {
+        b.extend_from_slice(&de_hex(x)?);
+    }
+    b.extend_from_slice(&(escolhas.len() as u32).to_be_bytes());
+    for e in escolhas {
+        b.extend_from_slice(&e.to_be_bytes());
+    }
+    Ok(b)
+}
+
 #[cfg(test)]
 mod testes {
     use super::*;

@@ -43,11 +43,14 @@ const HORIZON = "https://horizon-testnet.stellar.org";
 const FRIENDBOT = "https://friendbot.stellar.org";
 const PASSPHRASE = Networks.TESTNET;
 const CONTRATO = process.env.TESSERA_CONTRATO ??
-  "CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH";
+  "CDWGDWDPCXAAA3FO24NRRYS77HEMFHWDIBK4O3GB6L6BQGYWC7JYW3YS";
 /** A cadeia `quicknet` da drand. Ver docs/SOURCES.md. */
 const CADEIA_BALIZA = "52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971";
 
-const N = Number(process.env.N ?? 5);
+// Sete, não cinco: uma vai sabotada, e o piso agregado de τ = 5 (T-026) exige
+// cinco cédulas abertas para o placar em claro sair. Com cinco votantes a
+// rodada pararia no quórum em vez de chegar ao placar.
+const N = Number(process.env.N ?? 7);
 const OPCOES = 2;
 /** Quem leva o byte trocado no criptograma. `-1` desliga a sabotagem. */
 const SABOTADA = Number(process.env.SABOTADA ?? 2);
@@ -56,6 +59,26 @@ const TAXA_INCLUSAO = Number(process.env.TAXA_INCLUSAO ?? 1_000_000);
 const FOLGA_RODADA = Number(process.env.FOLGA_RODADA ?? 60);
 /** Segundos por ledger na testnet, para converter a janela em tempo. */
 const SEGUNDOS_POR_LEDGER = 5;
+
+/**
+ * **O modo semeadura, para gravar o vídeo** (T-004).
+ *
+ * `CONVIDADO=G…` põe um endereço de fora na lista de aptos — o de quem vai
+ * aparecer no vídeo — sem comparecer nem votar por ele. `SEMEAR=1` para o
+ * roteiro depois de depositar as cédulas, com a janela ainda aberta, e imprime
+ * tudo o que o apresentador precisa colar no dapp.
+ *
+ * Por que isto existe: desde T-026 o placar em claro só sai com `τ = 5` cédulas
+ * abertas no agregado. Um vídeo com um votante só **nunca** produz placar — a
+ * recusa seria correta e o vídeo, inútil. Então o eleitorado é real e já está no
+ * ledger, e o que acontece diante da câmera é uma cédula a mais e a apuração.
+ */
+const CONVIDADO = process.env.CONVIDADO ?? "";
+const SEMEAR = process.env.SEMEAR === "1";
+/** Ledgers de cada fase. O padrão serve ao roteiro headless; o vídeo precisa de
+ *  mais, porque tem gente clicando. */
+const LEDGERS_CADERNO = Number(process.env.LEDGERS_CADERNO ?? 0);
+const LEDGERS_URNA = Number(process.env.LEDGERS_URNA ?? 0);
 
 const servidor = new rpc.Server(RPC);
 const contrato = new Contract(CONTRATO);
@@ -161,7 +184,7 @@ const trocarUmByte = (h) =>
  * que entraram — que é a ordem da cadeia de compromissos que o contrato
  * re-encadeia. É o mesmo caminho de `rede.ts::cedulasDaSecao`.
  */
-async function cedulasDosEventos(id, desde) {
+async function cedulasDosEventos(id, desde, secao = 0) {
   const r = await servidor.getEvents({
     startLedger: desde,
     filters: [{ type: "contract", contractIds: [CONTRATO] }],
@@ -169,6 +192,7 @@ async function cedulasDosEventos(id, desde) {
   return r.events
     .filter((e) => scValToNative(e.topic[0]) === "anonimo")
     .filter((e) => bytesHex(scValToNative(e.topic[1])) === id)
+    .filter((e) => Number(scValToNative(e.topic[2])) === secao)
     .map((e) => {
       const v = scValToNative(e.value);
       return { compromissos: v[1].map(bytesHex), cripto: bytesHex(v[3]) };
@@ -190,17 +214,23 @@ async function main() {
   leitor = await nascer();
   const membros = [];
   for (let i = 0; i < N; i++) membros.push(await nascer());
-  const enderecos = membros.map((m) => xdrDe(m.publicKey()));
-  const pesos = membros.map(() => 1);
+  // O convidado entra na **lista de aptos** e em mais nada: este roteiro não
+  // tem a chave dele, e é essa a graça — quem comparece e vota por ele é a
+  // pessoa diante da câmera, no dapp.
+  const chavesPublicas = membros.map((m) => m.publicKey());
+  if (CONVIDADO) chavesPublicas.push(CONVIDADO);
+  const enderecos = chavesPublicas.map(xdrDe);
+  const pesos = chavesPublicas.map(() => 1);
   const id = bytesHex(Keypair.random().rawPublicKey().subarray(0, 32));
   const raiz = wasm.raiz_de_aptos(enderecos, pesos);
-  diz(`${N} identidades financiadas · raiz de aptos ${raiz.slice(0, 16)}…`);
-  diz("uma seção só: a divisão em seções é outro assunto (§11-N)");
+  diz(`${chavesPublicas.length} aptos · raiz ${raiz.slice(0, 16)}…`);
+  if (CONVIDADO) diz(`o convidado ${CONVIDADO.slice(0, 8)}… está na lista e NÃO vota aqui`);
+  diz("uma seção só: é o que o dimensionamento recomenda até 32 pessoas");
 
   titulo("abrir, sem mesa e com fechadura de tempo");
   const agora = await ledgerAtual();
-  const abreEm = agora + 12 + 2 * N;
-  const fechaEm = abreEm + 12 + 2 * N;
+  const abreEm = agora + (LEDGERS_CADERNO || 12 + 2 * N);
+  const fechaEm = abreEm + (LEDGERS_URNA || 12 + 2 * N);
   // A rodada que destranca as cédulas: a que vence pouco depois de a janela
   // fechar. Tem de estar no futuro agora, senão o contrato recusa com
   // `RodadaNaoFecha` — uma rodada vencida já tem assinatura publicada, e as
@@ -290,6 +320,32 @@ async function main() {
   diz("o contrato aceitou a sabotada: ele confere a **forma** do criptograma, e");
   diz("não pode conferir o conteúdo — o host não tem pareamento com valor.");
 
+  if (SEMEAR) {
+    const agoraL = await ledgerAtual();
+    titulo("semeado · a urna está aberta e a câmera pode ligar");
+    console.log("");
+    diz(`proposta      ${id}`);
+    diz(`contrato      ${CONTRATO}`);
+    diz(`votação até   ledger ${fechaEm} (faltam ${fechaEm - agoraL}, ~${Math.round((fechaEm - agoraL) * SEGUNDOS_POR_LEDGER / 60)} min)`);
+    diz(`rodada        ${rodada}, vence em ${venceEm - agoraSeg()}s`);
+    diz(`cédulas       ${enviadas.length} depositadas · ${enviadas.filter((c) => !c.sabota).length} vão abrir`);
+    console.log("");
+    diz("A LISTA DE APTOS, para colar no dapp:");
+    console.log("");
+    console.log(chavesPublicas.join("\n"));
+    console.log("");
+    if (CONVIDADO) {
+      diz(`o convidado é o último da lista, índice ${chavesPublicas.length - 1}`);
+    } else {
+      diz("sem CONVIDADO: ninguém de fora pode votar nesta proposta");
+    }
+    diz(`dapp:  /#/votacao/${id}`);
+    console.log("");
+    for (const [rotulo, hash] of hashes) console.log(`  ${rotulo.padEnd(26)} ${hash}`);
+    console.log("");
+    return;
+  }
+
   titulo("antes do fim da janela, nenhum placar — nem parcial");
   const apurador = await nascer();
   const listaCompleta = enviadas.flatMap((c) => c.compromissos);
@@ -297,8 +353,6 @@ async function main() {
     bN(id), addr(apurador.publicKey()), u32(0),
     vec(listaCompleta.map(bN)),
     vec(enviadas.map(() => bool(true))),
-    vec([u32(0), u32(0)]),
-    vec(["0".repeat(64), "0".repeat(64)].map(fr)),
   ]);
   if (cedo.ok) throw new Error("apurou com a votação aberta");
   diz(`recusado: ${cedo.fase} · ${cedo.erro}`);
@@ -320,8 +374,6 @@ async function main() {
       bN(id), addr(apurador.publicKey()), u32(0),
       vec(listaCompleta.map(bN)),
       vec(enviadas.map(() => bool(true))),
-      vec([u32(0), u32(0)]),
-      vec(["0".repeat(64), "0".repeat(64)].map(fr)),
     ]);
     if (antes.ok) throw new Error("apurou antes de a rodada vencer");
     diz(`recusado: ${antes.fase} · ${antes.erro}`);
@@ -368,37 +420,22 @@ async function main() {
   titulo("quem omite cédulas honestas é sobreposto");
   const parcial = a.abertas.map((b, i) => b && i < 2);
   const quantasParciais = parcial.filter(Boolean).length;
-  const totaisParciais = new Array(OPCOES).fill(0);
-  const aberturasParciais = new Array(OPCOES).fill(0n);
-  // Refaz a conta só sobre as duas primeiras: a abertura é a soma dos fatores,
-  // e sem elas o MSM não fecharia.
-  const so2 = wasm.abertura_da_secao(
-    doLedger.slice(0, 2).flatMap((c) => c.compromissos),
-    doLedger.slice(0, 2).map((c) => c.cripto),
-    OPCOES, h, BigInt(rodada), signature,
-  );
-  for (let j = 0; j < OPCOES; j++) {
-    totaisParciais[j] = so2.totais[j];
-    aberturasParciais[j] = so2.aberturas[j];
-  }
   const rp = anotar("apurar_secao (parcial)", await tentar(apurador, "apurar_secao", [
     bN(id), addr(apurador.publicKey()), u32(0),
     vec(compromissos.map(bN)),
     vec(parcial.map(bool)),
-    vec(totaisParciais.map((n) => u32(Number(n)))),
-    vec(aberturasParciais.map((x) => fr(x))),
   ]));
   if (!rp.ok) throw new Error(`a apuração parcial falhou: ${rp.fase} ${rp.erro}`);
   diz(`uma apuração de ${quantasParciais} cédulas entrou primeiro · tx ${rp.hash}`);
-  diz(`  no ledger: ${JSON.stringify(await ler("resultado_secao", bN(id), u32(0)))}`);
+  const guardado = await ler("resultado_secao", bN(id), u32(0));
+  diz(`  no ledger: ${guardado[0]} cédulas abertas e ${guardado[1].length} pontos`);
+  diz("  e nenhum número de voto: desde T-026 a seção guarda Σ Cᵢ, não o total");
 
   const outro = await nascer();
   const rc2 = anotar("apurar_secao (completa)", await tentar(outro, "apurar_secao", [
     bN(id), addr(outro.publicKey()), u32(0),
     vec(compromissos.map(bN)),
     vec(a.abertas.map(bool)),
-    vec(Array.from(a.totais).map((n) => u32(Number(n)))),
-    vec(a.aberturas.map((x) => fr(x))),
   ]));
   if (!rc2.ok) throw new Error(`a apuração completa falhou: ${rc2.fase} ${rc2.erro}`);
   diz(`outra carteira, que não votou, incluiu as ${a.abriram} e sobrepôs · tx ${rc2.hash}`);
@@ -408,17 +445,39 @@ async function main() {
     bN(id), addr(apurador.publicKey()), u32(0),
     vec(compromissos.map(bN)),
     vec(parcial.map(bool)),
-    vec(totaisParciais.map((n) => u32(Number(n)))),
-    vec(aberturasParciais.map((x) => fr(x))),
   ]);
   if (volta.ok) throw new Error("voltar atrás no placar foi aceito");
   diz(`tentar voltar ao placar menor: recusado · ${volta.erro}`);
   diz("é o #37 NaoMelhora — só um conjunto estritamente maior substitui o guardado");
 
+  // ---- 7. o placar, numa transação a mais ----
+  titulo("o placar da votação: uma transação, um MSM, um número em claro");
+  const rpr = anotar("publicar_resultado", await tentar(outro, "publicar_resultado", [
+    bN(id), addr(outro.publicKey()),
+    vec([u32(0)]),
+    vec(Array.from(a.totais).map((n) => u32(Number(n)))),
+    vec(a.aberturas.map((x) => fr(x))),
+  ]));
+  if (!rpr.ok) throw new Error(`publicar o placar falhou: ${rpr.fase} ${rpr.erro}`);
+  diz(`placar publicado · tx ${rpr.hash}`);
+  diz(`  ${comTeto(rpr.cpu)}`);
+
+  // E um agregado que mente é recusado aqui, que é onde a solidez mora agora.
+  const mentira = await tentar(outro, "publicar_resultado", [
+    bN(id), addr(outro.publicKey()),
+    vec([u32(0)]),
+    vec([u32(Number(a.totais[0]) + 1), u32(Math.max(0, Number(a.totais[1]) - 1))]),
+    vec(a.aberturas.map((x) => fr(x))),
+  ]);
+  if (mentira.ok) throw new Error("um agregado que mente foi aceito");
+  diz(`mover um voto de uma opção para a outra: recusado · ${mentira.erro}`);
+
   titulo("o que ficou no ledger");
-  const final = await ler("resultado_secao", bN(id), u32(0));
-  diz(`placar ............ ${final[1].join(" · ")}`);
-  diz(`cédulas abertas ... ${final[0]} de ${enviadas.length}`);
+  const porSecao = await ler("resultado_secao", bN(id), u32(0));
+  const final = await ler("resultado", bN(id));
+  diz(`placar ............ ${final.join(" · ")}`);
+  diz(`cédulas abertas ... ${porSecao[0]} de ${enviadas.length}`);
+  diz(`a seção guarda .... ${porSecao[1].length} pontos e nenhum total`);
   diz(`a sabotada ........ custou um voto, e só o dela`);
   diz(`mesa .............. nenhuma, em nenhum momento`);
   console.log("");

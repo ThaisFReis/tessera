@@ -268,7 +268,7 @@ pub fn nova_chave_de_anel() -> Result<JsValue, JsValue> {
 
 /// O que quem apura apresenta ao contrato, já reconstruído a partir dos
 /// criptogramas.
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub struct AberturaJs {
     /// Uma por cédula, na ordem da cadeia: se o criptograma dela abriu.
     pub abertas: Vec<bool>,
@@ -327,6 +327,38 @@ pub fn abertura_da_secao(
     )
     .map_err(|e| JsValue::from_str(&e))?;
     serde_wasm_bindgen::to_value(&js).map_err(Into::into)
+}
+
+/// **A soma dos fatores de abertura de várias seções**, em `Fr`.
+///
+/// `publicar_resultado` recebe `(totais, aberturas)` sobre o conjunto inteiro:
+/// os totais somam em `u32`, mas as aberturas são escalares de `Fr`, e somar
+/// 32 bytes módulo a ordem do grupo não é coisa que o navegador faça em
+/// JavaScript sem uma biblioteca de inteiros grandes. Então soma aqui, onde a
+/// aritmética já existe e já tem teste.
+#[wasm_bindgen]
+pub fn somar_aberturas(valores_hex: Vec<String>) -> Result<String, JsValue> {
+    somar_fr(&valores_hex).map_err(|e| JsValue::from_str(&e))
+}
+
+/// A mesma coisa em tipos Rust puros, pelo motivo de sempre: uma segunda
+/// implementação divergiria.
+pub fn somar_fr(valores_hex: &[String]) -> Result<String, String> {
+    if valores_hex.is_empty() {
+        return Err("nada a somar: a lista de aberturas veio vazia".into());
+    }
+    let mut acc = Fr::from(0u64);
+    for v in valores_hex {
+        let b = bytes_de_hex(v)?;
+        if b.len() != 32 {
+            return Err(format!(
+                "uma abertura tem {} bytes, e um escalar de Fr tem 32",
+                b.len()
+            ));
+        }
+        acc += pedersen::fr_de_bytes_be(&b);
+    }
+    Ok(hex(&pedersen::fr_para_bytes_be(&acc)))
 }
 
 /// A mesma coisa em tipos Rust puros — é esta que o teste de aceitação do
@@ -666,4 +698,52 @@ pub fn montar(
     }
 
     Ok(c)
+}
+
+#[cfg(test)]
+mod testes_do_agregado {
+    use super::*;
+
+    /// Somar as aberturas de duas seções dá a abertura do conjunto — e é isso
+    /// que `publicar_resultado` confere contra a soma dos pontos.
+    ///
+    /// A igualdade testada não é de strings: é a que o contrato vai conferir.
+    /// `(T₁+T₂)·G + (R₁+R₂)·H` tem de ser `C₁ + C₂`, com cada `Cᵢ` sendo o
+    /// compromisso de uma seção.
+    #[test]
+    fn a_soma_das_aberturas_abre_a_soma_dos_pontos() {
+        let g = pedersen::gerador();
+        // Um segundo gerador qualquer: o que o teste confere é a aritmética de
+        // Fr, não de onde H vem.
+        let h: G1Affine = (g * pedersen::acaso_fr().unwrap()).into();
+        let (r1, r2) = (pedersen::acaso_fr().unwrap(), pedersen::acaso_fr().unwrap());
+        let (t1, t2) = (3u64, 5u64);
+        let c1 = pedersen::comprometer(&g, &h, &pedersen::escalar(t1), &r1);
+        let c2 = pedersen::comprometer(&g, &h, &pedersen::escalar(t2), &r2);
+
+        let soma_hex = somar_fr(&[
+            hex(&pedersen::fr_para_bytes_be(&r1)),
+            hex(&pedersen::fr_para_bytes_be(&r2)),
+        ])
+        .unwrap();
+        let r = pedersen::fr_de_bytes_be(&bytes_de_hex(&soma_hex).unwrap());
+
+        assert_eq!(
+            pedersen::comprometer(&g, &h, &pedersen::escalar(t1 + t2), &r),
+            G1Affine::from(c1 + c2),
+            "a abertura somada nao abre a soma dos compromissos"
+        );
+    }
+
+    /// Uma só abertura soma a ela mesma, e a lista vazia é erro em vez de zero
+    /// — zero seria uma abertura válida de um conjunto vazio, e publicá-la
+    /// afirmaria um placar que ninguém calculou.
+    #[test]
+    fn um_so_valor_e_a_lista_vazia() {
+        let r = pedersen::acaso_fr().unwrap();
+        let h = hex(&pedersen::fr_para_bytes_be(&r));
+        assert_eq!(somar_fr(std::slice::from_ref(&h)).unwrap(), h);
+        assert!(somar_fr(&[]).is_err());
+        assert!(somar_fr(&["00ff".into()]).is_err(), "16 bytes nao e um Fr");
+    }
 }

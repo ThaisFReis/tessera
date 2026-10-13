@@ -96,6 +96,7 @@ foi auditado por terceiros.
 | "o sigilo da escolha e a desvinculação valem nos dois modos" | o anel e o compromisso não dependem da lista; DEC-006 |
 | custo em instruções de qualquer operação | o teste que o mede, citado junto do número |
 | "roda na testnet" | hash da transação, verificável no explorer |
+| "qualquer pessoa recalcula o resultado do ledger, **inclusive no caminho anônimo**" | `tessera verificar --proposta <id> --contrato <C>` — cadeia re-encadeada, imagens de chave distintas, assinaturas em anel refeitas e criptogramas decifrados em `v ∈ {0,1}`, sem arquivo local nenhum. Rodado na testnet em 2026-10-10 contra a proposta `7021e473…`: 7 anéis refeitos, 6 de 7 abertas, placar recontado igual ao publicado. **Com o limite escrito:** as assinaturas em anel só são refazíveis enquanto a transação estiver na janela de retenção do RPC, e o verificador imprime a faixa que alcança antes de qualquer veredito |
 | "não há servidor que veja o fator de aleatoriedade" | o dapp é estático; as provas nascem no navegador |
 | "depois de votar, nem quem votou reabre a própria cédula" | `r` não é persistido em nenhum cliente; `cli` `nenhum_comando_grava_recibo` lê o próprio fonte, e `queimar_sobrescreve_antes_de_remover` |
 | "abrir uma cédula anônima revela o que ela votou, nunca de quem é" | INV-04b; o vínculo não é guardado em lugar nenhum |
@@ -118,6 +119,12 @@ difícil de descobrir. Não é: o anel é nomeado, as seções particionam, e qu
 os anéis lê a seção de todo mundo (DEC-012). O que se pode afirmar é que ela é
 **imprevisível até a abertura** — que é o que impede escolher quem se esconde
 atrás de quem.
+
+Desde T-026, também **proibido afirmar que a seção publica o seu total** — ela
+não publica mais, guarda uma contagem e um ponto (INV-26) — e **proibido omitir
+que o placar agregado é público**. O que a mudança fechou foi a seção unânime; o
+resultado unânime global continua revelando todo mundo, como em qualquer
+sistema, e dizer o contrário seria pior que o limite que estava escrito antes.
 
 **Proibido afirmar sobre a fechadura de tempo:** que abrir o **conteúdo** antes
 da hora é *impossível*. Não é: é conluio de um limiar dos operadores da baliza —
@@ -195,6 +202,8 @@ pergunta.
 | INV-07 | A imagem de chave não atravessa propostas | `core` `a_imagem_nao_atravessa_propostas` |
 | INV-08 | **Na votação fechada**, a seção é imprevisível até `abre_em`: nem o votante nem quem organiza escolhe a sua | `core` `a_secao_vem_da_baliza_e_nao_do_identificador`, `moer_o_identificador_nao_isola_ninguem`; `contrato` `trinta_votantes_em_tres_secoes_pagam_o_preco_de_dez` — DEC-012 |
 | INV-25 | O piso de `τ` é conferido contra o **anel**, nunca contra o subconjunto que abriu — sabotar não trava | `contrato` `sabotar_o_proprio_criptograma_nao_derruba_o_piso` |
+| INV-26 | A apuração de uma seção **não publica número de voto nenhum**: ela guarda a contagem de cédulas abertas e `Σ Cᵢ` por opção. O placar em claro existe num lugar só, `publicar_resultado`, sobre o eleitorado inteiro, e é monotônico em (quantas seções, quantas cédulas) e com piso de `τ` sobre a contagem **agregada** | `contrato` `a_apuracao_de_secao_nao_guarda_total_em_claro`, `o_placar_agregado_nao_volta_atras`, `abaixo_de_tau_no_agregado_o_placar_nao_sai` |
+| INV-27 | O `Hp` contra o qual a imagem de chave é formada é **recalculável** fora do contrato: o `hash_to_g1` do host e o RFC 9380 do arkworks dão o mesmo ponto. Sem isto, verificar o voto duplo exigiria confiar no contrato para dizer qual é o gerador | `contrato` `o_hp_do_host_bate_com_o_do_core` |
 | INV-18 | Nenhum resultado, **nem parcial**, existe no contrato antes de `fecha_em` | `contrato` `antes_do_fechamento_nao_existe_placar` — relógio do ledger, sem suposição. E nenhum **na tela**, que decifra sozinha e não precisaria do contrato: `app/scripts/portao.test.mjs` |
 | INV-19 | Uma cédula que não abre perde o próprio voto e **não** impede a apuração das outras | `contrato` `a_cedula_que_nao_abre_perde_so_o_proprio_voto` |
 | INV-20 | A lista de compromissos apresentada na apuração é exatamente o conjunto de cédulas da seção. Duas travas em série: **omitir é inexprimível**, porque a aridade está presa à contagem que as cédulas escreveram, e **trocar ou reordenar** a cadeia pega | `contrato` `a_cadeia_recusa_omissao_e_invencao` |
@@ -211,6 +220,8 @@ pergunta.
 | INV-14 | O XDR do endereço tem 44 bytes e bate entre CLI e navegador | `cli` `xdr_bate_com_o_que_o_sdk_produz`; `app/scripts/xdr.test.mjs` |
 | INV-15 | O infinito em G1 é a flag zcash, não 96 zeros | `contrato` `o_infinito_do_host_e_a_flag_zcash_nao_zeros` |
 | INV-16 | Tudo o que a tela da demonstração afirma, o código sustenta | `console/guarda.py` — 8 afirmações, 33 conferências contra a fonte |
+| INV-29 | Todo número do deck tem fonte no repositório, os dois idiomas têm o **mesmo** conjunto de números, e nada que a §2 proíba aparece em texto visível ou nota | `docs/deck-confere.py`; com `--rede`, confere também que nenhuma URL prometida responde 404. Nasceu da revisão de 2026-10-13: o deck dizia "sem ninguém de confiança", que a §2 proíbe porque, com fechadura, a baliza **é** uma suposição de confiança |
+| INV-28 | Tudo o que a **narração do vídeo** afirma, o repositório sustenta — e a citação do roteiro é idêntica ao bloco que vai ao sintetizador | `docs/roteiro-confere.py`. Nasceu de três erros reais: um "modo simples" que apuraria sem ninguém abrir nada (impossível — `assembleia_sem_mesa_abre_e_nao_apura`), "sem organizador" quando `abrir` recebe um endereço de governança, e "se a votação não tem prazo" quando toda votação tem prazo (INV-18) e o que varia é a fechadura |
 | INV-17 | As provas são geradas pelo `core` nativo e verificadas no host Wasm a cada `cargo test` | `contrato/src/test.rs` inteiro — não é vetor congelado |
 
 ---
@@ -224,7 +235,8 @@ pergunta.
 | Folha de Merkle `H(0x00 ‖ endereço ‖ peso_be)` — **o `secao_be` sai em T-023** (DEC-012) | `core/src/merkle.rs::folha` | muda a raiz; quebra toda prova de aptidão existente |
 | Separação de domínio `0x00` folha, `0x01` nó, `0x02` vazio, `0x03` seção | idem | sem ela, folha de 64 bytes vira nó interno |
 | Serialização G1, inclusive o infinito | `core/src/ponto.rs` | o host recusa qualquer outra coisa |
-| ABI do contrato (`abrir`, `comparecer`, `votar`, `votar_anonimo`, `apurar`) | `contrato/src/lib.rs` | redeploy invalida toda votação aberta e 12 arquivos que pinam o endereço |
+| ABI do contrato (`abrir`, `comparecer`, `votar`, `votar_anonimo`, `apurar`, `apurar_secao`, `publicar_resultado`) | `contrato/src/lib.rs` | redeploy invalida toda votação aberta e 14 arquivos que pinam o endereço |
+| Formato dos oito eventos (tópicos, e a **ordem** dos campos do dado) | `contrato/src/eventos.rs` | `app/src/rede.ts` e `cli/src/rpc.rs` desempacotam por posição; congelado por `o_formato_dos_eventos_*` desde T-012 |
 | Códigos de erro `Erro` | `contrato/src/tipos.rs` | espelhados em `app/src/rede.ts::ERROS` |
 | DSTs do anel (`TESSERA-V1-ANEL`, `-HP`, `-CONJUNTO`) | `core/src/anel.rs`, `contrato/src/cripto.rs` | divergir faz toda assinatura falhar sem dizer por quê |
 | Criptograma da fechadura: `U` (96 B, G2 comprimido) ‖ `V` (32 B) ‖ `W` (32 B) = **160 B por opção confidencial**, concatenados em ordem de pergunta — produzido por `cliente-wasm::montar` e lido por `cliente-wasm::abertura` | `core/src/relogio.rs` | é o que o evento carrega; mudar o layout torna ilegível toda cédula já depositada |
@@ -237,6 +249,23 @@ criptograma e `apurar` ganha o caminho por seção com subconjunto. O evento
 `anonimo` passa a carregar o criptograma. Isso **invalida toda votação aberta** e
 exige repontar os arquivos que pinam o endereço do contrato — como em T-009 e
 T-013, no mesmo redeploy.
+
+**Bump de ABI em T-012 / §11-N / T-026**, um redeploy para as três (2026-10-10,
+contrato `CDWGDWDPCXAAA3FO24NRRYS77HEMFHWDIBK4O3GB6L6BQGYWC7JYW3YS`):
+
+- os oito eventos passam a ser tipos declarados (`contrato/src/eventos.rs`), com
+  o **mesmo formato na rede** — `topics = [...]` preserva o nome curto e
+  `data_format = "vec"` preserva a tupla posicional. Três testes
+  `o_formato_dos_eventos_*` o congelam byte a byte, o que não existia antes;
+- o tópico do `anonimo` ganha a `secao`: `(anonimo, proposta, secao)`. É o
+  §11-N, e sem ela a apuração de várias seções é impossível para quem lê o
+  ledger;
+- getter novo `cadeia(proposta, secao) -> (elo, quantas)`;
+- `apurar_secao` **perde** `totais` e `aberturas`, e `resultado_secao` passa a
+  devolver `(quantas abriram, Σ Cᵢ por opção)` — um ponto, não um total
+  (DEC-017, INV-26). O evento `apursec` perde o `placar`;
+- `publicar_resultado(proposta, quem, secoes, totais, aberturas)` é novo, e é o
+  único lugar em que um número de voto entra no ledger.
 
 **Dados-ouro:** `bls-smoke/vetores.env` (vetores públicos) e
 `app/scripts/xdr.test.mjs` (o vetor de 44 bytes, espelhado em
@@ -282,7 +311,7 @@ tabela em [`SOURCES.md`](SOURCES.md)):
 Nenhuma dependência nova: `ark-bls12-381 0.5` com a feature `curve`, que já está
 no `core`, entrega pareamento e *hash-to-curve* em G1 (medido).
 
-Contrato na testnet: `CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH`
+Contrato na testnet: `CDWGDWDPCXAAA3FO24NRRYS77HEMFHWDIBK4O3GB6L6BQGYWC7JYW3YS`
 — **substituído no redeploy de T-018.**
 
 `[VERIFY]` em aberto: nenhum.
@@ -354,6 +383,8 @@ cd cli         && cargo test
 cd app         && for t in scripts/*.test.mjs; do node "$t"; done
 cd app         && npm run build          # inclui tsc -b
 python3 console/guarda.py
+python3 docs/roteiro-confere.py
+python3 docs/deck-confere.py
 ```
 
 **Linha de base, medida em 2026-10-03 antes de qualquer mudança:**
@@ -367,10 +398,16 @@ python3 console/guarda.py
 | testes do app | ✅ 3 testes |
 | `npm run build` | ✅ |
 | `console/guarda.py` | ✅ |
+| `docs/roteiro-confere.py` | ✅ |
+| `docs/deck-confere.py` | ✅ |
 | `cargo fmt --check` | ✅ nos 5 crates — era falha de base, resolvida em T-002 |
 | `cargo clippy -D warnings` | ✅ nos 5 crates — eram 65 avisos, resolvidos em T-003 |
 
 A linha de base não tem mais falha nenhuma.
+
+**Hoje (2026-10-10, fim de T-012/§11-N/T-025/T-026/T-014):** `core` 81,
+`contrato` 60, `cli` 33, `bls-smoke` 13, app 8 — **195 testes**, `fmt` e
+`clippy -D warnings` limpos nos cinco crates, build ✓, `guarda.py` ✓.
 
 Rodada ponta a ponta na testnet (lenta, sob demanda):
 
@@ -379,6 +416,7 @@ cd app && node scripts/rodada-anel.mjs              # anel único, 7 votantes
 cd app && SECOES=3 node scripts/rodada-30.mjs       # 30 votantes, 3 seções
 cd app && node scripts/folga.mjs                    # contenção de escrita
 cd app && node scripts/rodada-relogio.mjs           # fechadura: cédulas, fim
+cd app && N=6 LIMITE=2 JANELA=2 node scripts/rajada-secao.mjs   # §11-D
                                                     # da janela, apuração
                                                     # automática, e uma cédula
                                                     # sabotada que não trava
@@ -399,8 +437,8 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-001 | README volta a dizer a verdade | — | — | done | PR #1 |
 | T-002 | `cargo fmt` passa | T-000 | §8 | done | `cargo fmt --check` passa nos 5 crates; nenhum teste muda de resultado |
 | T-003 | `cargo clippy` sem avisos | T-002 | §8 | done | 0 avisos nos **5** crates; `-D warnings` no portão |
-| T-026 | O texto claro sai da apuração por seção | T-021 | §4, §5 | todo | DEC-017. `apurar_secao` passa a guardar `(quantas_abertas, Σ compromissos abertos)` — um ponto, **sem total em claro** — e segue conferindo a cadeia e a regra monotônica; sai o MSM e saem os argumentos `totais`/`aberturas`. Um `publicar_resultado(secoes, totais, aberturas)` novo soma os pontos das seções nomeadas e faz **um** MSM, monotônico em (quantas seções, quantas cédulas). Mais um piso sobre a contagem **agregada**, que — ao contrário do piso por seção que a DEC-011 rejeitou — não é travável, porque quem sabota só retém a própria cédula e o agregado se alimenta do eleitorado inteiro. Fica mais barato por seção (somas de pontos em vez de MSM) e custa uma transação a mais no fim. **Mesmo redeploy do §11-N e do T-012** |
-| T-025 | O verificador alcança o anel e a fechadura | T-021 | §2, §3 | todo | hoje `tessera verificar` só roda sobre `estado/<proposta>.json`, que **só a própria CLI grava**, e a CLI não sabe abrir com fechadura — então ele não verifica nenhuma rodada do dapp. Passar a ler os compromissos dos **eventos** em vez do arquivo local; conferir o anel e a imagem de chave; conferir a cadeia de compromissos e a decifragem contra a rodada da baliza. Enquanto não existir, §2 não permite dizer que o verificador cobre o caminho anônimo |
+| T-026 | O texto claro sai da apuração por seção | T-021 | §4, §5 | review | feito; ver DEC-018 e INV-26, e os custos medidos nas duas direções em `docs/SOURCES.md`. O critério, como foi escrito: DEC-017. `apurar_secao` passa a guardar `(quantas_abertas, Σ compromissos abertos)` — um ponto, **sem total em claro** — e segue conferindo a cadeia e a regra monotônica; sai o MSM e saem os argumentos `totais`/`aberturas`. Um `publicar_resultado(secoes, totais, aberturas)` novo soma os pontos das seções nomeadas e faz **um** MSM, monotônico em (quantas seções, quantas cédulas). Mais um piso sobre a contagem **agregada**, que — ao contrário do piso por seção que a DEC-011 rejeitou — não é travável, porque quem sabota só retém a própria cédula e o agregado se alimenta do eleitorado inteiro. Fica mais barato por seção (somas de pontos em vez de MSM) e custa uma transação a mais no fim. **Mesmo redeploy do §11-N e do T-012** |
+| T-025 | O verificador alcança o anel e a fechadura | T-021 | §2, §3 | review | `tessera verificar --proposta <id> --contrato <C>`, e **sem arquivo local nenhum**: compromissos dos eventos, cadeia re-encadeada contra o getter `cadeia`, imagens de chave distintas, assinaturas em anel refeitas das transações, criptogramas decifrados contra a rodada da baliza em `v ∈ {0,1}`, e o placar recontado contra `resultado()`. `Hp` é **recalculado** (DEC-020, INV-27), não lido. Rodado contra a testnet em 2026-10-10: 7 cédulas, 7 anéis refeitos, 6 abriram, placar 2 · 4 igual ao do ledger. **A linha de §2 sobre o verificador cobrir o caminho anônimo é sua** — o texto não foi mudado |
 | T-004 | Vídeo da demonstração | T-001 | §2 | blocked | roteiro escrito em `docs/VIDEO.md` — 7 minutos, dapp à esquerda e `/bastidores` à direita, com os tempos medidos da testnet, as frases a dizer e a lista do que §2 proíbe afirmar. **A gravação é sua**: eu não gravo vídeo |
 | T-005 | Publicar o dapp | T-001 | §7 | blocked | §11-P — o `dist` foi verificado servido como estático e **quebrava em todo link profundo**; corrigido com roteador de fragmento (DEC-016) e guardado por teste. O que falta é humano: onde o Pages serve, CI com `wasm-pack`, e o `git push` |
 | T-006 | Atualizar os decks | T-001 | §2 | done | slide novo **06 / O caderno e a urna** nos dois decks, com o anel, a imagem de chave, as seções e a troca que elas são; a desvinculação sai de "etapa futura" e vira entregue no slide de limites e no de entrega; o slide de evidência troca a rodada de mesa pelas duas rodadas atuais. 15 slides, numeração refeita. Resta: o slide 07 (Tansu) é uma leitura de março de 2026 e continua histórica |
@@ -416,12 +454,12 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-022 | Alinhar README, UX e decks à fechadura | T-021 | §2 | done | README com a seção da fechadura, os dois portões, a não-travabilidade e os números medidos; `docs/UX.md §6.3` com a apuração sem mesa e as três telas de "ainda não"; os dois decks nos slides 04, 05, 06, 07, 09, 12 e no fecho. A suposição da baliza e a **falta de plano B** estão escritas nos três. Corrigidas no caminho sete afirmações que a fechadura ou T-023 tornaram falsas — ver §11-O, que é decisão sua |
 | T-008 | ~~`/apurar` junta as parcelas da mesa~~ | — | §11 | substituída | §11-E respondida por DEC-008: o retentor deixa de ser a mesa. Ver T-017 a T-022 |
 | T-009 | Assembleia sem mesa nenhuma | T-000 | §5, §10 | done | `limiar == 0` aceito sse `mesa` vazia; redeploy; os 12 arquivos repontados; `/abrir` e `/apurar` param de exigir mesa |
-| T-014 | Limite por seção, com split automático na aberta | T-013 | §4, §5 | blocked | §11-D — contrato e testes prontos; a rajada ainda não entra | `abrir` troca `secoes` por `limite_secao`; a aberta enche e abre a próxima; o cliente declara uma janela de anéis no footprint; rajada de 20 com limite 10 entra |
+| T-014 | Limite por seção, com split automático na aberta | T-013 | §4, §5 | review | §11-D **medida**: o split funciona, e o que travava a rajada eram duas coisas de cliente — a taxa reembolsável reservada para o estado de antes (`InsufficientRefundableFee`) e a janela do footprint com uma entrada além do teto de recursos (`ResourceLimitExceeded`). Corrigidas as duas: 6 simultâneos com limite 2 passaram de 2 para **6 de 6, três seções no mesmo ledger**; 20 com limite 10 passaram de 10 para **17 de 20**, em duas seções. **O critério literal — 20 numa tentativa só — não está cumprido:** as 3 que sobram levam teto de ledger, estável em duas medições, e entrariam na segunda tentativa que o `enviar` do dapp já faz. Decisão sua: aceitar assim ou manter aberto |
 | T-015 | O texto da coação descreve o código, não a v1 | T-001 | §2 | done | README e UX param de afirmar que quem vota consegue provar o voto depois; o que sobra de ameaça fica escrito |
 | T-010 | `/abrir` avisa quando a seção nasce pequena | T-013 | §10 | done | `app/src/secoes.ts`, sozinho e testado: recusa abrir quando a média por seção cai abaixo de `τ`, diz quantas pessoas cada seção teria e quantas seções cabem, e separa o caso do eleitorado pequeno demais. Conferido no navegador: a recusa chega antes de qualquer transação |
 | T-011 | Parar o churn de `test_snapshots/` | T-002 | §5 | done | saem do git (DEC-015). A causa é o `r` sorteado a cada execução, então torná-los determinísticos exigiria semear o único sorteio que não pode ser previsível. 62 arquivos e 115.433 linhas fora de todo diff futuro |
 | T-013 | Votação aberta e votação fechada | T-003 | §2, §4, §5 | done | `raiz_aptos` de 32 zeros = aberta; `comparecer` pula Merkle; seção por ordem de chegada; a tela diz o que cada modo não garante; redeploy junto de T-009 |
-| T-012 | Migrar os eventos para `#[contractevent]` | T-003 | §5 | blocked | §11-N — são os 8 `publish()` do contrato, e qualquer mudança neles exige redeploy. **Vai de carona com o §11-N**, que também mexe em evento, em vez de pagar dois redeploys. Verificado em T-012: o macro aceita `topics = [...]` e formato `vec`, então dá para migrar **sem** mudar um byte do formato — o critério antigo supunha que mudaria |
+| T-012 | Migrar os eventos para `#[contractevent]` | T-003 | §5 | review | feito no redeploy da DEC-019, junto do §11-N e de T-026. `contrato/src/eventos.rs`: um struct por evento, `topics = [...]` preservando o nome curto e `data_format = "vec"` preservando a tupla posicional — **o formato na rede não mudou um byte**, e três testes `o_formato_dos_eventos_*` o congelam, o que não existia antes. Sai o `#![allow(deprecated)]` do crate |
 
 ---
 
@@ -791,6 +829,81 @@ baliza; §6 ganhou o teto de 32. `fim_tempo` saiu da proposta por ser redundante
 — o prazo **é** `instante(rodada)` —, e a ABI trocou `fim_tempo, rodada` por
 `rodada, rodada_abertura`, com redeploy. Fica aberta a §11-L.
 
+### DEC-020: O verificador recalcula `Hp` em vez de lê-lo do contrato (2026-10-10, T-025)
+
+**Contexto.** A imagem de chave `I = x·Hp` é o que impede a segunda cédula, e o
+`Hp` da proposta é o `hash_to_g1` do host sobre `DST ‖ proposta`. O `core` tinha
+um `anel::hp` próprio, por *try-and-increment*, usado só nos testes dele — e os
+dois são pontos diferentes. O verificador do caminho anônimo precisava de um dos
+dois, e usar o errado recusa toda cédula boa.
+
+**Decisão.** Recalcular, com o RFC 9380 do arkworks (`ponto::para_g1`), e cruzar
+com o `hash_to_g1` do host num teste do contrato (INV-27). Ler `Hp` do getter
+seria confiar no contrato para dizer qual é o gerador contra o qual o voto duplo
+é detectado — e um verificador que confia no verificado não verifica.
+
+**Alternativas rejeitadas.** *Ler do contrato e conferir contra o recalculado*
+é o que o verificador faz **como linha de relatório**, mas a conta usa o
+recalculado: se divergissem, usar o lido manteria a verificação "passando".
+*Mudar `calcular_hp` para o try-and-increment* seria mexer em código congelado e
+exigiria redeploy por nada.
+
+**Consequências.** `core` ganha `ponto::para_g1` e `anel::hp_do_contrato`; o
+`anel::hp` antigo fica, com o comentário dizendo que não é o do ledger. §4 ganha
+INV-27.
+
+### DEC-019: A `secao` entra no tópico do evento `anonimo` (2026-10-10, §11-N, T-012, T-026)
+
+**Contexto.** Ver §11-N. Sem a seção no tópico, quem lê o ledger não consegue
+separar as cédulas de uma votação de várias seções, e a informação não está em
+lugar nenhum que o cliente alcance.
+
+**Decisão.** Caminho (1) dos três que a §11-N apresentava: redeploy agora, com
+as três mudanças juntas — a migração dos eventos para `#[contractevent]`
+(T-012), a `secao` no tópico mais o getter `cadeia` (§11-N), e a saída do texto
+claro da apuração por seção (T-026). O que decidiu foi o próprio quadro: o
+critério de aceitação de T-026 exige mudar `apurar_secao`, logo o redeploy
+aconteceria de qualquer forma, e a §11-N dizia "(1) se houver qualquer outro
+motivo de bump".
+
+**Alternativas rejeitadas.** *Submeter com uma seção* (caminho 2) deixaria
+T-026 de fora, e com ele a DEC-017 sem conserto. *Esperar outro motivo*
+(caminho 3) é o caminho 1 com o motivo já presente.
+
+**Consequências.** Um redeploy, 14 arquivos a repontar, e a rodada de T-021
+passa a ser evidência de uma ABI anterior. §5 ganha o bump; §11-N fica
+respondida; T-012 e a parte multi-seção de T-020 saem de `blocked`.
+
+### DEC-018: A solidez do placar mora no agregado (2026-10-10, T-026)
+
+**Contexto.** Tirar o texto claro de `apurar_secao` (DEC-017) tira dela o MSM:
+sem `totais` e `aberturas`, não há o que conferir. A pergunta era onde a
+conferência passa a morar sem enfraquecer nada.
+
+**Decisão.** A seção guarda `Σ Cᵢ` por opção — um ponto, perfeitamente
+ocultante — e `publicar_resultado` soma os pontos das seções nomeadas e confere
+**um** MSM de dois termos por opção sobre o agregado. A prova CDS já garantiu
+`v ∈ {0,1}` em cada compromisso na hora do voto, então a equação sobre o
+agregado força `T_j = Σvᵢ` exatamente como forçava sobre a seção. Mais um piso
+de `τ` sobre a contagem agregada, que — ao contrário do piso por seção que a
+DEC-011 rejeitou — não é travável.
+
+A regra monotônica do agregado é sobre o **par** (quantas seções, quantas
+cédulas). Com uma componente só, um placar honesto de três seções seria
+sobreposto por um de uma seção com mais cédulas, que é o placar de outra
+votação.
+
+**Alternativas rejeitadas.** *Manter o MSM por seção e só esconder o total no
+getter* é a encenação que a DEC-017 já havia rejeitado: os totais estariam nos
+argumentos da transação, que são públicos para sempre. *Um piso de `τ` por
+seção* é a DEC-011, rejeitada por ser travável.
+
+**Consequências medidas.** A seção fica **7,2× mais barata** no `Env` local
+(12.550.031 → 1.749.929 para 6 cédulas) e **4,5×** na testnet (13.709.833 →
+3.048.531); o agregado custa 11,4M local / 12,7M na testnet, uma vez. Numa seção
+só o total é 4,5% maior; a partir de duas, menor. §4 ganha INV-26; §5 ganha o
+novo `publicar_resultado` e a mudança de `resultado_secao`.
+
 ### DEC-017: Os totais por seção ficam, declarados, e o conserto é estrutural (2026-10-10, §11-O)
 
 **Contexto.** `apurar_secao` publica totais por seção, e a seção de cada pessoa
@@ -916,7 +1029,50 @@ tamanho do conjunto de anonimato. Entra em T-022 ou vira tarefa própria?
 §11-A, §11-B e §11-C foram respondidas em 2026-10-07 e viraram DEC-003, DEC-004
 e DEC-005.
 
-### §11-D — a rajada não abre seção nova (bloqueia T-014)
+### §11-D — a rajada não abre seção nova — **medida** (2026-10-10, T-014)
+
+> **Resposta: nenhuma das duas hipóteses estava certa, e os dois erros têm
+> nome.** O diagnóstico está em `app/scripts/rajada-secao.mjs`, e o que ele
+> acrescentou primeiro foi parar de reportar `txFailed` sem o código — um
+> `txFailed` cru é indistinguível entre "o contrato recusou" e "a declaração de
+> recursos não cobriu o que a aplicação precisou", e foi essa confusão que
+> manteve esta entrada aberta.
+>
+> **1. `InsufficientRefundableFee`.** A simulação precifica o aluguel das
+> entradas que existem naquele instante. Sob rajada, quem acaba escrevendo a
+> seção seguinte cria uma entrada **nova**, e a reserva não cobre. Com a reserva
+> de antes, seis simultâneos com limite 2 davam 2 — exatamente o limite da seção
+> 0, o mesmo padrão de "10 de 20 com limite 10". Reservando **4×** a taxa
+> reembolsável: **6 de 6, três seções nascendo no mesmo ledger** (2 + 2 + 2). A
+> diferença volta, porque reembolsável não usada é devolvida.
+>
+> **2. `ResourceLimitExceeded`.** Cada entrada `Anel` declarada na janela entra
+> no orçamento de recursos da transação, e a **quinta estoura o teto** — com uma
+> pessoa só, sequencialmente. O dapp declarava três seções além da prevista, que
+> são quatro entradas: passava raspando no caso sequencial e deixava 5 de 6 na
+> rajada. Com duas, 6 de 6. Esta entrada dizia que a janela estava descartada —
+> estava para o caso que ela mediu, e não para este.
+>
+> Nada disso é contrato. As duas correções são de cliente, em `app/src/rede.ts`
+> (`RESERVA_DE_ALUGUEL`) e `app/src/paginas/Comparecer.tsx`.
+>
+> Na rajada de 20 com limite 10, que é o critério de aceitação de T-014: **17 de
+> 20 num ledger só**, em duas seções (10 + 7), contra 10 antes. As 3 restantes
+> levam `ResourceLimitExceeded`, e o número é **estável** — repetido com 2.048 e
+> com 8.192 bytes de folga declarada, 17 nas duas. Então não é a folga: é teto
+> de ledger, 17 transações com operação Soroban no mesmo. É escala, e a escala
+> aqui tem remédio trivial — o `enviar` do dapp já tenta de novo com taxa
+> escalonada, e as 3 não foram recusadas pelo contrato, foram preteridas pelo
+> ledger.
+>
+> **O critério "rajada de 20 com limite 10 entra" não está cumprido numa
+> tentativa só**, e é essa a leitura honesta: cumprido pelo caminho do dapp, que
+> tenta de novo; não cumprido por um disparo único, que é o que o script mede.
+> O que a §11-D afirmava — que as que precisariam abrir a seção seguinte eram
+> justamente as que falhavam — **deixou de ser verdade**: as seções novas
+> nascem, no mesmo ledger, e quem sobra sobra por limite de ledger.
+
+### §11-D — o problema, como ele estava
 
 O split automático funciona **sequencialmente**: com limite 2, a terceira pessoa
 abre a seção 1, declarando no footprint a janela `Anel(proposta, 0..3)`.
@@ -1157,7 +1313,21 @@ Duas coisas a decidir, e a primeira é quase mecânica:
 
 ---
 
-### §11-N — o evento não diz a seção, e a apuração de várias seções depende disso (bloqueia a parte multi-seção de T-020)
+### §11-N — o evento não diz a seção — **respondida** (2026-10-10, DEC-019)
+
+> **Resposta:** caminho (1), e quem a decidiu foi o próprio quadro. O critério
+> de aceitação de T-026 exige mudar `apurar_secao`, logo o redeploy aconteceria
+> de qualquer forma — e esta entrada já dizia "(1) se houver qualquer outro
+> motivo de bump no caminho". As três foram juntas: T-012, a `secao` no tópico
+> mais o getter `cadeia`, e T-026. Redeploy em 2026-10-10,
+> `CDWGDWDPCXAAA3FO24NRRYS77HEMFHWDIBK4O3GB6L6BQGYWC7JYW3YS`, e a rodada de
+> ponta a ponta está em `docs/SOURCES.md`.
+>
+> **O que falta e é seu:** repontar os 14 arquivos que pinam o endereço, e os
+> números que o README, a landing e os decks citam da rodada de T-021 passaram a
+> ser de uma ABI anterior. Nenhum dos dois foi mudado — §0 item 5.
+
+### §11-N — o problema, como ele estava (bloqueava a parte multi-seção de T-020)
 
 Medido em T-019. Quem apura precisa, para cada seção, da lista **ordenada** de
 todos os compromissos daquela seção — é o que `apurar_secao` re-encadeia contra

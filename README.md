@@ -54,14 +54,15 @@ segunda cédula da mesma pessoa sem revelar quem ela é.
 | | |
 |---|---|
 | Sondas criptográficas medidas na testnet | ✅ 13 sondas |
-| Contrato de urna (`abrir`/`votar`/`apurar`) | ✅ no ar, 30 testes |
+| Contrato de urna (`abrir`/`votar`/`apurar`) | ✅ no ar, 60 testes |
 | Caderno e urna separados (`comparecer`/`votar_anonimo`) | ✅ no ar, rodada de 30 na testnet |
 | Seções (anel por seção, resultado único) | ✅ no ar, 30 em 3 seções |
 | Cliente CLI | ✅ rodada completa na testnet |
-| Verificador público | ✅ no `tessera verificar` |
+| Verificador público, caminho com mesa | ✅ `tessera verificar` |
+| Verificador público, caminho **anônimo** | ✅ `tessera verificar --contrato` · anel, cadeia, imagem de chave e decifragem, sem arquivo local |
 | dapp (React, cripto no navegador) | ✅ roda local, **não publicado** |
 | Fechadura de tempo (apuração **sem mesa**) | ✅ rodada ponta a ponta na testnet |
-| Apuração pelo dapp | ✅ com fechadura, sozinha, numa seção · ⬜ com mesa, só pela CLI |
+| Apuração pelo dapp | ✅ com fechadura, sozinha, em qualquer número de seções · ⬜ com mesa, só pela CLI |
 | Console de demonstração | ✅ visor sobre a saída da CLI |
 
 Todo número abaixo veio de uma invocação real na testnet ou de um teste que roda
@@ -87,7 +88,8 @@ Teto de CPU por transação, achado por bissecção na testnet: **400.000.000**.
 | **caminho de Merkle (profundidade 8)** | **127.863** | **5.235 stroops** |
 | **`votar()` completo, m=2** | **36.812.994** | |
 | **`apurar()`, m=2** | **11.197.414** | |
-| **`apurar_secao()`** (sem mesa) | **11.035.050 + 252.722 por cédula** | |
+| **`apurar_secao()`** (sem mesa, por seção) | **1.233.597 + 252.722 por cédula** | |
+| **`publicar_resultado()`** (o placar, uma vez) | **11.359.274** | |
 | apuração ElGamal (desenho anterior) | 6.712.183 | 11.852 stroops |
 | verificação Groth16 (4 entradas públicas) | 47.371.348 | |
 
@@ -131,7 +133,7 @@ usa 11,8% de uma transação e caberiam 8 numa só. O gargalo de ZK na Stellar n
 | 5 | Buscar o total é viável? | **não** — conferir, nunca procurar |
 | 6 | Groth16 cabe no orçamento? | sim, 11,8% do teto |
 | 7 | O desenho Pedersen fecha, e recusa mesa mentindo? | sim, e é mais barato |
-| 8 | Por quanto tempo o verificador consegue ler o passado? | **7 dias** no RPC |
+| 8 | Por quanto tempo o verificador consegue ler o passado? | **7 dias** no RPC — e, passados eles, a conferência do anel e a da cadeia somem juntas |
 | 9 | O estado arquiva? | **TTL padrão de 7 dias**, teto de 180 |
 | 10 | Quanto custa validar um ponto que chega? | 738.901, ou 1,1% da transação |
 | 11 | `H` é um gerador honesto? | sim, e não é `±k·G` para k em 1..512 |
@@ -190,16 +192,20 @@ caderno.
 **Com mesa, o resultado é único.** O acumulador é por proposta e não sabe de
 que seção veio cada cédula.
 
-**Com fechadura de tempo, os totais são por seção** — e isso é uma troca, não um
-detalhe. A cadeia de compromissos, o anel e a regra que impede travar o placar
-são todos por seção; um total agregado só poderia ser publicado depois que
-todas as seções fossem apuradas, e aí uma seção que ninguém apurasse travaria o
-placar inteiro. Ou totais por seção, ou um placar travável.
+**Com fechadura de tempo, a seção não publica total nenhum.** Ela guarda quantas
+cédulas abriram e a soma dos compromissos abertos — um ponto de Pedersen,
+perfeitamente ocultante. O número de voto existe num lugar só: uma transação a
+mais, sobre o eleitorado inteiro.
 
-A consequência tem de ser dita: **numa seção unânime, qualquer pessoa sabe em
-que cada um dos seus membros votou**, porque a seção de cada pessoa é pública.
-Com uma seção só — que é o que o dimensionamento recomenda até 32 pessoas
-— a brecha é a do resultado unânime global, que todo sistema de votação tem.
+O dilema que isso resolve era real, e por um tempo o projeto o declarou como
+limite em vez de consertá-lo. A cadeia de compromissos, o anel e a regra que
+impede travar o placar são todos por seção; um total agregado parecia exigir que
+todas as seções fossem apuradas antes, e aí uma seção que ninguém apurasse
+travaria o placar inteiro. A saída foi somar **pontos**, não totais: cada seção
+contribui um ponto, o agregado confere o mesmo MSM de dois termos de sempre, e o
+piso de anonimato passou a ser sobre a contagem **agregada** — que não é
+travável, porque quem sabota retém a própria cédula e o agregado se alimenta do
+eleitorado inteiro.
 
 O que se paga, em qualquer caso, é o conjunto de anonimato, que passa a ser a
 seção: seções compram vazão pagando com o tamanho do grupo em que você se
@@ -288,23 +294,27 @@ travar a apuração estragando o próprio criptograma.
 
 ### Medido na testnet
 
-Rodada ponta a ponta em 2026-10-10, proposta `d06750b2…`, **sem mesa em nenhum
-momento**, 5 cédulas e uma sabotada de propósito:
+Rodada ponta a ponta em 2026-10-10, proposta `7021e473…`, **sem mesa em nenhum
+momento**, 7 cédulas e uma sabotada de propósito:
 
 ```
-cédula       320 B de criptograma · 100.684.411 instruções (anel de 5)
+cédula       320 B de criptograma · 123.605.080 instruções (anel de 7)
 urna aberta  apurar recusado · #7  VotacaoAindaAberta
 urna fechada apurar recusado · #35 RelogioAindaNaoAbriu
-rodada venceu, 4 de 5 abriram · placar 2 · 2
-parcial de 2 entrou primeiro e foi sobreposta por quem incluiu as 4
+rodada venceu, 6 de 7 abriram · placar 2 · 4
+parcial de 2 entrou primeiro e foi sobreposta por quem incluiu as 6
 voltar atrás recusado · #37 NaoMelhora
-apurar_secao 13.709.833 instruções
+apurar_secao        3.048.531 instruções · 0,76% do teto
+publicar_resultado 12.702.177 instruções · 3,2% do teto
+agregado que mente recusado · AberturaNaoFecha
 ```
 
 Conferir a assinatura da baliza dentro do contrato custa **24.053.490
-instruções**, 6% do teto. `apurar_secao` custou 11,5% mais on-chain que a
-fórmula medida no `Env` local — a diferença é autorização, evento e estado, que
-o teste local não cobra.
+instruções**, 6% do teto. A apuração por seção ficou **4,5× mais barata** desde
+que o MSM saiu dela: 3,0 M contra os 13,7 M que a mesma chamada custava quando
+publicava totais. O que apareceu foi a transação do placar, 12,7 M, que não
+cresce com as cédulas — então numa seção só o total é parecido, e a partir de
+duas é menor.
 
 ### O que isto custa em confiança, dito inteiro
 
@@ -337,6 +347,34 @@ tessera votar   --proposta contas --opcao rejeitar --identidade marta
 tessera queimar --identidade marta
 tessera apurar  --proposta contas
 tessera verificar --proposta contas
+```
+
+E a rodada **sem mesa**, que não tem arquivo local nenhum para o verificador
+ler — a cédula saiu do navegador, e o identificador da proposta é o que está na
+URL do dapp:
+
+```bash
+tessera verificar --proposta 7021e473…b7793e8 \
+                  --contrato CDWGDWDPCXAAA3FO24NRRYS77HEMFHWDIBK4O3GB6L6BQGYWC7JYW3YS
+```
+
+Ele relê os compromissos dos **eventos**, re-encadeia a cadeia contra o getter
+que diz quantas cédulas deveriam estar lá, confere que as imagens de chave são
+todas distintas, **refaz cada assinatura em anel** a partir dos argumentos da
+transação que depositou a cédula, decifra cada criptograma contra a rodada da
+baliza e confere que cada compromisso abre em `v ∈ {0,1}` — e só então compara
+o placar que recontou com o que está publicado. O `Hp` contra o qual as imagens
+de chave são formadas é **recalculado**, não lido do contrato: ler e usar seria
+confiar no verificado para dizer como se detecta o voto duplo.
+
+```
+Hp da proposta ..... 191e…c727 recalculado do identificador          ✓
+Fechadura .......... rodada 32951126 conferida no pareamento         ✓
+Seção 0 · cadeia ... 7 de 7 cédulas re-encadeiam                     ✓
+Imagem de chave .... 7 distintas em 7 cédulas                        ✓
+Anel ............... 7 assinaturas refeitas do zero                  ✓
+Decifragem ......... 6 de 7 cédulas abriram em v ∈ {0,1}             ✓
+Placar ............. ledger diz 2 · 4 · eu recontei 2 · 4            ✓
 ```
 
 No modo anel a CLI **abre** a votação e não vota nela — o voto em anel é do
@@ -373,7 +411,13 @@ RPC para de servir os eventos *e* o acumulador arquiva. Nada emite erro no
 dia 1. As consequências de desenho estão em
 [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) §5.1 e §8.3 — resumidas:
 
-- o verificador lê dos **arquivos de histórico** por padrão, não do RPC;
+- o verificador do caminho **com mesa** lê dos **arquivos de histórico**, não do RPC;
+  o do caminho **anônimo** lê dos **eventos**, e por isso tem a janela de 7 dias
+  na cara: ele imprime a faixa de ledgers que ainda alcança **antes** de
+  qualquer veredito, e diz quantas assinaturas em anel ficaram fora dela em vez
+  de omitir a linha. Passados os 7 dias, a conferência do anel e a da cadeia
+  somem juntas — o placar continua conferível pelos getters, o caminho até ele
+  não;
 - `abrir()` estende o TTL de `Proposta` e dos acumuladores ao teto da rede
   (**1,73 XLM**, independente do comparecimento), e deixa as entradas `Votou`
   arquivarem;
@@ -418,15 +462,15 @@ RPC sete dias depois de feitas. Depois disso, leia dos arquivos de histórico.
 
 ```bash
 cd bls-smoke   && cargo test --lib -- --nocapture --test-threads=1  # 13 sondas
-cd ../core     && cargo test --lib                                  # 68 testes
-cd ../contrato && cargo test                                        # 30 testes
-cd ../cli      && cargo test                                        # 25 testes
-cd ../app      && for t in scripts/*.test.mjs; do node "$t"; done    # 3 testes
+cd ../core     && cargo test --lib                                  # 81 testes
+cd ../contrato && cargo test                                        # 60 testes
+cd ../cli      && cargo test                                        # 33 testes
+cd ../app      && for t in scripts/*.test.mjs; do node "$t"; done    # 8 testes
 ```
 
 Requer `rustc 1.97.1`, `stellar-cli 25.2.0`, alvo `wasm32v1-none`, Node 22+
 (os testes do app usam a remoção de tipos nativa do Node).
-**Cento e trinta e seis testes em Rust e três em JavaScript**, todos passando,
+**Cento e oitenta e sete testes em Rust e oito em JavaScript**, todos passando,
 sem rede.
 
 O dapp precisa do cliente wasm antes de rodar:
@@ -456,7 +500,7 @@ Contratos na testnet:
 
 | | |
 |---|---|
-| **Tessera (cédula mista)** | `CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH` |
+| **Tessera (cédula mista)** | `CDWGDWDPCXAAA3FO24NRRYS77HEMFHWDIBK4O3GB6L6BQGYWC7JYW3YS` |
 | Tessera v1, cédula de uma pergunta | `CBLUSE2LCPPELS7GIQ5MRYKSW7KTILMWY7VBRFRSWAVG3L7TSRQYHP7H` |
 | sondas 1–13 (cripto, CDS e Merkle) | `CCL4CPAJ4ZVP25FP2PO7T3AMYGIVQZLYJZYZS53UAM5IFA5NFYGLUISR` |
 | sonda 9 (TTL) | `CCCZ4HPW3ESHO6BMNFGXX6DJRSWPWA7FBQH2MS6QGHC3U67DIZ434KFC` |
@@ -551,10 +595,11 @@ sigilo além do que entrega é pior que um honesto.
   conteúdo das cédulas antes da hora; se ela parar, o placar não existe e não há
   alternativa prevista. É a única suposição do projeto que depende de gente, e
   por isso está escrita aqui e não implícita.
-- **Totais por seção, numa votação com fechadura.** Eles são públicos por
-  construção, e a seção de cada pessoa também é. Numa seção unânime, isso revela
-  o voto de todos os seus membros. Com uma seção — o que o dimensionamento
-  recomenda até 32 pessoas — a brecha é a do resultado unânime global.
+- **O placar agregado é público, como em qualquer votação.** Um resultado unânime
+  revela todo mundo, e isso não é consertável em sistema nenhum. O que foi
+  consertado foi o caso menor: a seção não publica mais o seu próprio total, só
+  uma contagem e um ponto, então uma seção unânime não denuncia mais os seus
+  membros.
 - **Mesa que não destrói suas cópias.** O limiar `k`-de-`n` está implementado
   em `core/src/shamir.rs` e protege abaixo de `k` conluios: a mesa soma as
   shares localmente e nenhum `r` individual se junta em lugar algum. Acima de

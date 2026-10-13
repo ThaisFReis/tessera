@@ -531,7 +531,7 @@ cd cli && cargo build --release && cd ..
 ```
 
 ```bash
-export TESSERA_CONTRATO=CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH
+export TESSERA_CONTRATO=CDWGDWDPCXAAA3FO24NRRYS77HEMFHWDIBK4O3GB6L6BQGYWC7JYW3YS
 python3 console/ponte.py
 ```
 
@@ -673,12 +673,12 @@ Nada fora desta tabela deve ser afirmado em quadro.
 
 | | |
 |---|---|
-| Contrato (testnet) | `CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH` |
+| Contrato (testnet) | `CDWGDWDPCXAAA3FO24NRRYS77HEMFHWDIBK4O3GB6L6BQGYWC7JYW3YS` |
 | Wasm otimizado | 22.584 B = **29,2 KB** |
 | Testes | **112** · bls-smoke 13, core 49, contrato 25, cli 25 |
 | `votar`, custo | **9.805.000 + 13.501.500 por opção sigilosa** |
 | 1 pergunta sigilosa, 2 opções | 36.804.670 — **9,2%** do teto |
-| mista: 1 pública + 2 sigilosas | 73.547.797 — **18,4%** |
+| mista: 1 pública + 2 sigilosas | 73.552.104 — **18,4%** |
 | 16 opções sigilosas (o máximo) | 225.920.355 — **56,5%** |
 | cédula pública inteira | 350.372 |
 | Taxa, cédula mista | **0,0242 XLM** |

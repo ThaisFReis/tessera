@@ -19,7 +19,7 @@ export const REDE = {
   horizon: "https://horizon-testnet.stellar.org",
   friendbot: "https://friendbot.stellar.org",
   passphrase: Networks.TESTNET,
-  contrato: "CAZVUPKVXCV6CB2V2LC4OY5FHU3HG5OVIDMSQB4Z7VST36XEZMIDWILH",
+  contrato: "CDWGDWDPCXAAA3FO24NRRYS77HEMFHWDIBK4O3GB6L6BQGYWC7JYW3YS",
   explorer: "https://stellar.expert/explorer/testnet",
 };
 
@@ -59,6 +59,16 @@ const LANCES = 3;
  * diferença no que sai da conta, contra 1 de 15 virando 15 de 15.
  */
 const STROOPS_POR_BYTE = 400n;
+
+/**
+ * Quantas vezes a taxa reembolsável que a simulação calculou.
+ *
+ * Quatro, medido: a simulação precifica o aluguel das entradas que **existem**
+ * naquele instante, e sob rajada quem aplica depois pode ter de criar uma
+ * entrada nova — a seção seguinte. Com ×1, a rajada de seis com limite 2 deixa
+ * 2 entrarem; com ×4, entram 6. Ver §11-D.
+ */
+const RESERVA_DE_ALUGUEL = 4n;
 
 /**
  * Espaço de escrita a declarar além do que a simulação pediu.
@@ -271,15 +281,37 @@ export const lerResultado = async (id: string): Promise<number[] | null> =>
  * sem dizer qual subconjunto é um placar que mente por omissão — e o contrato
  * guarda os dois justamente para que a tela não possa separá-los.
  */
+/**
+ * O que uma seção apurada guarda: **quantas cédulas abriram e um ponto por
+ * opção** — a soma dos compromissos abertos.
+ *
+ * Nenhum total em claro, desde T-026: o ponto é perfeitamente ocultante, e o
+ * número de voto só existe no placar agregado, que `lerResultado` devolve.
+ */
 export const lerResultadoSecao = async (
   id: string,
   secao: number,
-): Promise<{ abriram: number; totais: number[] } | null> => {
+): Promise<{ abriram: number; pontos: string[] } | null> => {
   const r = (await ler("resultado_secao", bytesN(id), u32(secao))) as
-    | [number, number[]]
+    | [Uint8Array, Uint8Array[]]
     | null
     | undefined;
-  return r ? { abriram: r[0], totais: Array.from(r[1]) } : null;
+  return r ? { abriram: Number(r[0]), pontos: (r[1] as Uint8Array[]).map(bytesParaHex) } : null;
+};
+
+/**
+ * A cadeia de uma seção: o encadeamento e **quantas cédulas** ele prendeu.
+ *
+ * É como quem lê os eventos sabe se achou todas. Sem isto, uma leitura
+ * incompleta — janela do RPC, página perdida — levaria `CadeiaNaoFecha`, que é
+ * indistinguível de uma cadeia adulterada.
+ */
+export const lerCadeia = async (
+  id: string,
+  secao: number,
+): Promise<{ elo: string; quantas: number }> => {
+  const r = (await ler("cadeia", bytesN(id), u32(secao))) as [Uint8Array, number] | undefined;
+  return r ? { elo: bytesParaHex(r[0]), quantas: Number(r[1]) } : { elo: "", quantas: 0 };
 };
 
 /** Quantas seções existem agora. Na aberta cresce com o comparecimento. */
@@ -470,11 +502,16 @@ export type CedulaNoLedger = {
  * que `apurar_secao` re-encadeia: ler na ordem errada é recusado com
  * `CadeiaNaoFecha`, não aceito em silêncio.
  *
- * Hoje isto só serve a uma votação de **uma** seção: o tópico do evento tem a
- * proposta e não a seção, então não há como separar as cédulas por seção sem
- * um bump de ABI. Ver §11-N.
+ * A seção vem do **tópico** do evento (§11-N). Sem ela, uma votação de várias
+ * seções era ilegível para quem apura: o criptograma não diz a seção, a
+ * assinatura em anel não diz qual anel assinou, e a cadeia é sequencial — então
+ * separar as cédulas seria testar as partições possíveis.
  */
-export async function cedulasDaSecao(id: string, desdeLedger: number): Promise<CedulaNoLedger[]> {
+export async function cedulasDaSecao(
+  id: string,
+  desdeLedger: number,
+  secao: number,
+): Promise<CedulaNoLedger[]> {
   const todas: CedulaNoLedger[] = [];
   let cursor: string | undefined;
   for (;;) {
@@ -489,6 +526,7 @@ export async function cedulasDaSecao(id: string, desdeLedger: number): Promise<C
     for (const e of r.events) {
       if (scValToNative(e.topic[0]) !== "anonimo") continue;
       if (bytesParaHex(scValToNative(e.topic[1]) as Uint8Array) !== id) continue;
+      if (Number(scValToNative(e.topic[2])) !== secao) continue;
       const v = scValToNative(e.value) as [Uint8Array, Uint8Array[], number[], Uint8Array];
       todas.push({
         imagem: bytesParaHex(v[0]),
@@ -557,11 +595,39 @@ export const apurarSecao = (
       u32(secao),
       vetor(compromissos.map(ponto)),
       vetor(a.abertas.map((b) => xdr.ScVal.scvBool(b))),
-      vetor(a.totais.map(u32)),
-      vetor(a.aberturas.map(escalar)),
     ],
     d,
     `proposta ${id.slice(0, 8)}… · seção ${secao} · ${a.abriram} de ${a.cedulas} cédulas abriram`,
+  );
+
+/**
+ * **O placar da votação.** A única transação em que um número de voto aparece.
+ *
+ * `apurar_secao` guarda uma contagem e um ponto por seção, e nada em claro —
+ * é o conserto da DEC-017, em que o total de uma seção unânime era o voto dos
+ * seus membros. Aqui as seções nomeadas são somadas e um MSM confere o
+ * agregado, sobre o eleitorado inteiro.
+ */
+export const publicarResultado = (
+  c: Carteira,
+  id: string,
+  secoes: number[],
+  totais: number[],
+  aberturas: string[],
+  d?: Diario,
+) =>
+  enviar(
+    c,
+    "publicar_resultado",
+    [
+      bytesN(id),
+      endereco(c.endereco()),
+      vetor(secoes.map(u32)),
+      vetor(totais.map(u32)),
+      vetor(aberturas.map(escalar)),
+    ],
+    d,
+    `proposta ${id.slice(0, 8)}… · ${secoes.length} seção${secoes.length === 1 ? "" : "ões"} · placar ${totais.join(" · ")}`,
   );
 
 // ---------- escrita ----------
@@ -673,8 +739,26 @@ async function uma(
       const novas = extras.filter((k) => !vistas.has(k.toXDR("base64")));
       dados.setReadWrite([...atuais, ...novas]);
     }
+    // **A taxa reembolsável, reservada com sobra** (§11-D, T-014).
+    //
+    // Medido em 2026-10-10: sob rajada, quem acaba escrevendo uma seção que a
+    // simulação não previu paga **aluguel de uma entrada nova**, e a reserva
+    // calculada para o estado de antes não cobre. O erro é
+    // `InsufficientRefundableFee`, e é de onde vinha o padrão "só a primeira
+    // seção encheu" — não de buraco no mecanismo de split. Seis comparecendo de
+    // uma vez com limite 2 passaram de 2 de 6 para **6 de 6**, três seções
+    // nascendo no mesmo ledger.
+    //
+    // A diferença volta: taxa reembolsável reservada e não usada é devolvida,
+    // e é por isso que reservar com folga sai quase de graça.
+    const reembolsavel = BigInt(dados.build().resourceFee().toString());
+    dados.setResourceFee(reembolsavel * RESERVA_DE_ALUGUEL);
     pronta = TransactionBuilder.cloneFrom(pronta, {
-      fee: (BigInt(pronta.fee) + BigInt(folga) * STROOPS_POR_BYTE).toString(),
+      fee: (
+        BigInt(pronta.fee) +
+        reembolsavel * RESERVA_DE_ALUGUEL +
+        BigInt(folga) * STROOPS_POR_BYTE
+      ).toString(),
       sorobanData: dados.build(),
     }).build();
   }

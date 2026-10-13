@@ -123,6 +123,30 @@ pub fn serializar_g2(p: &ark_bls12_381::G2Affine) -> [u8; TAMANHO_G2] {
     saida
 }
 
+/// **`hash_to_g1` conforme o RFC 9380**, com `expand_message_xmd` sobre
+/// SHA-256 — a mesma curva e o mesmo mapa que o host do Soroban usa em
+/// `bls12_381().hash_to_g1(msg, dst)` e que a drand usa para assinar.
+///
+/// Fica aqui, e não em `anel` ou `relogio`, porque três lugares precisavam dela
+/// e uma segunda implementação divergiria em silêncio — que é precisamente o
+/// erro que este módulo existe para fechar.
+pub fn para_g1(msg: &[u8], dst: &[u8]) -> G1Affine {
+    use ark_ec::hashing::curve_maps::wb::WBMap;
+    use ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher;
+    use ark_ec::hashing::HashToCurve;
+    use ark_ff::field_hashers::DefaultFieldHasher;
+    use sha2::Sha256;
+
+    MapToCurveBasedHasher::<
+        ark_ec::short_weierstrass::Projective<ark_bls12_381::g1::Config>,
+        DefaultFieldHasher<Sha256, 128>,
+        WBMap<ark_bls12_381::g1::Config>,
+    >::new(dst)
+    .expect("o DST não é vazio")
+    .hash(msg)
+    .expect("hash-to-curve não falha para mensagem finita")
+}
+
 #[cfg(test)]
 mod testes {
     use super::*;
