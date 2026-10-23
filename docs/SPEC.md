@@ -108,6 +108,7 @@ foi auditado por terceiros.
 | "nem quem organiza escolhe quem se esconde atrás de quem" | INV-08 e DEC-012 — a seção vem da baliza, que não existe quando a votação é aberta |
 | "o piso de `τ` protege o conjunto de anonimato, e abrir cédula por cédula não o afrouxa" | INV-12 e INV-25; `PROTOCOLO §6.6` — o piso é sobre o anel, não sobre quantas cédulas abriram |
 | "não existe segredo durável que possa vazar depois" | INV-23 — a chave é publicada de propósito no instante da rodada; nenhum cliente guarda o `r` |
+| "o dapp está publicado em [thaisfreis.github.io/tessera/dapp](https://thaisfreis.github.io/tessera/dapp/)" | confirmado pelo humano em 2026-10-23; a URL respondeu HTTP 200 nessa data (`docs/SOURCES.md`); DEC-024 |
 
 **Proibido afirmar na votação aberta:** que há voto obrigatório, que existe
 lista de quem faltou, ou que o total significa alguma coisa — qualquer pessoa
@@ -134,8 +135,8 @@ sai antes do fechamento. Também proibido chamar a baliza de "sem confiança" ou
 "trustless", e prometer resultado se a baliza parar: se ela parar, não sai
 resultado, e isso não tem plano B (§7).
 
-**Proibido afirmar:** que o dapp está publicado (não está), que houve auditoria,
-que há garantia contra coação, que **não existe vínculo nenhum fora do ledger**
+**Proibido afirmar:** que houve auditoria, que há garantia contra coação, que
+**não existe vínculo nenhum fora do ledger**
 (o friendbot vê IP e endereço efêmero — DEC-004), ou qualquer número que não
 venha de medição.
 
@@ -433,6 +434,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 
 | ID | Título | Deps | Lê | Estado | Critérios de aceitação |
 |---|---|---|---|---|---|
+| T-031 | README em inglês | T-030 | §2 | review | Pedido em 2026-10-23 ("o readme está em português"), forma escolhida pelo humano: `README.md` em inglês, o texto em português preservado em `README.pt.md`, link cruzado no topo de cada um. Tradução fiel: nenhum número, link, endereço de contrato ou limite muda; nomes de funções, comandos, flags e códigos de erro ficam em português com o significado ao lado; a saída da CLI fica literal, com tradução linha a linha. |
 | T-030 | Dapp em inglês | T-029 | §2, §4, §5 | review | Pedido de traduzir todo o dapp; navegação, formulários, cédula, apuração, bastidores, acessibilidade, metadados e mensagens em inglês; links e ABI preservados. Guarda do diário cobre também termos ingleses. |
 | T-029 | Corrigir e simplificar a landing do dapp | T-020 | §2, §4, §5 | review | Pedido direto de atualização da landing em 2026-10-13; texto alinhado à apuração com fechadura, limites explícitos, layout responsivo e artefato dapp regenerado. Build, testes do app, Rust, fmt, clippy e guardas passam. |
 | T-000 | Spec de trabalho e mudança do protocolo | — | — | done | `docs/SPEC.md` no formato do `CLAUDE.md`; protocolo em `PROTOCOLO.md`; 19 citações no código repontadas; portões passam |
@@ -1040,6 +1042,23 @@ Pedido explícito de trocar o idioma da aplicação. Traduzir a apresentação, 
 
 ---
 
+### DEC-023: README em inglês, português em `README.pt.md` (2026-10-23, T-031)
+
+Contexto: o README, que é a primeira página que a banca e o GitHub mostram, estava só em português, enquanto o dapp (T-030), o deck e os textos de submissão já têm versão em inglês.
+Decisão: `README.md` passa a ser a tradução inglesa; o português atual vai para `README.pt.md`, com link cruzado no topo. Identificadores da ABI e da CLI não são traduzidos (são a interface), e a saída da CLI é citada literalmente com tradução ao lado, para o README não mostrar uma saída que o programa não imprime.
+Alternativas: `README.en.md` ao lado do português (padrão de `SUBMISSAO.en.md`), rejeitada pelo humano porque o GitHub mostra o `README.md`; só inglês, rejeitada para não perder o texto original.
+Consequências: duas versões a manter em paridade — toda mudança de número ou limite vai nas duas. `docs/deck-confere.py` continua lendo números do `README.md`, que tem os mesmos números do português.
+
+---
+
+### DEC-024: §2 permite dizer que o dapp está publicado (2026-10-23, T-031)
+
+Contexto: §11-Q — §2 proibia afirmar que o dapp estava publicado, mas ele está no ar desde `3249fa5` e o README já o dizia.
+Decisão: do humano, em conversa. Sai a proibição; entra na tabela de §2 a afirmação "o dapp está publicado em thaisfreis.github.io/tessera/dapp", com a confirmação do humano e o HTTP 200 conferido em 2026-10-23.
+Consequências: README, README.pt e landing podem dizer que o dapp está no ar. §11-P e T-005 continuam como estavam até o humano decidir.
+
+---
+
 ## §11 Perguntas em aberto
 
 §11-A, §11-B e §11-C foram respondidas em 2026-10-07 e viraram DEC-003, DEC-004
@@ -1481,3 +1500,9 @@ profundo existia desde que o dapp existe, e nenhum portão o pegaria: `npm run
 build` compila, `tsc` passa, e navegando por dentro do app tudo funciona. Ele
 só apareceu porque desta vez o `dist` foi **servido e aberto num link direto**,
 em vez de confiado. Vale manter esse passo na publicação.
+
+### §11-Q — §2 ainda proíbe dizer que o dapp está publicado (achado em T-031) — **respondida** (2026-10-23, DEC-024)
+
+§2 diz: *"Proibido afirmar: que o dapp está publicado (não está)"*, e §11-P diz que o README continua dizendo "não publicado". Mas o README, desde o commit `3249fa5`, diz que o dapp está no ar em `thaisfreis.github.io/tessera/dapp`, e T-031 só traduziu isso. Se o dapp está mesmo publicado, §2 e §11-P precisam ser atualizados, e T-005 fechado; essa mudança é sua (§2 é texto público). Não bloqueia T-031.
+
+**Resposta (2026-10-23):** *"sim, o dapp está publicado, atualiza a §2"*. §2 passou a permitir a afirmação, com a URL como evidência. §11-P e o estado de T-005 não foram mexidos: fechar uma tarefa é só seu.
