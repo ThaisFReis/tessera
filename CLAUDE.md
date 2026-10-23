@@ -84,6 +84,7 @@ Record the question in §11, set the task to `blocked` with a link to that entry
 - One branch and one PR per task, named from the task ID and a short slug: `t-014-retry-queue`. If §9 defines prefixes per milestone, use them.
 - Within a milestone, PRs stack on the previous task's branch.
 - The human reviews at the phase gates listed in §9. If none are listed, every PR is a gate. Only the human sets a task to `done`.
+- Commit messages, PR titles and PR descriptions are written in English, whatever language the code, docs or conversation use.
 - Commit messages start with the task ID. Never commit directly to the default branch, force-push a branch under review, or merge your own PR.
 - If the environment has no remote or PR tooling, leave the work on the branch and put the PR summary in your final message.
 

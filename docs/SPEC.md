@@ -437,6 +437,7 @@ em §11-R. Portão de revisão: todo PR.
 
 | ID | Título | Deps | Lê | Estado | Critérios de aceitação |
 |---|---|---|---|---|---|
+| T-034 | Commits e PRs em inglês | — | §0 | review | Pedido em 2026-10-23: *"agora toda commit, prs.. tem que ser em inglês. Coloque no claude.md"*. A regra entra na seção Git do `CLAUDE.md`, escrita de forma genérica; vale daqui para frente e não reescreve a história (DEC-027) |
 | T-033 | O comando de regenerar `dapp/` apaga o próprio `dapp/README.md` | — | §8 | todo | Achado em T-032. `dapp/README.md` manda rodar `vite build --outDir ../dapp --emptyOutDir`, e o `--emptyOutDir` esvazia o diretório inteiro, README incluído. O comando documentado regenera o `dapp/` sem apagar o README, ou o README sai de dentro de `dapp/`; conferido rodando o comando numa árvore limpa e vendo `git status` |
 | T-032 | Arrumação do repositório | T-031 | §4, §6, §8, §11 | review | Pedido em 2026-10-23 ("estude o repositório e arrume ele"), escopo escolhido pelo humano: (1) branches locais já contidas em `origin/master` apagadas e `master` local avançado, nada no remoto; (2) material do vídeo e dos decks fora do git e no `.gitignore`, junto com os dois conferidores e INV-28/INV-29 (DEC-026), e as duas linhas dos READMEs que apontavam para eles removidas com o texto aprovado; (3) `app/tsconfig.tsbuildinfo` fora do git (DEC-025); (4) registro interno da spec posto em dia — §6, §8, §11-H, §11-L, §11-N, §11-P — sem mudar invariante restante, §2 ou estado de tarefa alheia; (5) pergunta do próximo marco em §11-R. Portões do §8 passam. |
 | T-031 | README em inglês | T-030 | §2 | review | Pedido em 2026-10-23 ("o readme está em português"), forma escolhida pelo humano: `README.md` em inglês, o texto em português preservado em `README.pt.md`, link cruzado no topo de cada um. Tradução fiel: nenhum número, link, endereço de contrato ou limite muda; nomes de funções, comandos, flags e códigos de erro ficam em português com o significado ao lado; a saída da CLI fica literal, com tradução linha a linha. |
@@ -1061,6 +1062,15 @@ Contexto: o humano, em conversa: *"Eu não queria subir nada do video demo e nem
 Decisão: saem do índice e entram no `.gitignore` os roteiros (`docs/VIDEO.md`, `docs/VIDEO-PITCH.md`, `docs/VIDEO-PITCH.en.md`), os decks (`index.html`, `index.en.html`), `docs/SUBMISSAO.en.md`, o áudio do pitch (`docs/*.mp3`) e os dois conferidores (`docs/roteiro-confere.py`, `docs/deck-confere.py`). Os arquivos continuam no disco de quem os produziu. Saem com eles a INV-28 e a INV-29, que só conferiam esse material, e os dois portões do §8. Nos dois READMEs, saem a linha da tabela que apontava para `docs/VIDEO.md` e a linha "Decks:", com o texto aprovado pelo humano.
 Alternativas: tirar só o que ainda não estava no git, rejeitada pelo humano; manter os decks porque o Pages os serve, rejeitada pelo humano.
 Consequências: depois do merge, a raiz de `thaisfreis.github.io/tessera/` deixa de servir os decks; o dapp em `/dapp/` e o console em `/console/` não mudam. A história do git continua tendo os arquivos — tirar do índice não reescreve commits. Um número citado num deck ou numa narração não é mais conferido por portão nenhum; se o material voltar a ser publicado, os conferidores voltam com ele. O fato das etiquetas de áudio em `docs/SOURCES.md` fica, porque o registro de fontes é histórico. `docs/PLANO.md` ainda diz que os decks ficam na raiz: é o plano até a submissão e fica como registro.
+
+---
+
+### DEC-027: Commits e PRs em inglês, com a regra no `CLAUDE.md` (2026-10-23, T-034)
+
+Contexto: pedido do humano: mensagens de commit e PRs passam a ser sempre em inglês, com a regra no `CLAUDE.md`. O `CLAUDE.md` diz que não recebe fatos específicos do projeto.
+Decisão: a regra entra na seção Git do `CLAUDE.md` como convenção de trabalho, sem nada específico deste projeto: commits, títulos e descrições de PR em inglês, qualquer que seja o idioma do código, dos documentos ou da conversa. A pedido explícito do humano, essa mudança vale como exceção registrada à regra de não editar o `CLAUDE.md`.
+Alternativas: pôr a regra no §0 da spec, que é onde ficam as adições específicas do projeto; rejeitada porque o humano pediu o `CLAUDE.md`.
+Consequências: vale daqui para frente. Os commits antigos em português ficam como estão, porque reescrever a história exigiria force-push. A spec e os documentos continuam em português.
 
 ---
 
