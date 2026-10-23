@@ -59,6 +59,7 @@ no teste que as produz, que é o que as mantém verdadeiras. Ver
 | — | Teto de CPU por transação na testnet | 400.000.000 | — | achado por bissecção, `bls-smoke/RESULTADOS.md` |
 | — | Codificação do ponto no infinito em G1 | flag zcash `0x40` no byte alto, zeros no resto — **não** 96 bytes de zero | — | achado somando candidatos ao gerador; travado em `core/src/ponto.rs` |
 | — | Retenção do RPC público e TTL padrão de entrada persistente | 120.960 e 120.959 ledgers — ambos 7 dias | — | sondas 8 e 9, `bls-smoke/RESULTADOS.md` |
+| 2026-10-23 | dapp publicado no GitHub Pages | `https://thaisfreis.github.io/tessera/dapp/` responde HTTP 200, `<title>Tessera</title>` | — | https://thaisfreis.github.io/tessera/dapp/ |
 
 ## Versões fixadas
 
