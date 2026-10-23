@@ -555,14 +555,11 @@ The documents below are in Portuguese, except where noted.
 | [`docs/PLANO.md`](docs/PLANO.md) | schedule up to submission, with gates and pre-decided cuts |
 | [`docs/UX.md`](docs/UX.md) | the UX specification, and why this product's value is an absence |
 | [`docs/UX-CLI.md`](docs/UX-CLI.md) | the exact CLI output, measured in columns |
-| [`docs/VIDEO.md`](docs/VIDEO.md) | the dapp video script, with the measured timings and what §2 forbids saying |
 | [`docs/design-votacao.md`](docs/design-votacao.md) | the dapp design, the backstage view and the journal guard |
 | [`docs/SPEC.md`](docs/SPEC.md) | the working specification: invariants, gates, task board, decisions |
 | [`docs/RELOGIO.md`](docs/RELOGIO.md) | the time lock: the beacon, the three measurements that unlocked it, and what it costs in trust |
 | [`docs/SOURCES.md`](docs/SOURCES.md) | every external fact checked, with dates |
 | [`CLAUDE.md`](CLAUDE.md) | how work is done in this repository (English) |
-
-Decks: [Portuguese](index.html) · [English](index.en.html)
 
 Console: [`console/`](console/) — a viewer over a real round, with the grid of
 indistinguishable commitments that does not fit in a terminal. It is a

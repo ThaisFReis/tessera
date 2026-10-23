@@ -13,3 +13,18 @@ cliente-wasm/pacote-node/
 # depurar, e fora do git para não sujar todo diff com milhares de linhas que
 # ninguém lê e que nada prendem.
 contrato/test_snapshots/
+
+# Material do vídeo e dos decks fica fora do repositório, no disco de quem o
+# produz (DEC-026). Os dois conferidores saem junto, porque conferem só isso.
+index.html
+index.en.html
+docs/VIDEO.md
+docs/VIDEO-PITCH.md
+docs/VIDEO-PITCH.en.md
+docs/SUBMISSAO.en.md
+docs/deck-confere.py
+docs/roteiro-confere.py
+docs/*.mp3
+
+# Cache incremental do `tsc -b`: todo build o reescreve (DEC-025).
+app/tsconfig.tsbuildinfo

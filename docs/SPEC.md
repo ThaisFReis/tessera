@@ -221,8 +221,6 @@ pergunta.
 | INV-14 | O XDR do endereço tem 44 bytes e bate entre CLI e navegador | `cli` `xdr_bate_com_o_que_o_sdk_produz`; `app/scripts/xdr.test.mjs` |
 | INV-15 | O infinito em G1 é a flag zcash, não 96 zeros | `contrato` `o_infinito_do_host_e_a_flag_zcash_nao_zeros` |
 | INV-16 | Tudo o que a tela da demonstração afirma, o código sustenta | `console/guarda.py` — 8 afirmações, 33 conferências contra a fonte |
-| INV-29 | Todo número do deck tem fonte no repositório, os dois idiomas têm o **mesmo** conjunto de números, e nada que a §2 proíba aparece em texto visível ou nota | `docs/deck-confere.py`; com `--rede`, confere também que nenhuma URL prometida responde 404. Nasceu da revisão de 2026-10-13: o deck dizia "sem ninguém de confiança", que a §2 proíbe porque, com fechadura, a baliza **é** uma suposição de confiança |
-| INV-28 | Tudo o que a **narração do vídeo** afirma, o repositório sustenta — e a citação do roteiro é idêntica ao bloco que vai ao sintetizador | `docs/roteiro-confere.py`. Nasceu de três erros reais: um "modo simples" que apuraria sem ninguém abrir nada (impossível — `assembleia_sem_mesa_abre_e_nao_apura`), "sem organizador" quando `abrir` recebe um endereço de governança, e "se a votação não tem prazo" quando toda votação tem prazo (INV-18) e o que varia é a fechadura |
 | INV-17 | As provas são geradas pelo `core` nativo e verificadas no host Wasm a cada `cargo test` | `contrato/src/test.rs` inteiro — não é vetor congelado |
 
 ---
@@ -312,8 +310,12 @@ tabela em [`SOURCES.md`](SOURCES.md)):
 Nenhuma dependência nova: `ark-bls12-381 0.5` com a feature `curve`, que já está
 no `core`, entrega pareamento e *hash-to-curve* em G1 (medido).
 
-Contrato na testnet: `CDWGDWDPCXAAA3FO24NRRYS77HEMFHWDIBK4O3GB6L6BQGYWC7JYW3YS`
-— **substituído no redeploy de T-018.**
+Contrato na testnet: `CDWGDWDPCXAAA3FO24NRRYS77HEMFHWDIBK4O3GB6L6BQGYWC7JYW3YS`,
+o do redeploy de T-012/§11-N/T-026 (2026-10-10, ver §5). É o endereço que
+`app/src/rede.ts`, os scripts de carga e a `cli` usam hoje. A nota que estava
+aqui ("substituído no redeploy de T-018") foi escrita em `0016e72` para o
+`CDJ3VMFK…`; os redeploys seguintes trocaram o endereço e não a nota
+(corrigido em T-032).
 
 `[VERIFY]` em aberto: nenhum.
 
@@ -384,8 +386,6 @@ cd cli         && cargo test
 cd app         && for t in scripts/*.test.mjs; do node "$t"; done
 cd app         && npm run build          # inclui tsc -b
 python3 console/guarda.py
-python3 docs/roteiro-confere.py
-python3 docs/deck-confere.py
 ```
 
 **Linha de base, medida em 2026-10-03 antes de qualquer mudança:**
@@ -399,16 +399,18 @@ python3 docs/deck-confere.py
 | testes do app | ✅ 3 testes |
 | `npm run build` | ✅ |
 | `console/guarda.py` | ✅ |
-| `docs/roteiro-confere.py` | ✅ |
-| `docs/deck-confere.py` | ✅ |
 | `cargo fmt --check` | ✅ nos 5 crates — era falha de base, resolvida em T-002 |
 | `cargo clippy -D warnings` | ✅ nos 5 crates — eram 65 avisos, resolvidos em T-003 |
 
 A linha de base não tem mais falha nenhuma.
 
-**Hoje (2026-10-10, fim de T-012/§11-N/T-025/T-026/T-014):** `core` 81,
-`contrato` 60, `cli` 33, `bls-smoke` 13, app 8 — **195 testes**, `fmt` e
-`clippy -D warnings` limpos nos cinco crates, build ✓, `guarda.py` ✓.
+`docs/roteiro-confere.py` e `docs/deck-confere.py` foram portões de 2026-10-13
+a 2026-10-23 e saíram junto com o material que conferiam (DEC-026).
+
+**Hoje (2026-10-23, medido em T-032):** `core` 81, `contrato` 60, `cli` 33,
+`bls-smoke` 13, app 9 — **196 testes**, `fmt` e `clippy -D warnings` limpos nos
+cinco crates, build ✓, `guarda.py` ✓. O `dapp/` publicado é idêntico, arquivo
+a arquivo, ao `app/dist` que o build de hoje produz.
 
 Rodada ponta a ponta na testnet (lenta, sob demanda):
 
@@ -430,10 +432,13 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 
 ## §9 Marcos e tarefas
 
-**Marco: submissão, 13 out 2026.** Portão de revisão: todo PR.
+**Marco: submissão, 13 out 2026** — vencido; o próximo marco é pergunta aberta
+em §11-R. Portão de revisão: todo PR.
 
 | ID | Título | Deps | Lê | Estado | Critérios de aceitação |
 |---|---|---|---|---|---|
+| T-033 | O comando de regenerar `dapp/` apaga o próprio `dapp/README.md` | — | §8 | todo | Achado em T-032. `dapp/README.md` manda rodar `vite build --outDir ../dapp --emptyOutDir`, e o `--emptyOutDir` esvazia o diretório inteiro, README incluído. O comando documentado regenera o `dapp/` sem apagar o README, ou o README sai de dentro de `dapp/`; conferido rodando o comando numa árvore limpa e vendo `git status` |
+| T-032 | Arrumação do repositório | T-031 | §4, §6, §8, §11 | review | Pedido em 2026-10-23 ("estude o repositório e arrume ele"), escopo escolhido pelo humano: (1) branches locais já contidas em `origin/master` apagadas e `master` local avançado, nada no remoto; (2) material do vídeo e dos decks fora do git e no `.gitignore`, junto com os dois conferidores e INV-28/INV-29 (DEC-026), e as duas linhas dos READMEs que apontavam para eles removidas com o texto aprovado; (3) `app/tsconfig.tsbuildinfo` fora do git (DEC-025); (4) registro interno da spec posto em dia — §6, §8, §11-H, §11-L, §11-N, §11-P — sem mudar invariante restante, §2 ou estado de tarefa alheia; (5) pergunta do próximo marco em §11-R. Portões do §8 passam. |
 | T-031 | README em inglês | T-030 | §2 | review | Pedido em 2026-10-23 ("o readme está em português"), forma escolhida pelo humano: `README.md` em inglês, o texto em português preservado em `README.pt.md`, link cruzado no topo de cada um. Tradução fiel: nenhum número, link, endereço de contrato ou limite muda; nomes de funções, comandos, flags e códigos de erro ficam em português com o significado ao lado; a saída da CLI fica literal, com tradução linha a linha. |
 | T-030 | Dapp em inglês | T-029 | §2, §4, §5 | review | Pedido de traduzir todo o dapp; navegação, formulários, cédula, apuração, bastidores, acessibilidade, metadados e mensagens em inglês; links e ABI preservados. Guarda do diário cobre também termos ingleses. |
 | T-029 | Corrigir e simplificar a landing do dapp | T-020 | §2, §4, §5 | review | Pedido direto de atualização da landing em 2026-10-13; texto alinhado à apuração com fechadura, limites explícitos, layout responsivo e artefato dapp regenerado. Build, testes do app, Rust, fmt, clippy e guardas passam. |
@@ -443,7 +448,7 @@ A `rodada-relogio.mjs` é o portão de aceitação de T-021 e **precisa de rede*
 | T-003 | `cargo clippy` sem avisos | T-002 | §8 | done | 0 avisos nos **5** crates; `-D warnings` no portão |
 | T-026 | O texto claro sai da apuração por seção | T-021 | §4, §5 | review | feito; ver DEC-018 e INV-26, e os custos medidos nas duas direções em `docs/SOURCES.md`. O critério, como foi escrito: DEC-017. `apurar_secao` passa a guardar `(quantas_abertas, Σ compromissos abertos)` — um ponto, **sem total em claro** — e segue conferindo a cadeia e a regra monotônica; sai o MSM e saem os argumentos `totais`/`aberturas`. Um `publicar_resultado(secoes, totais, aberturas)` novo soma os pontos das seções nomeadas e faz **um** MSM, monotônico em (quantas seções, quantas cédulas). Mais um piso sobre a contagem **agregada**, que — ao contrário do piso por seção que a DEC-011 rejeitou — não é travável, porque quem sabota só retém a própria cédula e o agregado se alimenta do eleitorado inteiro. Fica mais barato por seção (somas de pontos em vez de MSM) e custa uma transação a mais no fim. **Mesmo redeploy do §11-N e do T-012** |
 | T-025 | O verificador alcança o anel e a fechadura | T-021 | §2, §3 | review | `tessera verificar --proposta <id> --contrato <C>`, e **sem arquivo local nenhum**: compromissos dos eventos, cadeia re-encadeada contra o getter `cadeia`, imagens de chave distintas, assinaturas em anel refeitas das transações, criptogramas decifrados contra a rodada da baliza em `v ∈ {0,1}`, e o placar recontado contra `resultado()`. `Hp` é **recalculado** (DEC-020, INV-27), não lido. Rodado contra a testnet em 2026-10-10: 7 cédulas, 7 anéis refeitos, 6 abriram, placar 2 · 4 igual ao do ledger. **A linha de §2 sobre o verificador cobrir o caminho anônimo é sua** — o texto não foi mudado |
-| T-004 | Vídeo da demonstração | T-001 | §2 | blocked | roteiro escrito em `docs/VIDEO.md` — 7 minutos, dapp à esquerda e `/bastidores` à direita, com os tempos medidos da testnet, as frases a dizer e a lista do que §2 proíbe afirmar. **A gravação é sua**: eu não gravo vídeo |
+| T-004 | Vídeo da demonstração | T-001 | §2 | blocked | roteiro escrito em `docs/VIDEO.md` — 7 minutos, dapp à esquerda e `/bastidores` à direita, com os tempos medidos da testnet, as frases a dizer e a lista do que §2 proíbe afirmar. **A gravação é sua**: eu não gravo vídeo. Desde T-032 os roteiros não estão mais no git (DEC-026) e ficam só no disco de quem grava |
 | T-005 | Publicar o dapp | T-001 | §7 | blocked | §11-P — o `dist` foi verificado servido como estático e **quebrava em todo link profundo**; corrigido com roteador de fragmento (DEC-016) e guardado por teste. O que falta é humano: onde o Pages serve, CI com `wasm-pack`, e o `git push` |
 | T-006 | Atualizar os decks | T-001 | §2 | done | slide novo **06 / O caderno e a urna** nos dois decks, com o anel, a imagem de chave, as seções e a troca que elas são; a desvinculação sai de "etapa futura" e vira entregue no slide de limites e no de entrega; o slide de evidência troca a rodada de mesa pelas duas rodadas atuais. 15 slides, numeração refeita. Resta: o slide 07 (Tansu) é uma leitura de março de 2026 e continua histórica |
 | T-007 | "O modo" em `/abrir` | T-001 | §4 | done | a tela ganha os portões que faltavam — teto de opções, mesa com endereço repetido, janela de duração zero — e passa a **oferecer a fechadura de tempo**, que era o único modo do contrato sem caminho na interface. O custo da baliza e a falta de plano B aparecem ao lado da opção |
@@ -1010,24 +1015,6 @@ teste nativo só usa o caminho feliz delas — e isso está escrito em comentár
 
 ---
 
-### §11-L — vazão contra conjunto de anonimato, e a landing fala de um só
-
-`secoes_para(30)` devolve **uma** seção, porque o alvo é 20 por seção e 30 cabe
-num anel. Mas `rodada-30.mjs` usa três de propósito: três seções deixam três
-cédulas entrarem por ledger, uma deixa uma. Os dois objetivos são opostos —
-menos seções dá conjunto de anonimato maior e `τ` folgado, mais seções dá vazão.
-
-A regra que escrevi otimiza o anonimato, que é o que uma votação real quer. A
-demonstração desvia dela para mostrar escala, e com média 10 carrega os 3,5% de
-risco medidos.
-
-Hoje a landing cita "30 votantes em 3 seções" como prova de escala **sem dizer**
-que a configuração recomendada para 30 pessoas é outra. Isso precisa aparecer nos
-dois lugares, e é §2: a frase que falta é que seções compram vazão pagando com
-tamanho do conjunto de anonimato. Entra em T-022 ou vira tarefa própria?
-
----
-
 ### DEC-021: Landing concisa, com limites por modo (2026-10-13, T-029)
 
 Contexto: pedido explícito de corrigir e atualizar a landing, podendo simplificá-la. A página ainda negava apuração sem mesa e trazia custos anteriores à fechadura.
@@ -1056,6 +1043,24 @@ Consequências: duas versões a manter em paridade — toda mudança de número 
 Contexto: §11-Q — §2 proibia afirmar que o dapp estava publicado, mas ele está no ar desde `3249fa5` e o README já o dizia.
 Decisão: do humano, em conversa. Sai a proibição; entra na tabela de §2 a afirmação "o dapp está publicado em thaisfreis.github.io/tessera/dapp", com a confirmação do humano e o HTTP 200 conferido em 2026-10-23.
 Consequências: README, README.pt e landing podem dizer que o dapp está no ar. §11-P e T-005 continuam como estavam até o humano decidir.
+
+---
+
+### DEC-025: `app/tsconfig.tsbuildinfo` sai do git (2026-10-23, T-032)
+
+Contexto: o arquivo é o cache incremental do `tsc -b`, e todo `npm run build` — que é portão do §8 — o reescreve. Rodar os portões numa árvore limpa deixava a árvore suja.
+Decisão: sai do índice e entra no `.gitignore`. O `tsc -b` o recria na primeira execução.
+Alternativas: manter rastreado e restaurar depois de cada build, rejeitada porque é passo manual que alguém esquece; tirar o `-b` do script, rejeitada porque muda o build por um problema de higiene.
+Consequências: o build a partir de checkout limpo é igual ao de antes, só sem o cache. Mesmo raciocínio da DEC-015.
+
+---
+
+### DEC-026: Vídeo e decks saem do repositório, e os dois conferidores com eles (2026-10-23, T-032)
+
+Contexto: o humano, em conversa: *"Eu não queria subir nada do video demo e nem do deck. Vamos manter no gitignore"*, e, perguntado sobre o alcance, escolheu tirar tudo do repositório, inclusive o que já estava publicado.
+Decisão: saem do índice e entram no `.gitignore` os roteiros (`docs/VIDEO.md`, `docs/VIDEO-PITCH.md`, `docs/VIDEO-PITCH.en.md`), os decks (`index.html`, `index.en.html`), `docs/SUBMISSAO.en.md`, o áudio do pitch (`docs/*.mp3`) e os dois conferidores (`docs/roteiro-confere.py`, `docs/deck-confere.py`). Os arquivos continuam no disco de quem os produziu. Saem com eles a INV-28 e a INV-29, que só conferiam esse material, e os dois portões do §8. Nos dois READMEs, saem a linha da tabela que apontava para `docs/VIDEO.md` e a linha "Decks:", com o texto aprovado pelo humano.
+Alternativas: tirar só o que ainda não estava no git, rejeitada pelo humano; manter os decks porque o Pages os serve, rejeitada pelo humano.
+Consequências: depois do merge, a raiz de `thaisfreis.github.io/tessera/` deixa de servir os decks; o dapp em `/dapp/` e o console em `/console/` não mudam. A história do git continua tendo os arquivos — tirar do índice não reescreve commits. Um número citado num deck ou numa narração não é mais conferido por portão nenhum; se o material voltar a ser publicado, os conferidores voltam com ele. O fato das etiquetas de áudio em `docs/SOURCES.md` fica, porque o registro de fontes é histórico. `docs/PLANO.md` ainda diz que os decks ficam na raiz: é o plano até a submissão e fica como registro.
 
 ---
 
@@ -1208,18 +1213,9 @@ deck afirmando a peça medida em vez de prometer o placar automático.
 ### §11-H — o `τ` perde a razão original — **respondida** (2026-10-07)
 
 Resposta do humano: *"o τ protege"*. Virou DEC-011, e ela mudou um critério de
-aceitação de T-018 — não era só redação.
+aceitação de T-018 — não era só redação. O registro original segue.
 
-### §11-G — interoperar com o `tlock` publicado? (não bloqueia)
-
-O formato de criptograma de §5 é nosso, com DSTs nossos, e isso basta para o
-desenho: quem decifra é o nosso cliente, e a assinatura da baliza se autovalida
-(INV-24). Casar byte a byte com o formato das implementações publicadas do
-`tlock` deixaria qualquer ferramenta de terceiro abrir as cédulas depois do
-fechamento, o que fortalece "qualquer pessoa apura" — e exige conferir os hashes
-delas contra a fonte, trabalho que não medi. Vale depois da submissão?
-
-### §11-H — o `τ` perde a razão original (não bloqueia o código)
+#### registro original
 
 O `τ` existia para que um total agregado não determinasse o voto de uma pessoa
 quando pouca gente votou em sigilo (INV-12, `PROTOCOLO §6.6`). Com a apuração por
@@ -1232,6 +1228,15 @@ e só recusa votações minúsculas. O que não fiz, por ser enfraquecer uma pro
 declarada: reescrever o enunciado da INV-12 e o texto do `PROTOCOLO §6.6`. A
 pergunta é se o `τ` passa a ser enunciado como piso do **conjunto de anonimato**
 — que é o que ele de fato protege agora — ou se sai.
+
+### §11-G — interoperar com o `tlock` publicado? (não bloqueia)
+
+O formato de criptograma de §5 é nosso, com DSTs nossos, e isso basta para o
+desenho: quem decifra é o nosso cliente, e a assinatura da baliza se autovalida
+(INV-24). Casar byte a byte com o formato das implementações publicadas do
+`tlock` deixaria qualquer ferramenta de terceiro abrir as cédulas depois do
+fechamento, o que fortalece "qualquer pessoa apura" — e exige conferir os hashes
+delas contra a fonte, trabalho que não medi. Vale depois da submissão?
 
 ### §11-I — a T-023 precisa da rodada de **abertura**, e a ABI só carrega a de fechamento
 
@@ -1310,6 +1315,25 @@ ver se 36 cabe.
 
 Eu começaria medindo — é um teste e responde sozinho.
 
+### §11-L — vazão contra conjunto de anonimato, e a landing fala de um só
+
+*(Estava no meio do §10, entre a DEC-014 e a DEC-021; movida para cá em T-032
+sem mudar o texto.)*
+
+`secoes_para(30)` devolve **uma** seção, porque o alvo é 20 por seção e 30 cabe
+num anel. Mas `rodada-30.mjs` usa três de propósito: três seções deixam três
+cédulas entrarem por ledger, uma deixa uma. Os dois objetivos são opostos —
+menos seções dá conjunto de anonimato maior e `τ` folgado, mais seções dá vazão.
+
+A regra que escrevi otimiza o anonimato, que é o que uma votação real quer. A
+demonstração desvia dela para mostrar escala, e com média 10 carrega os 3,5% de
+risco medidos.
+
+Hoje a landing cita "30 votantes em 3 seções" como prova de escala **sem dizer**
+que a configuração recomendada para 30 pessoas é outra. Isso precisa aparecer nos
+dois lugares, e é §2: a frase que falta é que seções compram vazão pagando com
+tamanho do conjunto de anonimato. Entra em T-022 ou vira tarefa própria?
+
 ### §11-M — o "30/30 · zero recusas" do README é condicional — **resolvido no número** (2026-10-09)
 
 Refeito com `RETENTATIVAS=12`: **30 de 30 aceitas, zero recusadas**, em 10
@@ -1361,6 +1385,14 @@ Duas coisas a decidir, e a primeira é quase mecânica:
 > **O que falta e é seu:** repontar os 14 arquivos que pinam o endereço, e os
 > números que o README, a landing e os decks citam da rodada de T-021 passaram a
 > ser de uma ABI anterior. Nenhum dos dois foi mudado — §0 item 5.
+>
+> **Conferido em 2026-10-23 (T-032):** o repontamento está feito. `CDWG…` é o
+> único endereço de contrato em `app/src/rede.ts`, nos scripts de carga, no
+> `dapp/` publicado e nos READMEs. Os outros endereços que ainda aparecem no
+> repositório são registro de rodadas antigas (`bls-smoke/RESULTADOS.md`,
+> `docs/PROTOCOLO.md`, `console/exemplo/`) ou vetor de teste
+> (`cli/src/chave.rs`). Se os números da rodada de T-021 no README foram
+> refeitos, não conferi.
 
 ### §11-N — o problema, como ele estava (bloqueava a parte multi-seção de T-020)
 
@@ -1473,6 +1505,11 @@ muda com ela.
 
 ### §11-P — publicar o dapp precisa de três decisões suas (bloqueia T-005)
 
+> **Superada pelos fatos (anotado em 2026-10-23, T-032):** o dapp está no ar em
+> `thaisfreis.github.io/tessera/dapp/` (DEC-024), servido de `dapp/` na raiz,
+> que foi a resposta ao item 1 e ao item 2 (o `dist` commitado). Fechar esta
+> entrada e a T-005 é seu.
+
 O código está pronto e verificado: o `dist` serve como arquivo estático, as
 rotas sobrevivem a um link compartilhado desde a DEC-016, e o teste
 `rotas.test.mjs` impede a regressão. O que falta não é código.
@@ -1506,3 +1543,16 @@ em vez de confiado. Vale manter esse passo na publicação.
 §2 diz: *"Proibido afirmar: que o dapp está publicado (não está)"*, e §11-P diz que o README continua dizendo "não publicado". Mas o README, desde o commit `3249fa5`, diz que o dapp está no ar em `thaisfreis.github.io/tessera/dapp`, e T-031 só traduziu isso. Se o dapp está mesmo publicado, §2 e §11-P precisam ser atualizados, e T-005 fechado; essa mudança é sua (§2 é texto público). Não bloqueia T-031.
 
 **Resposta (2026-10-23):** *"sim, o dapp está publicado, atualiza a §2"*. §2 passou a permitir a afirmação, com a URL como evidência. §11-P e o estado de T-005 não foram mexidos: fechar uma tarefa é só seu.
+
+### §11-R — qual é o próximo marco? (aberta em 2026-10-23, T-032; não bloqueia tarefa)
+
+O marco do §1 e do §9 é a submissão do Find Your Way, com prazo em 13 out 2026,
+que já passou. O §1 ainda descreve sucesso nos termos da submissão ("mais o que
+a submissão exige — vídeo e repositório público legível"), e desde a DEC-026 o
+vídeo nem está no repositório. Sem marco novo, não há critério para ordenar o
+quadro: o que sobra em `review` e `blocked` é decisão de fechamento sua (T-004,
+T-005, T-012, T-014, T-025, T-026, T-029, T-030, T-031, T-032), e as perguntas
+que diziam "depois da submissão" (§11-G) ficam sem dono.
+
+O que eu preciso: o nome do próximo marco, o que é sucesso nele e o que fica de
+fora. Não escrevo isso sozinho — é escopo e §1.

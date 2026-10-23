@@ -523,14 +523,11 @@ decimal errado.
 | [`docs/PLANO.md`](docs/PLANO.md) | cronograma até a submissão, com portões e cortes pré-decididos |
 | [`docs/UX.md`](docs/UX.md) | a especificação de UX, e por que o valor deste produto é uma ausência |
 | [`docs/UX-CLI.md`](docs/UX-CLI.md) | a saída exata da CLI, medida em colunas |
-| [`docs/VIDEO.md`](docs/VIDEO.md) | o roteiro do vídeo do dapp, com os tempos medidos e o que §2 proíbe dizer |
 | [`docs/design-votacao.md`](docs/design-votacao.md) | o desenho do dapp, os bastidores e o guarda do diário |
 | [`docs/SPEC.md`](docs/SPEC.md) | a especificação de trabalho: invariantes, portões, quadro de tarefas, decisões |
 | [`docs/RELOGIO.md`](docs/RELOGIO.md) | a fechadura de tempo: a baliza, as três medições que a destravaram, e o que ela custa em confiança |
 | [`docs/SOURCES.md`](docs/SOURCES.md) | todo fato externo conferido, com data |
 | [`CLAUDE.md`](CLAUDE.md) | como se trabalha neste repositório |
-
-Decks: [português](index.html) · [inglês](index.en.html)
 
 Console: [`console/`](console/) — visor sobre uma rodada real, com a grade de
 compromissos indistinguíveis que não cabe num terminal. É um **visor**, não um
