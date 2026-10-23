@@ -3,7 +3,7 @@
 **English** · [Português](README.pt.md)
 
 **Secret ballot for any governance, on Stellar.**
-Find Your Way hackathon (Meridian) · General track
+Find Your Way hackathon (Meridian) · General track · [pitch video](https://youtu.be/HFIg5_DhOMQ)
 
 Tessera is a voting module for Soroban contracts. It is not a governance app or
 a DAO: it is a contract that any existing governance can call to run a vote in
